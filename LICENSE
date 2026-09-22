@@ -2,11 +2,6 @@ MIT License
 
 Copyright (c) 2026 dsh-flash-presets contributors
 
-The preset composition files under `presets/` are derived from the agent presets
-shipped with DeepSeek Harness (package `@deepseek-ai/dsh-agent-presets`,
-MIT License, Copyright (c) 2026 DeepSeek). Only the rows listed in the README are
-modified; the remaining composition is retained as shipped.
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -24,3 +19,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-party notice
+
+The preset composition files under `presets/` are derived from the agent presets
+shipped with DeepSeek Harness (package `@deepseek-ai/dsh-agent-presets`, MIT License,
+Copyright (c) 2026 DeepSeek). Only the rows documented in the README are modified;
+the remaining composition is retained as shipped.
