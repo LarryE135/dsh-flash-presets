@@ -188,8 +188,12 @@ git push origin v1.0.0        # 密码位填 Personal Access Token
 
 ## 许可
 
-MIT，见 [LICENSE](LICENSE)。`presets/` 下的组合文件派生自 DSH 自带的 agent 预设
-（`@deepseek-ai/dsh-agent-presets`，MIT，© 2026 DeepSeek）：除上表列出的 4 处外，其余组合按原样保留。
+MIT，见 [LICENSE](LICENSE)。
+
+**第三方来源声明**：`presets/` 下的组合文件派生自 DeepSeek Harness 自带的 agent 预设
+（`@deepseek-ai/dsh-agent-presets`，MIT License，Copyright (c) 2026 DeepSeek）。
+除 README 上表列出的 4 处（persona、`compaction-basic`、`tool-workflow`/`tool-ralph`、PTC 版另加 `tool-presentation`）之外，
+其余组合与外层文件头注释按原样保留。
 
 ---
 
