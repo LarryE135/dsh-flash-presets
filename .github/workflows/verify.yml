@@ -1,0 +1,26 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install presets into a throwaway DSH home
+        run: DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh
+
+      - name: Structural check (no dependencies)
+        run: DSH_HOME="$RUNNER_TEMP/dsh" node scripts/verify-presets.mjs
+
+      - name: YAML parse + value assertions
+        run: |
+          npm install --no-save --silent js-yaml@4
+          node scripts/verify-yaml.mjs

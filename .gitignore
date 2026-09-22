@@ -1,0 +1,15 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+
+# Local overrides / secrets (never commit)
+settings.yaml
+*.local.yaml
+.credentials.yaml
+*.bak-*
+*.bak
+
+# Build output / release artifacts
+dist/
+node_modules/

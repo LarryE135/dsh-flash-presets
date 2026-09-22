@@ -1,0 +1,3 @@
+name: Flash 精简·PTC（v4.1-flash）
+description: PTC 模式：工具经 run_code 编程式调用（多步合成一个程序、减少来回），压缩与约束同「Flash 精简」。适用：用脚本批量调用工具的任务。
+order: 22
