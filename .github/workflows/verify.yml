@@ -7,20 +7,34 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install presets into a throwaway DSH home
+      # Install with the script a user of that OS would actually run, so a
+      # bash-only or PowerShell-only installer cannot slip through unnoticed.
+      - name: Install presets (bash)
+        if: runner.os != 'Windows'
         run: DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh
 
-      - name: Structural check (no dependencies)
+      - name: Install presets (PowerShell)
+        if: runner.os == 'Windows'
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome "$env:RUNNER_TEMP/dsh"
+
+      - name: Structural + cross-platform check (no dependencies)
+        shell: bash
         run: DSH_HOME="$RUNNER_TEMP/dsh" node scripts/verify-presets.mjs
 
       - name: YAML parse + value assertions
+        shell: bash
         run: |
           npm install --no-save --silent js-yaml@4
           node scripts/verify-yaml.mjs

@@ -1,0 +1,14 @@
+# Normalize to LF inside the repository, and check out shell/node sources as LF on every OS.
+# Without this, a Windows clone with core.autocrlf=true turns install.sh into CRLF and
+# bash then fails with: bad interpreter: /usr/bin/env bash^M
+* text=auto eol=lf
+*.sh    text eol=lf
+*.mjs   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.png   binary
+*.zip   binary

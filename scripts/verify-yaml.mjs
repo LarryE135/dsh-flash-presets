@@ -1,37 +1,96 @@
 #!/usr/bin/env node
 /**
  * Parse both preset files with js-yaml and assert the tuned values.
- * js-yaml is resolved from, in order: local node_modules, the DSH installation,
- * DSH_JS_YAML. If none is found the script prints SKIP and exits 0.
+ * Cross-platform (Windows / macOS / Linux): the script directory is resolved with
+ * fileURLToPath — `new URL(import.meta.url).pathname` yields `/D:/...` on Windows and
+ * would send readFileSync to `D:\D:\...` (ENOENT).
+ *
+ * js-yaml is looked up in this order:
+ *   1. $DSH_JS_YAML
+ *   2. this repo's node_modules / any ancestor node_modules   (`npm i --no-save js-yaml@4`)
+ *   3. next to a globally installed DSH (POSIX and Windows layouts)
+ *   4. `npm root -g`
+ * If nothing is found the script prints SKIP and exits 0.
  *
  *   node scripts/verify-yaml.mjs
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const repo = path.join(here, '..');
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, '..');
 const require = createRequire(import.meta.url);
 
 function loadYaml() {
-  const candidates = [
-    process.env.DSH_JS_YAML,
-    '/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/js-yaml',
-    '/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/js-yaml',
-  ].filter(Boolean);
-  for (const c of candidates) {
-    try { return require(c); } catch { /* keep looking */ }
+  const tryRequire = spec => {
+    try {
+      return { mod: require(spec), from: spec };
+    } catch {
+      return null;
+    }
+  };
+
+  if (process.env.DSH_JS_YAML) {
+    const hit = tryRequire(process.env.DSH_JS_YAML);
+    if (hit) return hit;
+    console.log('DSH_JS_YAML 指向的 js-yaml 无法加载，继续按默认顺序查找：' + process.env.DSH_JS_YAML);
   }
-  try { return require('js-yaml'); } catch { /* fall through to skip */ }
+
+  // 2) repo-local / ancestor node_modules (works on every OS)
+  const local = tryRequire('js-yaml');
+  if (local) return local;
+
+  // 3) beside a global DSH installation
+  const globalRoots = [
+    '/usr/lib/node_modules',
+    '/usr/local/lib/node_modules',
+    '/opt/homebrew/lib/node_modules',
+    path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'npm', 'node_modules'),
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node_modules'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules'),
+  ];
+  for (const root of globalRoots) {
+    for (const rel of ['js-yaml', path.join('@deepseek-ai', 'dsh', 'node_modules', 'js-yaml')]) {
+      const candidate = path.join(root, rel);
+      if (!fs.existsSync(candidate)) continue;
+      const hit = tryRequire(candidate);
+      if (hit) return hit;
+    }
+  }
+
+  // 4) ask npm where the global root is (prefixes vary per OS and per install method)
+  try {
+    const cmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const r = spawnSync(cmd, ['root', '-g'], { encoding: 'utf8', timeout: 15000 });
+    const out = (r.stdout || '').trim();
+    if (out) {
+      for (const rel of ['js-yaml', path.join('@deepseek-ai', 'dsh', 'node_modules', 'js-yaml')]) {
+        const candidate = path.join(out, rel);
+        if (!fs.existsSync(candidate)) continue;
+        const hit = tryRequire(candidate);
+        if (hit) return hit;
+      }
+    }
+  } catch { /* fall through to skip */ }
+
   return null;
 }
 
-const yaml = loadYaml();
-if (yaml === null) {
-  console.log('SKIP: js-yaml 不可用（CI 里用 `npm i --no-save js-yaml` 安装；本地可 export DSH_JS_YAML=<path>）');
+const loaded = loadYaml();
+if (loaded === null) {
+  console.log('SKIP: js-yaml 不可用。装法（任选）：');
+  console.log('  - 本仓库内安装：npm install --no-save js-yaml@4');
+  console.log(process.platform === 'win32'
+    ? '  - 或指向已有的副本：$env:DSH_JS_YAML = "C:\\path\\to\\js-yaml"'
+    : '  - 或指向已有的副本：export DSH_JS_YAML=/path/to/js-yaml');
   process.exit(0);
 }
+const yaml = loaded.mod;
+console.log('js-yaml 来自: ' + loaded.from);
 
 const Schema = yaml.DEFAULT_SCHEMA.extend({
   explicit: [new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', resolve: () => true, construct: d => String(d) })],
@@ -54,6 +113,8 @@ const rows = doc => {
 for (const name of ['flash-lean', 'flash-lean-ptc']) {
   console.log('\n[' + name + ']');
   const file = path.join(repo, 'presets', name, 'agent.cordis.yml');
+  check(fs.existsSync(file), '找到 ' + path.relative(repo, file).split(path.sep).join('/'));
+  if (!fs.existsSync(file)) continue;
   const doc = yaml.load(fs.readFileSync(file, 'utf8'), { schema: Schema });
   const list = rows(doc);
   // Row ids are prefixed by their group in the composed tree (e.g. `delegation/tool-ralph`),

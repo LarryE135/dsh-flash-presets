@@ -22,20 +22,43 @@
 ```bash
 git clone https://github.com/LarryE135/dsh-flash-presets-.git
 cd dsh-flash-presets
-bash scripts/install.sh                 # 安装到 ~/.dsh/.agent-presets/
-# 自定义 DSH 目录：DSH_HOME=/path/to/.dsh bash scripts/install.sh
 ```
 
-`install.sh` 会把 `presets/<name>/`（`preset.yml` + `agent.cordis.yml`）复制到 `$DSH_HOME/.agent-presets/<name>/`；
-若目标已存在同名预设，会先备份为 `<name>.bak-<时间戳>`，可重复执行。
+**Linux / macOS / WSL / Git Bash**
+
+```bash
+bash scripts/install.sh                      # 安装到 ~/.dsh/.agent-presets/
+DSH_HOME=/path/to/.dsh bash scripts/install.sh   # 自定义 DSH 主目录
+```
+
+**Windows（PowerShell 5.1+ 或 PowerShell 7）**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+.\scripts\install.ps1 -DshHome D:\tmp\.dsh      # 自定义 DSH 主目录
+```
+
+两个安装器行为一致：把 `presets/<name>/`（`preset.yml` + `agent.cordis.yml`）复制到
+`<DSH_HOME>/.agent-presets/<name>/`；若目标已存在同名预设，先备份为 `<name>.bak-<时间戳>`，可重复执行。
+`install.sh` 需要 bash（WSL / Git Bash / macOS / Linux 均可）；原生 Windows 请用 `install.ps1`。
 
 ### 校验
 
 ```bash
-node scripts/verify-presets.mjs          # 无依赖，24 项结构检查
-npm install --no-save js-yaml@4
+npm install --no-save js-yaml@4          # verify-yaml 需要；verify-presets 无依赖
+node scripts/verify-presets.mjs          # 结构 + 跨平台回归检查
 node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言
 ```
+
+Windows 上若 `DSH_HOME` 不是默认值（默认 `%USERPROFILE%\.dsh`）：
+
+```powershell
+$env:DSH_HOME = "$env:USERPROFILE\.dsh"
+node scripts\verify-presets.mjs
+```
+
+两个脚本都是纯 Node（无第三方依赖，`verify-yaml` 需要 `js-yaml`），在 Windows / macOS / Linux 上行为一致；
+`js-yaml` 会自动从仓库 `node_modules`、全局 DSH 安装位置或 `npm root -g` 中查找，也可以用 `DSH_JS_YAML` 直接指定。
 
 随后重启 DSH（或刷新 GUI），预设列表里会出现「Flash 精简」和「Flash 精简·PTC」。
 
@@ -121,6 +144,21 @@ node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言
 
 ---
 
+## 跨平台支持
+
+| 动作 | Linux / macOS / WSL / Git Bash | 原生 Windows |
+|---|---|---|
+| 安装 | `bash scripts/install.sh` | `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1` |
+| 结构校验 | `node scripts/verify-presets.mjs` | 同左（PowerShell 里用 `node scripts\verify-presets.mjs`） |
+| YAML 校验 | `npm i --no-save js-yaml@4 && node scripts/verify-yaml.mjs` | 同左 |
+| 推送 | `bash scripts/publish.sh` | `powershell ... -File scripts\publish.ps1` |
+| DSH 主目录 | `$DSH_HOME` 或 `~/.dsh` | `$env:DSH_HOME` 或 `%USERPROFILE%\.dsh` |
+
+CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑一遍
+「安装 → 两套校验」，所以任何"只在某个系统上坏"的问题会在 PR 阶段暴露。
+`scripts/verify-presets.mjs` 另外带一组**回归守卫**：禁止 `import.meta.url).pathname`
+（Windows 上会得到 `/D:/…`）、要求两种安装器都在、要求 `.gitattributes` 把 `*.sh` 钉为 LF。
+
 ## 兼容性
 
 - 在 **DSH 0.1.5-rc.2** 上实测；预设文件是从该版本的 `standard` / `ptc` 预设整份复制的，行 id 与插件名必须与目标部署一致。
@@ -148,15 +186,26 @@ dsh-flash-presets/
 │   ├── flash-lean/{preset.yml,agent.cordis.yml}
 │   └── flash-lean-ptc/{preset.yml,agent.cordis.yml}
 ├── scripts/
-│   ├── install.sh            # 安装到 $DSH_HOME/.agent-presets/
-│   ├── verify-presets.mjs    # 结构检查（无依赖）
-│   └── verify-yaml.mjs       # YAML 解析 + 取值断言
-├── .github/workflows/verify.yml
+│   ├── install.sh / install.ps1    # 安装（bash / PowerShell，行为一致）
+│   ├── verify-presets.mjs          # 结构 + 跨平台回归检查（无依赖）
+│   ├── verify-yaml.mjs             # YAML 解析 + 取值断言（需 js-yaml）
+│   └── publish.sh / publish.ps1    # 推送到 GitHub（+ Release）
+├── .github/workflows/verify.yml    # CI：ubuntu / windows / macos 三系统矩阵
+├── .gitattributes                  # 行尾规范（*.sh 钉 LF，Windows 克隆后仍可直接 bash）
+├── .gitignore
 ├── LICENSE
 └── README.md
 ```
 
 ## 版本历史
+
+### v1.0.1（2026-09-23）
+- 修复 Windows 可用性：`scripts/verify-yaml.mjs` 用 `fileURLToPath` 取代
+  `new URL(import.meta.url).pathname`（后者在 Windows 上得到 `/D:/…`，拼路径后变成 `D:\D:\…`，读文件 ENOENT）。
+- 新增 `scripts/install.ps1`、`scripts/publish.ps1`：原生 Windows（PowerShell 5.1+）不再需要 bash。
+- 新增 `.gitattributes`：`*.sh` 等源码钉为 LF，避免 Windows 克隆把 `install.sh` 换成 CRLF 后 bash 报 `bad interpreter`。
+- `js-yaml` 查找顺序扩展到 Windows 布局（`%APPDATA%\npm`、`%ProgramFiles%\nodejs`）与 `npm root -g` 兜底。
+- CI 从单系统扩为 **ubuntu / windows / macos** 三系统矩阵；`verify-presets.mjs` 增加跨平台回归守卫。
 
 ### v1.0.0（2026-09-23）
 - 首次发布：`flash-lean`（11 条规则 + 阈值 0.3 + 禁用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条专属规则）。

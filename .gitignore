@@ -4,6 +4,7 @@ Thumbs.db
 *.swp
 
 # Local overrides / secrets (never commit)
+*.local.*
 settings.yaml
 *.local.yaml
 .credentials.yaml
