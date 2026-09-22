@@ -17,11 +17,12 @@
 直接地讲，这两个预设会抑制模型过渡思考的倾向，转而表现出较高的指令遵从度。其优点是在特定场景下（如上述算法题、或指令明确的长任务中），在维持模型能力水平的同时，可以同时减少Token和时间的消耗（对"反复跑一小段、看输出、再跑"的增量式折腾尤其有效），同时通过修改压缩逻辑提高了长会话的注意力。
 
 缺点也同样明显，在该预设可以视作通过“卡预算”的方式减少了思考的边际效益，在Oneshot样例中，使用一样的提示词时，通常会输出更少的Token。但是在这样的短会话中，如果模型本身的过度思考并不明显，就会变成花了更少Token办了更少事，且两者在效率上的差距并不明显：
+
 图一使用该预设（lean-PTC），报告的Token消耗为5.3M，耗时14m37s，42步
 <img width="2559" height="1540" alt="屏幕截图 2026-09-22 205848" src="https://github.com/user-attachments/assets/c469f899-3433-4afd-a931-1e160c1f95b1" />
 <img width="1877" height="1598" alt="屏幕截图 2026-09-22 205905" src="https://github.com/user-attachments/assets/b12c0dcb-8700-4099-a876-ac2dcfe5fd4d" />
 
-图二使用PTC模式，报告的Token消耗为8.3M，耗时40m45s，
+图二使用PTC模式，报告的Token消耗为8.3M，耗时40m45s，60步（环境均为WSL，先执行特殊预设，且工具链一致）
 <img width="2559" height="1539" alt="屏幕截图 2026-09-22 205636" src="https://github.com/user-attachments/assets/9d35dc3c-1f3f-4abd-b51e-ec62772da890" />
 <img width="1901" height="1599" alt="屏幕截图 2026-09-22 205702" src="https://github.com/user-attachments/assets/e9db03d9-52e9-45cb-b225-56d4cd57d6c3" />
 
