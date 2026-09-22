@@ -1,4 +1,4 @@
-<img width="2559" height="1540" alt="屏幕截图 2026-09-22 205550" src="https://github.com/user-attachments/assets/72e09ee4-e365-4973-b837-528ca8ad64aa" /># DSH Flash 精简预设
+# DSH Flash 精简预设
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
