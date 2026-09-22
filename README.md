@@ -1,4 +1,4 @@
-# DSH Flash 精简预设
+<img width="2559" height="1540" alt="屏幕截图 2026-09-22 205550" src="https://github.com/user-attachments/assets/72e09ee4-e365-4973-b837-528ca8ad64aa" /># DSH Flash 精简预设
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
@@ -7,11 +7,25 @@
 - **`flash-lean`** — 日常主力。压缩阈值下调到 300k 级 + 11 条行为硬约束 + 砍掉两个从未被调用的工具行。
 - **`flash-lean-ptc`** — 同上，另加 PTC 工具面（所有工具经 `run_code` 编程式调用）与 3 条 PTC 专属规则。
 
+结合AA榜单上的Token efficiency和日常使用不难看出，Deepseek v4.1 flash在有过渡思考倾向的同时，意图理解较差（注意，不是指令遵从度）。在喜闻乐见的MC Benchmark中，作者仅在新的提示词中加上一句“这是一个新项目，不要参考已有的项目”，模型就直接理解为不能选用Three.js这样成熟的技术栈（且完全没有征求我的意见），而是选择自研WebGL引擎，一连开了两个对话都是这样（供应商为官方）。加上v4.1flash能力并不差，容易给人一种“时神时鬼”的感觉。实际使用时除了Linux环境外，v4.1f高度依赖准确的提示词或其他能力更强模型的指导。
+
+基于这两周的历史对话（大概25etoken），本仓库给出了两个特化的精简预设：
 这两个预设**不改变模型能力，只改变"怎么花 token、怎么约束行为"**：在自建评测的三个题库族里质量全部满分
 （含外部题库 LiveCodeBench 4 题 × 40 组官方隐藏测试、USACO 官方数据 + 特制 checker），
 而计费输入降到标准的 **30%–70%**（多题算法任务上 PTC 最低到 **−88%**）。
 
-**当前版本：v1.0.1**（2026-09-23）
+直接地讲，这两个预设会抑制模型过渡思考的倾向，转而表现出较高的指令遵从度。其优点是在特定场景下（如上述算法题、或指令明确的长任务中），在维持模型能力水平的同时，可以同时减少Token和时间的消耗（对"反复跑一小段、看输出、再跑"的增量式折腾尤其有效），同时通过修改压缩逻辑提高了长会话的注意力。
+
+缺点也同样明显，在该预设可以视作通过“卡预算”的方式减少了思考的边际效益，在Oneshot样例中，使用一样的提示词时，通常会输出更少的Token。但是在这样的短会话中，如果模型本身的过度思考并不明显，就会变成花了更少Token办了更少事，且两者在效率上的差距并不明显：
+图一使用该预设（lean-PTC），报告的Token消耗为5.3M，耗时14m37s，42步
+<img width="2559" height="1540" alt="屏幕截图 2026-09-22 205848" src="https://github.com/user-attachments/assets/c469f899-3433-4afd-a931-1e160c1f95b1" />
+<img width="1877" height="1598" alt="屏幕截图 2026-09-22 205905" src="https://github.com/user-attachments/assets/b12c0dcb-8700-4099-a876-ac2dcfe5fd4d" />
+
+图二使用PTC模式，报告的Token消耗为8.3M，耗时40m45s，
+<img width="2559" height="1539" alt="屏幕截图 2026-09-22 205636" src="https://github.com/user-attachments/assets/9d35dc3c-1f3f-4abd-b51e-ec62772da890" />
+<img width="1901" height="1599" alt="屏幕截图 2026-09-22 205702" src="https://github.com/user-attachments/assets/e9db03d9-52e9-45cb-b225-56d4cd57d6c3" />
+
+可以看到，尽管使用本预设的速度更快（权衡之后效益也更高），但是实际产出确实没有弱约束好（抽到好卡了.jpg），故使用本预设依旧依赖准确的提示词，或依赖能力更强的模型来完成技术选型，是一种偏向于保下限的做法。如果你期望这个插件能让Oneshot小垃圾效果更好，那你大抵要失望了。
 
 ---
 
@@ -64,7 +78,7 @@ node scripts\verify-presets.mjs
 
 ---
 
-## 两个预设怎么选
+## 如何选择？
 
 | | `flash-lean` | `flash-lean-ptc` |
 |---|---|---|
@@ -107,7 +121,7 @@ node scripts\verify-presets.mjs
 
 ---
 
-## 为什么是这些数字（实测依据）
+## 设计依据
 
 所有数值都来自同一套 A/B 评测（同一 flash 级路由、同一批任务、同一网络条件；该路由声明 1,000,000 token 上下文窗口）。
 
@@ -141,6 +155,7 @@ node scripts\verify-presets.mjs
 | 长会话（35 轮） | 1 条 | 31.58M | 17.29M | — |
 
 外部题库的质量项：4 题 160/160 官方隐藏测试全部通过（三条臂均满分）；校正 checker 后 USACO 14/14。
+后续会考虑增加难度更高的测试题目
 
 ---
 
@@ -211,39 +226,6 @@ dsh-flash-presets/
 ### v1.0.0（2026-09-23）
 - 首次发布：`flash-lean`（11 条规则 + 阈值 0.3 + 禁用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条专属规则）。
 - 附带两套校验脚本与 CI；注释保留实测数字，已剔除本机路径、私有评测引用与特定 provider 名称。
-
-## 打包
-
-```bash
-mkdir -p dist && rm -f dist/dsh-flash-presets-v1.0.0.zip
-git archive --format=zip -o dist/dsh-flash-presets-v1.0.0.zip HEAD
-```
-
-## 发布到 GitHub
-
-一条命令（推荐先 `gh auth login`）：
-
-```bash
-bash scripts/publish.sh          # 自动建仓库 + 推 main/tag + 发 Release
-# 覆盖默认值：GH_USER=you REPO=name VISIBILITY=private bash scripts/publish.sh
-```
-
-没有 gh 时先手工建仓库再推：
-
-```bash
-git remote add origin https://github.com/LarryE135/dsh-flash-presets.git
-git push -u origin main
-git push origin v1.0.0        # 密码位填 Personal Access Token
-```
-
-## 许可
-
-MIT，见 [LICENSE](LICENSE)。
-
-**第三方来源声明**：`presets/` 下的组合文件派生自 DeepSeek Harness 自带的 agent 预设
-（`@deepseek-ai/dsh-agent-presets`，MIT License，Copyright (c) 2026 DeepSeek）。
-除 README 上表列出的 4 处（persona、`compaction-basic`、`tool-workflow`/`tool-ralph`、PTC 版另加 `tool-presentation`）之外，
-其余组合与外层文件头注释按原样保留。
 
 ---
 
