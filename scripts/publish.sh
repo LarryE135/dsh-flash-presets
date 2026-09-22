@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 
 GH_USER="${GH_USER:-LarryE135}"
-REPO="${REPO:-dsh-flash-presets-}"
+REPO="${REPO:-dsh-flash-presets}"
 VISIBILITY="${VISIBILITY:-public}"          # public | private
 TAG="${TAG:-$(git describe --tags --abbrev=0 2>/dev/null || echo v1.0.0)}"
 REMOTE="${REMOTE:-https://github.com/$GH_USER/$REPO.git}"

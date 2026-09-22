@@ -11,7 +11,7 @@
 [CmdletBinding()]
 param(
   [string] $GhUser = $(if ($env:GH_USER) { $env:GH_USER } else { 'LarryE135' }),
-  [string] $Repo   = $(if ($env:REPO)    { $env:REPO }    else { 'dsh-flash-presets-' }),
+  [string] $Repo   = $(if ($env:REPO)    { $env:REPO }    else { 'dsh-flash-presets' }),
   [ValidateSet('public', 'private')]
   [string] $Visibility = 'public',
   [string] $Tag = 'v1.0.0'

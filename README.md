@@ -1,6 +1,6 @@
 # DSH Flash 精简预设
 
-[![verify](https://github.com/LarryE135/dsh-flash-presets-/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets-/actions/workflows/verify.yml)
+[![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）准备的两个 agent 预设，面向 **flash 级路由**做 token 效率优化：
 
@@ -20,7 +20,7 @@
 ### 安装
 
 ```bash
-git clone https://github.com/LarryE135/dsh-flash-presets-.git
+git clone https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 ```
 
@@ -206,6 +206,7 @@ dsh-flash-presets/
 - 新增 `.gitattributes`：`*.sh` 等源码钉为 LF，避免 Windows 克隆把 `install.sh` 换成 CRLF 后 bash 报 `bad interpreter`。
 - `js-yaml` 查找顺序扩展到 Windows 布局（`%APPDATA%\npm`、`%ProgramFiles%\nodejs`）与 `npm root -g` 兜底。
 - CI 从单系统扩为 **ubuntu / windows / macos** 三系统矩阵；`verify-presets.mjs` 增加跨平台回归守卫。
+- 仓库更名为 `dsh-flash-presets`，README 徽章 / clone 地址 / `publish.sh|ps1` 默认仓库名同步更新（GitHub 侧旧地址自动重定向）。
 
 ### v1.0.0（2026-09-23）
 - 首次发布：`flash-lean`（11 条规则 + 阈值 0.3 + 禁用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条专属规则）。
@@ -230,7 +231,7 @@ bash scripts/publish.sh          # 自动建仓库 + 推 main/tag + 发 Release
 没有 gh 时先手工建仓库再推：
 
 ```bash
-git remote add origin https://github.com/LarryE135/dsh-flash-presets-.git
+git remote add origin https://github.com/LarryE135/dsh-flash-presets.git
 git push -u origin main
 git push origin v1.0.0        # 密码位填 Personal Access Token
 ```
