@@ -66,8 +66,12 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
+          set -x
+          bash --version | head -1
           mkdir -p "$RUNNER_TEMP/dsh-legacy/.agent-presets"
           DSH_HOME="$RUNNER_TEMP/dsh-legacy" bash scripts/install.sh --legacy
+          echo "--- 安装结果 ---"
+          find "$RUNNER_TEMP/dsh-legacy" -maxdepth 3 | sort
           DSH_HOME="$RUNNER_TEMP/dsh-legacy" DSH_PROFILE=web node scripts/verify-presets.mjs
 
       - name: Legacy install path (PowerShell)
