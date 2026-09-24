@@ -89,6 +89,14 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(badUrl.length === 0, '脚本未用 URL.pathname 拼路径（Windows 上会得到 /D:/…）'
         + (badUrl.length ? '：' + badUrl.join(', ') : ''));
   check(mjs.some(f => /fileURLToPath/.test(read(path.join(here, f)) || '')), '脚本使用 node:url 的 fileURLToPath');
+  // macOS 自带 bash 3.2 会把 `$p（` 里的全角括号吞进变量名（Linux 的 bash 5 不会）→
+  // 变量后面直接跟非 ASCII 字符时必须写成 ${p}，否则旧版 bash 报 "unbound variable"。
+  for (const f of ['install.sh', 'install.ps1']) {
+    const text = read(path.join(here, f)) || '';
+    const hits = text.match(/\$[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7f])/g) || [];
+    check(hits.length === 0, f + ' 的变量在非 ASCII 字符前都加了花括号'
+          + (hits.length ? '（发现 ' + hits.slice(0, 3).join(', ') + '）' : ''));
+  }
   const ga = read(path.join(repo, '.gitattributes')) || '';
   check(/\*\.sh[^\n]*eol=lf/.test(ga), '.gitattributes 把 *.sh 钉为 LF');
   check(/\.mjs/.test(ga) && /\.yml/.test(ga), '.gitattributes 覆盖 .mjs / .yml');

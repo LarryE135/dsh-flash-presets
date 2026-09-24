@@ -45,10 +45,10 @@ if [ "$MODE" = "auto" ]; then
     MODE="modern"
   elif [ -e "$LEGACY_DIR" ]; then
     MODE="legacy"
-    echo "未发现 $PATCH，但存在 $LEGACY_DIR → 按旧版（DSH < 0.1.7）目录式安装。"
+    echo "未发现 ${PATCH}，但存在 $LEGACY_DIR → 按旧版（DSH < 0.1.7）目录式安装。"
   else
-    echo "找不到 $PATCH（也没有 $LEGACY_DIR）。" >&2
-    echo "请确认 DSH_HOME 是否正确（当前：$DSH_DIR），或用 --profile 指定 profile 名。" >&2
+    echo "找不到 ${PATCH}（也没有 ${LEGACY_DIR}）。" >&2
+    echo "请确认 DSH_HOME 是否正确（当前：${DSH_DIR}），或用 --profile 指定 profile 名。" >&2
     exit 1
   fi
 fi
@@ -92,17 +92,17 @@ install_legacy() {
     fi
     mkdir -p "$LEGACY_DIR/$p"
     cp "$src/preset.yml" "$src/agent.cordis.yml" "$LEGACY_DIR/$p/"
-    echo "已安装 $LEGACY_DIR/$p（旧版目录式）"
+    echo "已安装 $LEGACY_DIR/${p}（旧版目录式）"
   done
   echo
   echo "安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简」/「Flash 精简·PTC」。"
 }
 
 uninstall_modern() {
-  [ -f "$PATCH" ] || { echo "缺少 $PATCH（无需卸载）" >&2; exit 0; }
+  [ -f "$PATCH" ] || { echo "缺少 ${PATCH}（无需卸载）" >&2; exit 0; }
   cp "$PATCH" "$PATCH.bak-$STAMP"
   strip_patch
-  echo "已移除托管块（备份 $(basename "$PATCH").bak-$STAMP）"
+  echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
 }
 
 uninstall_legacy() {
