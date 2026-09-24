@@ -78,8 +78,9 @@ jobs:
           echo "$out"
           echo "verify 退出码: $vrc"
           if [ "$irc" -ne 0 ] || [ "$vrc" -ne 0 ]; then
-            echo "$out" | tail -25 | while IFS= read -r line; do echo "::error::legacy: $line"; done
-            [ "$irc" -eq 0 ] || echo "::error::legacy: install.sh exited $irc"
+            # 只把失败行发成注解：GitHub 每个 check-run 最多保留 10 条注解
+            echo "$out" | grep '✖' | head -8 | while IFS= read -r line; do echo "::error::legacy$line"; done
+            echo "::error::legacy install 退出码=$irc verify 退出码=$vrc"
             exit 1
           fi
 
