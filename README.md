@@ -1,5 +1,7 @@
 # DSH Flash 精简预设
 
+**当前版本：v1.1.0**（2026-09-24 · 适配 DSH 0.1.7-rc.1 的预设机制改版）
+
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）准备的两个 agent 预设，面向 **flash 级路由**做 token 效率优化：
@@ -34,6 +36,10 @@
 
 ### 安装
 
+> **DSH 0.1.7-rc.1 起预设机制变了**：旧的 `~/.dsh/.agent-presets/<id>/` 目录**不再被读取**，
+> 预设现在是插进 profile 用户补丁层的插件行（`@deepseek-ai/dsh-agent-preset`）。
+> 本仓库同时提供两种形态，安装器会**按你的 DSH 自动选择**。
+
 ```bash
 git clone https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
@@ -42,27 +48,50 @@ cd dsh-flash-presets
 **Linux / macOS / WSL / Git Bash**
 
 ```bash
-bash scripts/install.sh                      # 安装到 ~/.dsh/.agent-presets/
-DSH_HOME=/path/to/.dsh bash scripts/install.sh   # 自定义 DSH 主目录
+bash scripts/install.sh                        # 0.1.7+ 写 profile 补丁；旧版自动回退到目录式
+bash scripts/install.sh --profile headless      # 指定 profile（默认 web）
+bash scripts/install.sh --legacy                # 强制旧版目录式
+bash scripts/install.sh --uninstall             # 卸载（移除托管块）
+DSH_HOME=/path/to/.dsh bash scripts/install.sh  # 自定义 DSH 主目录
 ```
 
 **Windows（PowerShell 5.1+ 或 PowerShell 7）**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-.\scripts\install.ps1 -DshHome D:\tmp\.dsh      # 自定义 DSH 主目录
+.\scripts\install.ps1 -Profile headless        # 指定 profile
+.\scripts\install.ps1 -Legacy                  # 强制旧版目录式
+.\scripts\install.ps1 -Uninstall               # 卸载
+.\scripts\install.ps1 -DshHome D:\tmp\.dsh     # 自定义 DSH 主目录
 ```
 
-两个安装器行为一致：把 `presets/<name>/`（`preset.yml` + `agent.cordis.yml`）复制到
-`<DSH_HOME>/.agent-presets/<name>/`；若目标已存在同名预设，先备份为 `<name>.bak-<时间戳>`，可重复执行。
-`install.sh` 需要 bash（WSL / Git Bash / macOS / Linux 均可）；原生 Windows 请用 `install.ps1`。
+两者的行为完全一致（共用同一个 Node 合并器 `scripts/merge-presets.mjs`）：
+
+| 你的 DSH | 安装动作 | 生效方式 |
+|---|---|---|
+| **≥ 0.1.7-rc.1** | 把两个预设的 `- insert:` 条目写进 `<DSH_HOME>/profiles/<profile>/cordis.patch.yml` 的**托管块**里 | `web` 模板是 **live reload**：无需重启，刷新 GUI 即出现；其它模板需重启 |
+| **< 0.1.7** | 复制 `presets/legacy-0.1.5/<name>/` 到 `<DSH_HOME>/.agent-presets/<name>/` | 重启 DSH |
+
+安装器**可重复执行**：先备份 `cordis.patch.yml.bak-<时间戳>`，再整块替换（不会出现两份）；
+目录式安装则把已存在的同名预设改名备份。要求 Node 在 PATH 上（DSH 本身依赖它）。
 
 ### 校验
 
 ```bash
-npm install --no-save js-yaml@4          # verify-yaml 需要；verify-presets 无依赖
-node scripts/verify-presets.mjs          # 结构 + 跨平台回归检查
-node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言
+npm install --no-save js-yaml@4          # verify-yaml 需要；verify-presets 无第三方依赖
+node scripts/verify-presets.mjs          # 结构 + 跨平台回归 + 安装形态（自动识别新旧机制）
+node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言（阈值/规则条数/PTC 展示层…）
+```
+
+看排在最前面的 `[安装] 检测到: …` 一行即可确认当前生效的是哪种机制：
+
+- `插件行式（…/profiles/web/cordis.patch.yml）` → 0.1.7+；
+- `旧版目录式（…/.agent-presets）` → 旧版 DSH。
+
+还可以直接问 DSH 组合结果对不对：
+
+```bash
+dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean'
 ```
 
 Windows 上若 `DSH_HOME` 不是默认值（默认 `%USERPROFILE%\.dsh`）：
@@ -72,10 +101,11 @@ $env:DSH_HOME = "$env:USERPROFILE\.dsh"
 node scripts\verify-presets.mjs
 ```
 
-两个脚本都是纯 Node（无第三方依赖，`verify-yaml` 需要 `js-yaml`），在 Windows / macOS / Linux 上行为一致；
-`js-yaml` 会自动从仓库 `node_modules`、全局 DSH 安装位置或 `npm root -g` 中查找，也可以用 `DSH_JS_YAML` 直接指定。
+两个脚本都是纯 Node，在 Windows / macOS / Linux 上行为一致；`js-yaml` 会自动从仓库 `node_modules`、
+全局 DSH 安装位置或 `npm root -g` 中查找，也可以用 `DSH_JS_YAML` 直接指定。
 
-随后重启 DSH（或刷新 GUI），预设列表里会出现「Flash 精简」和「Flash 精简·PTC」。
+装好后预设列表里会出现「Flash 精简（v4.1-flash）」和「Flash 精简·PTC（v4.1-flash）」
+（0.1.7+ 的 web profile 无需重启，刷新页面即可）。
 
 ---
 
@@ -177,11 +207,18 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 
 ## 兼容性
 
-- 在 **DSH 0.1.5-rc.2** 上实测；预设文件是从该版本的 `standard` / `ptc` 预设整份复制的，行 id 与插件名必须与目标部署一致。
-  若目标部署缺少某个插件行导致挂载失败，删掉该行即可（`disabled: true` 的行删掉只影响"少了哪些工具"）。
+| DSH 版本 | 预设形态 | 说明 |
+|---|---|---|
+| **≥ 0.1.7-rc.1** | 插件行（profile 补丁里的托管块） | 预设机制改版：目录不再被读取；两个预设都以本版出厂的 `standard` / `ptc` 为基座，只保留 3 处 FLASH 差异（persona 规则、压缩阈值、停用 `tool-workflow`）。`web` 模板 live reload。 |
+| **< 0.1.7** | 目录式（`.agent-presets/<id>/`） | 安装器自动回退；文件在 `presets/legacy-0.1.5/`，整份来自 0.1.5 的 `standard` / `ptc`。 |
+
+- 行 id 与插件名必须与目标部署一致：若目标部署缺少某个插件行导致挂载失败，删掉该行即可
+  （`disabled: true` 的行删掉只影响"少了哪些工具"）。
 - **PTC 在 headless 下需要显式开启**：交互式由 `tool-presentation: {mode: ptc}` 生效，
   `dsh --profile headless` 下必须设 `DSH_TOOLS_MODE=ptc`，否则仍是标准工具面。
 - 未绑定任何 provider/模型；路由不同（尤其是声明窗口不同）时，压缩阈值请按"约 30% 声明窗口"重新评估。
+- 升级 DSH 后若出厂 `standard`/`ptc` 结构变了，重新生成即可：以新版
+  `<dsh>/node_modules/@deepseek-ai/dsh-web-app/presets/{standard,ptc}.patch.yml` 为基座，套回上述 3 处差异。
 
 ---
 
@@ -199,21 +236,35 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 ```
 dsh-flash-presets/
 ├── presets/
-│   ├── flash-lean/{preset.yml,agent.cordis.yml}
-│   └── flash-lean-ptc/{preset.yml,agent.cordis.yml}
+│   ├── flash-lean.patch.yml              # 0.1.7+ 插件行式（基座 = 新版 standard）
+│   ├── flash-lean-ptc.patch.yml          # 0.1.7+ 插件行式（基座 = 新版 ptc）
+│   └── legacy-0.1.5/<name>/              # 旧版目录式（DSH < 0.1.7 回退用）
+│       └── {preset.yml,agent.cordis.yml}
 ├── scripts/
-│   ├── install.sh / install.ps1    # 安装（bash / PowerShell，行为一致）
-│   ├── verify-presets.mjs          # 结构 + 跨平台回归检查（无依赖）
-│   ├── verify-yaml.mjs             # YAML 解析 + 取值断言（需 js-yaml）
-│   └── publish.sh / publish.ps1    # 推送到 GitHub（+ Release）
-├── .github/workflows/verify.yml    # CI：ubuntu / windows / macos 三系统矩阵
-├── .gitattributes                  # 行尾规范（*.sh 钉 LF，Windows 克隆后仍可直接 bash）
+│   ├── install.sh / install.ps1          # 安装/卸载（bash / PowerShell，行为一致，自动选机制）
+│   ├── merge-presets.mjs                 # 两种安装器共用的补丁合并器（托管块插入/替换/移除）
+│   ├── verify-presets.mjs                # 结构 + 跨平台回归 + 安装形态检查（无依赖）
+│   ├── verify-yaml.mjs                   # YAML 解析 + 取值断言（需 js-yaml）
+│   └── publish.sh / publish.ps1          # 推送到 GitHub（+ Release）
+├── .github/workflows/verify.yml          # CI：ubuntu / windows / macos 三系统 × 新旧两种安装机制
+├── .gitattributes                        # 行尾规范（*.sh 钉 LF，Windows 克隆后仍可直接 bash）
 ├── .gitignore
 ├── LICENSE
 └── README.md
 ```
 
 ## 版本历史
+
+### v1.1.0（2026-09-24）
+- **适配 DSH 0.1.7-rc.1 的预设机制改版**：预设从"每预设一个目录"改为"插进 profile 用户补丁层的插件行"
+  （`@deepseek-ai/dsh-agent-preset`）。旧目录在新版被忽略，这版把两个预设重新生成为
+  `presets/*.patch.yml`，并保留 `presets/legacy-0.1.5/` 供旧版 DSH 使用。
+- 基座换成新版出厂的 `standard` / `ptc` 预设，只保留 3 处 FLASH 差异；顺带修正 PTC 版里
+  **重复的规则编号**（旧文件里出现两组 10./11.，现为连续 1–14）。
+- 安装器重写：自动识别机制（0.1.7+ 写补丁托管块 / 旧版复制目录）、**可重复执行**、支持
+  `--profile`、`--legacy`、`--uninstall`，并共用同一个 Node 合并器 `scripts/merge-presets.mjs`。
+- 校验器覆盖两种形态（`[安装] 检测到: 插件行式 / 旧版目录式`），并新增"托管块完整性 / 规则编号连续 /
+  组合阈值 / 本机路径泄漏"等断言；CI 增加旧版机制安装路径的回归。
 
 ### v1.0.1（2026-09-23）
 - 修复 Windows 可用性：`scripts/verify-yaml.mjs` 用 `fileURLToPath` 取代
