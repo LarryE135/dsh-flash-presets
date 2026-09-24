@@ -19,15 +19,36 @@ jobs:
         with:
           node-version: '20'
 
+      # A DSH home that looks like 0.1.7+: the profile patch layer exists, so the
+      # installers take the plugin-row path instead of the legacy directory path.
+      - name: Prepare a DSH home (0.1.7 layout)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dsh/profiles/web"
+          printf '# ci profile patch\n[]\n' > "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"
+
       # Install with the script a user of that OS would actually run, so a
       # bash-only or PowerShell-only installer cannot slip through unnoticed.
       - name: Install presets (bash)
         if: runner.os != 'Windows'
+        shell: bash
         run: DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh
 
       - name: Install presets (PowerShell)
         if: runner.os == 'Windows'
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome "$env:RUNNER_TEMP/dsh"
+
+      - name: Re-install to prove idempotence
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pwsh -NoProfile -File scripts/install.ps1 -DshHome "$RUNNER_TEMP/dsh"
+          else
+            DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh
+          fi
+          blocks=$(grep -c 'dsh-flash-presets: managed block' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml")
+          echo "managed-block marker lines: $blocks (expect 2)"
+          [ "$blocks" -eq 2 ] || exit 1
 
       - name: Structural + cross-platform check (no dependencies)
         shell: bash
@@ -38,3 +59,34 @@ jobs:
         run: |
           npm install --no-save --silent js-yaml@4
           node scripts/verify-yaml.mjs
+          node scripts/verify-yaml.mjs "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"
+
+      # The legacy (DSH < 0.1.7) install path must keep working too.
+      - name: Legacy install path (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dsh-legacy/.agent-presets"
+          DSH_HOME="$RUNNER_TEMP/dsh-legacy" bash scripts/install.sh --legacy
+          DSH_HOME="$RUNNER_TEMP/dsh-legacy" DSH_PROFILE=web node scripts/verify-presets.mjs
+
+      - name: Legacy install path (PowerShell)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/dsh-legacy/.agent-presets" | Out-Null
+          pwsh -NoProfile -File scripts/install.ps1 -DshHome "$env:RUNNER_TEMP/dsh-legacy" -Legacy
+          $env:DSH_HOME = "$env:RUNNER_TEMP/dsh-legacy"
+          node scripts/verify-presets.mjs
+
+      - name: Uninstall leaves the user patch intact
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pwsh -NoProfile -File scripts/install.ps1 -DshHome "$RUNNER_TEMP/dsh" -Uninstall
+          else
+            DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh --uninstall
+          fi
+          if grep -q 'preset-flash-lean' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"; then
+            echo "managed block still present after uninstall"; exit 1
+          fi
+          echo "uninstalled cleanly"

@@ -1,18 +1,26 @@
-﻿<#
-.SYNOPSIS
-  把本仓库的预设安装到 DSH 主目录（Windows PowerShell 5.1+ / PowerShell 7+）。
-.DESCRIPTION
-  与 scripts/install.sh 等价：复制 presets\<name>\{preset.yml,agent.cordis.yml} 到
-  <DSH_HOME>\.agent-presets\<name>\；若目标已存在，先备份为 <name>.bak-<时间戳>，可重复执行。
-.EXAMPLE
-  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-.EXAMPLE
-  .\scripts\install.ps1 -DshHome D:\tmp\.dsh
-#>
+﻿# Install the Flash 精简 presets into a DSH home (Windows PowerShell 5.1+).
+#
+# DSH 0.1.7-rc.1 changed how presets are declared: the old per-preset directory
+# ($DshHome\.agent-presets\<id>\) is no longer read; a preset is now a plugin row
+# (`@deepseek-ai/dsh-agent-preset`) inserted into a profile's user patch layer.
+# This script writes a managed block into the profile patch file, and falls back
+# to the legacy directory install for older DSH versions.
+#
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+#   ... -Profile headless      # another profile
+#   ... -Legacy                # force the 0.1.5 directory layout
+#   ... -Uninstall             # remove the managed block
+#   ... -DshHome "D:\dsh"      # custom DSH home (default: $env:DSH_HOME or ~\.dsh)
+#
+# Safe to run repeatedly: the managed block is replaced in place and the patch
+# file is backed up as cordis.patch.yml.bak-<timestamp> before every write.
 [CmdletBinding()]
 param(
   [string]   $DshHome,
-  [string[]] $Presets = @('flash-lean', 'flash-lean-ptc')
+  [string]   $Profile = 'web',
+  [string[]] $Presets = @('flash-lean', 'flash-lean-ptc'),
+  [switch]   $Legacy,
+  [switch]   $Uninstall
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,31 +32,93 @@ if (-not $DshHome) {
   else                      { throw '无法确定 DSH 主目录，请用 -DshHome 指定。' }
 }
 
-$repo  = Split-Path -Parent $PSScriptRoot
-$dest  = Join-Path $DshHome '.agent-presets'
+$here = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$patch = Join-Path $DshHome "profiles\$Profile\cordis.patch.yml"
+$legacyDir = Join-Path $DshHome '.agent-presets'
+$merge = Join-Path $here 'scripts\merge-presets.mjs'
+$verifyYaml = Join-Path $here 'scripts\verify-yaml.mjs'
 
-if (-not (Test-Path -LiteralPath (Join-Path $repo 'presets'))) {
-  throw "找不到 presets 目录：$repo\presets（请在仓库副本内运行本脚本）"
+# ── 选机制 ────────────────────────────────────────────────────────────────────
+if ($Legacy) {
+  $mode = 'legacy'
+} elseif (Test-Path $patch) {
+  $mode = 'modern'
+} elseif (Test-Path $legacyDir) {
+  $mode = 'legacy'
+  Write-Host "未发现 $patch，但存在 $legacyDir → 按旧版（DSH < 0.1.7）目录式安装。"
+} else {
+  throw "找不到 $patch（也没有 $legacyDir）。请确认 -DshHome 是否正确（当前：$DshHome）。"
 }
 
-foreach ($name in $Presets) {
-  $src = Join-Path (Join-Path $repo 'presets') $name
-  if (-not (Test-Path -LiteralPath $src)) { throw "缺少目录: $src" }
-
-  $target = Join-Path $dest $name
-  if (Test-Path -LiteralPath $target) {
-    $backup = "$target.bak-$stamp"
-    Write-Host "已存在 $target → 备份为 $backup"
-    Move-Item -LiteralPath $target -Destination $backup
+function Invoke-Merge([string[]]$ExtraArgs) {
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    throw '需要 Node（DSH 本身就依赖它）来改写补丁文件。'
   }
-  New-Item -ItemType Directory -Force -Path $target | Out-Null
-  Copy-Item -LiteralPath (Join-Path $src 'preset.yml')       -Destination $target -Force
-  Copy-Item -LiteralPath (Join-Path $src 'agent.cordis.yml') -Destination $target -Force
-  Write-Host "已安装 $target"
+  $argv = @($merge, '--patch', $patch) + $ExtraArgs
+  & node @argv
+  if ($LASTEXITCODE -eq 3) { exit 3 }
+  if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
-Write-Host ''
-Write-Host '安装完成。'
-Write-Host "  校验：`$env:DSH_HOME = '$DshHome'; node `"$repo\scripts\verify-presets.mjs`""
-Write-Host '  随后重启 DSH（或刷新 GUI），在预设列表选择「Flash 精简」/「Flash 精简·PTC」。'
+# ── 旧版：目录式 ──────────────────────────────────────────────────────────────
+function Install-Legacy {
+  foreach ($p in $Presets) {
+    $src = Join-Path $here "presets\legacy-0.1.5\$p"
+    if (-not (Test-Path $src)) { throw "缺少目录: $src" }
+    $dst = Join-Path $legacyDir $p
+    if (Test-Path $dst) {
+      Write-Host "已存在 $dst → 备份为 .bak-$stamp"
+      Move-Item $dst "$dst.bak-$stamp"
+    }
+    New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    Copy-Item (Join-Path $src 'preset.yml') $dst
+    Copy-Item (Join-Path $src 'agent.cordis.yml') $dst
+    Write-Host "已安装 $dst（旧版目录式）"
+  }
+  Write-Host ''
+  Write-Host '安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简」/「Flash 精简·PTC」。'
+}
+
+function Uninstall-Legacy {
+  foreach ($p in $Presets) {
+    $dst = Join-Path $legacyDir $p
+    if (Test-Path $dst) {
+      Move-Item $dst "$dst.removed-$stamp"
+      Write-Host "已移走 $dst → .removed-$stamp"
+    }
+  }
+}
+
+# ── 新版：写 profile 补丁层 ───────────────────────────────────────────────────
+function Install-Modern {
+  if (-not (Test-Path $patch)) { throw "缺少 $patch" }
+  Copy-Item $patch "$patch.bak-$stamp"
+  Write-Host "已备份 $patch → cordis.patch.yml.bak-$stamp"
+  Invoke-Merge @()
+  Write-Host "已写入托管块：$patch"
+  & node $verifyYaml $patch | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host 'YAML 校验通过。'
+  } else {
+    Write-Warning "YAML 校验未通过，请运行：node `"$verifyYaml`" `"$patch`""
+  }
+  Write-Host ''
+  Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
+  Write-Host '「Flash 精简（v4.1-flash）」与「Flash 精简·PTC（v4.1-flash）」。'
+  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean'"
+  Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
+}
+
+function Uninstall-Modern {
+  if (-not (Test-Path $patch)) { Write-Host "缺少 $patch（无需卸载）"; return }
+  Copy-Item $patch "$patch.bak-$stamp"
+  Invoke-Merge @('--remove')
+  Write-Host "已移除托管块（备份 cordis.patch.yml.bak-$stamp）"
+}
+
+if ($mode -eq 'modern') {
+  if ($Uninstall) { Uninstall-Modern } else { Install-Modern }
+} else {
+  if ($Uninstall) { Uninstall-Legacy } else { Install-Legacy }
+}
