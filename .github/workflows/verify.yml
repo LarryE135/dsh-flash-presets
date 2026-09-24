@@ -67,14 +67,10 @@ jobs:
         shell: bash
         run: |
           set +e
-          bash --version | head -1
-          echo '--- presets 目录 ---'
-          ls -R presets | head -20
           mkdir -p "$RUNNER_TEMP/dsh-legacy/.agent-presets"
-          iout=$(DSH_HOME="$RUNNER_TEMP/dsh-legacy" bash -x scripts/install.sh --legacy 2>&1)
+          # bash 3.2（macOS 自带）会把 `$p（` 里的全角括号吞进变量名，所以脚本里一律用 ${p}
+          DSH_HOME="$RUNNER_TEMP/dsh-legacy" bash scripts/install.sh --legacy
           irc=$?
-          echo "$iout" | tail -20
-          echo "$iout" | tail -6 | while IFS= read -r line; do echo "::error::legacy-install$line"; done
           echo "install.sh --legacy 退出码: $irc"
           find "$RUNNER_TEMP/dsh-legacy" -maxdepth 3 | sort
           out=$(DSH_HOME="$RUNNER_TEMP/dsh-legacy" DSH_PROFILE=web node scripts/verify-presets.mjs 2>&1)

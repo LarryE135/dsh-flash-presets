@@ -46,9 +46,9 @@ if ($Legacy) {
   $mode = 'modern'
 } elseif (Test-Path $legacyDir) {
   $mode = 'legacy'
-  Write-Host "未发现 $patch，但存在 $legacyDir → 按旧版（DSH < 0.1.7）目录式安装。"
+  Write-Host "未发现 ${patch}，但存在 $legacyDir → 按旧版（DSH < 0.1.7）目录式安装。"
 } else {
-  throw "找不到 $patch（也没有 $legacyDir）。请确认 -DshHome 是否正确（当前：$DshHome）。"
+  throw "找不到 ${patch}（也没有 ${legacyDir}）。请确认 -DshHome 是否正确（当前：${DshHome}）。"
 }
 
 function Invoke-Merge([string[]]$ExtraArgs) {
@@ -74,7 +74,7 @@ function Install-Legacy {
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
     Copy-Item (Join-Path $src 'preset.yml') $dst
     Copy-Item (Join-Path $src 'agent.cordis.yml') $dst
-    Write-Host "已安装 $dst（旧版目录式）"
+    Write-Host "已安装 ${dst}（旧版目录式）"
   }
   Write-Host ''
   Write-Host '安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简」/「Flash 精简·PTC」。'
@@ -111,10 +111,10 @@ function Install-Modern {
 }
 
 function Uninstall-Modern {
-  if (-not (Test-Path $patch)) { Write-Host "缺少 $patch（无需卸载）"; return }
+  if (-not (Test-Path $patch)) { Write-Host "缺少 ${patch}（无需卸载）"; return }
   Copy-Item $patch "$patch.bak-$stamp"
   Invoke-Merge @('--remove')
-  Write-Host "已移除托管块（备份 cordis.patch.yml.bak-$stamp）"
+  Write-Host "已移除托管块（备份 cordis.patch.yml.bak-${stamp}）"
 }
 
 if ($mode -eq 'modern') {
