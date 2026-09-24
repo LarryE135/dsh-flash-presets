@@ -1,6 +1,6 @@
 # DSH Flash 精简预设
 
-**当前版本：v1.1.0**（2026-09-24 · 适配 DSH 0.1.7-rc.1 的预设机制改版）
+**当前版本：v0.1.0**（2026-09-24·适配 DSH 0.1.7-rc.1 ）
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
