@@ -54,6 +54,10 @@ jobs:
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/dsh" node scripts/verify-presets.mjs
 
+      - name: Guard against the bash 3.2 multibyte trap (no dependencies)
+        shell: bash
+        run: node scripts/check-bash32-cjk.mjs
+
       - name: YAML parse + value assertions
         shell: bash
         run: |
