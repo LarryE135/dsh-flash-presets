@@ -12,7 +12,7 @@ VISIBILITY="${VISIBILITY:-public}"          # public | private
 TAG="${TAG:-$(git describe --tags --abbrev=0 2>/dev/null || echo v1.0.0)}"
 REMOTE="${REMOTE:-https://github.com/$GH_USER/$REPO.git}"
 
-echo "目标：$GH_USER/$REPO（$VISIBILITY），标签 $TAG"
+echo "目标：${GH_USER}/${REPO}（${VISIBILITY}），标签 ${TAG}"
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
 
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -33,7 +33,7 @@ A) 网页创建仓库后推送（无需装东西）
    2. 然后在仓库目录执行：
         git push -u origin main
         git push origin $TAG
-     用户名填 $GH_USER，密码填 Personal Access Token（Settings → Developer settings → Fine-grained tokens，需 Contents: Read and write）
+     用户名填 ${GH_USER}，密码填 Personal Access Token（Settings → Developer settings → Fine-grained tokens，需 Contents: Read and write）
 
 B) 装上 GitHub CLI 后重跑本脚本（可自动建仓库 + 发布 Release）
        bash scripts/publish.sh
