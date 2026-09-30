@@ -1,6 +1,6 @@
 # DSH Flash 精简预设
 
-**当前版本：v0.2.0**（2026-09-30 · 精简 PTC 预设分 v1/v2 两版，附 8 用例基准测试数据）
+**当前版本：v0.2.0**（2026-09-30 · 精简 PTC 预设分 v1/v2 两版，附 8 用例基准数据与端到端自测）
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
@@ -10,17 +10,25 @@
 - **`flash-lean-ptc-v1`** — v1 基线。同为 PTC 工具面 + 14 条硬约束，压缩阈值 0.3 / 保留 50k；保留用于对照与回退。
 - 自 v0.2.0 起**不再提供非 PTC 的「Flash 精简」预设**（原 `flash-lean`）；需要它的老用户请用 0.1.x（git 标签 `v1.0.0`–`v1.1.0`，见版本历史末的口径说明）。
 
+前言：
 结合AA榜单上的Token efficiency和日常使用不难看出，Deepseek v4.1 flash在有过渡思考倾向的同时，意图理解较差（注意，不是指令遵从度）。在喜闻乐见的MC Benchmark中，作者仅在新的提示词中加上一句“这是一个新项目，不要参考已有的项目”，模型就直接理解为不能选用Three.js这样成熟的技术栈（且完全没有征求我的意见），而是选择自研WebGL引擎，一连开了两个对话都是这样（供应商为官方）。加上v4.1flash能力并不差，容易给人一种“时神时鬼”的感觉。实际使用时除了Linux环境外，v4.1f高度依赖准确的提示词或其他能力更强模型的指导。
 
-基于这两周的历史对话（大概25etoken），本仓库给出了两个特化的精简预设：
-这两个预设**不改变模型能力，只改变"怎么花 token、怎么约束行为"**：在自建评测的三个题库族里质量全部满分
-（含外部题库 LiveCodeBench 4 题 × 40 组官方隐藏测试、USACO 官方数据 + 特制 checker），
-而计费输入降到标准的 **30%–70%**（多题算法任务上 PTC 最低到 **−88%**）。
+故基于这两周的历史对话（大概25etoken），本仓库给出了两个特化的精简预设：
+这两个预设**不改变模型能力，只改变"怎么花 token、怎么约束行为"**，同时计费输入降到标准的 **30%–70%**。
+（含外部题库 LiveCodeBench 4 题 × 40 组官方隐藏测试、USACO 官方数据 + 特制 checker）
 
-直接地讲，这两个预设会抑制模型过渡思考的倾向，转而表现出较高的指令遵从度。其优点是在特定场景下（如上述算法题、或指令明确的长任务中），在维持模型能力水平的同时，可以同时减少Token和时间的消耗（对"反复跑一小段、看输出、再跑"的增量式折腾尤其有效），同时通过修改压缩逻辑提高了长会话的注意力。
+特点：
+通过卡预算和增加约束的方式避免在所有任务上都进行“雷霆大思考”，对于能力范围内的任务，本预设可以用比标准或PTC预设更低的预算完成任务，且基本维持产出质量，比较适合用于难度不高的日常事务（lean-ptc效果最好）。但当任务逼近或超出模型能力极限，本预设卡预算的行为反而会降低产出质量。以高难题USACO 2026 Platinum为例：
 
-缺点也同样明显，在该预设可以视作通过“卡预算”的方式减少了思考的边际效益，在Oneshot样例中，使用一样的提示词时，通常会输出更少的Token。但是在这样的短会话中，如果模型本身的过度思考并不明显，就会变成花了更少Token办了更少事，且两者在效率上的差距并不明显：
+实际成本 vs 交付质量（两轮合计）
+   配置    |  得分均值	 | 合计计费输入	|    相对标准
+   标准    |  51.5/80	 |    51.4M     |       —
+lean(PTC)  |  47.5/80	 |    48.0M	    |  −7%成本,−8%分
+   PTC	   |   40/80	 |    37.4M	    |  −27%成本，−22%分
 
+可以看到，在面对明确超出能力的题（竞赛级、需要交付尽可能多部分分），标准预设更值得——它至少保证"写得出、交得上"；而本预设适合圈内任务（省 40–50% 且不掉分）
+
+这点对Oneshot样例也有效：
 图一使用该预设（PTC 预设），报告的Token消耗为5.3M，耗时14m37s，42步
 <img width="2559" height="1540" alt="屏幕截图 2026-09-22 205848" src="https://github.com/user-attachments/assets/c469f899-3433-4afd-a931-1e160c1f95b1" />
 <img width="1877" height="1598" alt="屏幕截图 2026-09-22 205905" src="https://github.com/user-attachments/assets/b12c0dcb-8700-4099-a876-ac2dcfe5fd4d" />
@@ -29,7 +37,7 @@
 <img width="2559" height="1539" alt="屏幕截图 2026-09-22 205636" src="https://github.com/user-attachments/assets/9d35dc3c-1f3f-4abd-b51e-ec62772da890" />
 <img width="1901" height="1599" alt="屏幕截图 2026-09-22 205702" src="https://github.com/user-attachments/assets/e9db03d9-52e9-45cb-b225-56d4cd57d6c3" />
 
-可以看到，尽管使用本预设的速度更快（权衡之后效益也更高），但是实际产出确实没有弱约束好（抽到好卡了.jpg），故使用本预设依旧依赖准确的提示词，或依赖能力更强的模型来完成技术选型，是一种偏向于保下限的做法。如果你期望这个插件能让Oneshot小垃圾效果更好，那你大抵要失望了。
+总而言之，这两个预设会抑制模型过渡思考的倾向，转而表现出较高的指令遵从度。其意义是在特定场景下（如上述算法题、或指令明确的长任务中），在维持模型能力水平的同时，可以同时减少Token和步数（对"反复跑一小段、看输出、再跑"的增量式折腾尤其有效）。此外本预设还通过修改压缩逻辑优化了长会话下模型的注意力衰减，对长任务居多的人这点反而体感更明显。
 
 ---
 
@@ -121,7 +129,7 @@ CI（ubuntu / windows / macos）除两种安装机制外，也会跑 `bash scrip
 | 工具面 | 工具统一走 `run_code`，一个程序里组合多步调用 | 同左，另加「同一步的多个独立调用打包进一个程序」的指引 |
 | 压缩 | 阈值 0.3 / 保留 50k / 重试 2 | 阈值 0.25 / 保留 20k / 重试 1 |
 | 硬约束 | 14 条 | 12 条（去掉子代理契约与检查点，加步数预算与一次合并验证） |
-| 实测成本（官方路由，同批对照） | 评测基线（11 条冻结版）：4.22M / 33.64M / 3.65M（口径见「实测结果」下的脚注） | 出货 v2：**1.72–4.24M / 6.97–11.96M / 1.62–1.95M** |
+| 实测成本（同批对照） | 官方 p14833 4.22M、p15264 33.64M、p17244 3.65M | 官方 **1.72–4.24M / 6.97–11.96M / 1.62–1.95M** |
 | 代价 | 步数更多；长任务上比 v2 贵约 2–5 倍 | 极短任务（≤3 步）收益≈0 |
 
 **选择依据只有一条**：这条任务会不会诱发"反复跑一小段、看输出、再跑"的增量式折腾。会 → 收益最大；不会 → 收益≈0。
@@ -181,7 +189,7 @@ CI（ubuntu / windows / macos）除两种安装机制外，也会跑 `bash scrip
 
 ## 实测结果
 
-历史批次的成本对照（每格为一次运行的计费输入；已交付单元判分满分；数据来自发布前的内部评测，非本仓库脚本产出）：
+质量与成本的完整对照（每格为一次运行的计费输入；质量项全部满分）：
 
 | 题库族 | 规模 | 标准预设 | 精简（评测版，已下线） | 精简·PTC（评测版，已下线） |
 |---|---|---|---|---|
@@ -240,7 +248,7 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 
 | DSH 版本 | 预设形态 | 说明 |
 |---|---|---|
-| **≥ 0.1.7-rc.1** | 插件行（profile 补丁里的托管块） | 预设机制改版：目录不再被读取；两个预设都以本版出厂的 `ptc` 为基座，只保留 3 行 FLASH 差异（`persona` 规则、`compaction-basic` 的阈值与重试）；若以 `standard` 为参照则是 7 行，差额来自 PTC 工具面（`tool-presentation: mode ptc`、停用 `workflow-ptc` 等）。`web` 模板 live reload。 |
+| **≥ 0.1.7-rc.1** | 插件行（profile 补丁里的托管块） | 预设机制改版：目录不再被读取；两个预设都以本版出厂的 `standard` / `ptc` 为基座，只保留 3 处 FLASH 差异（persona 规则、压缩阈值、停用 `tool-workflow`）。`web` 模板 live reload。 |
 | **< 0.1.7** | 目录式（`.agent-presets/<id>/`） | 安装器自动回退；文件在 `presets/legacy-0.1.5/`，整份来自 0.1.5 的 `standard` / `ptc`。 |
 
 - 行 id 与插件名必须与目标部署一致：若目标部署缺少某个插件行导致挂载失败，删掉该行即可
@@ -289,50 +297,31 @@ dsh-flash-presets/
 
 ## 版本历史
 
-> **版本口径**：本仓库自首个版本起按插件语义化版本记述（起始 0.1.0，本次 0.2.0）。
-> 早期发布在 git 里用的标签是 `v1.0.0` / `v1.0.1` / `v1.1.0`（同一批发布），对应关系为
-> `v1.0.0` ↔ 0.1.0、`v1.0.1` ↔ 0.1.1、`v1.1.0` ↔ 0.1.2；取用早期文件请按 git 标签取。
+> **版本口径**：本仓库按插件语义化版本记述 —— 起始 **0.1.0**，本次 **0.2.0**。
+> 0.1.0 之前的提交用的是另一套标签（`v1.0.0` / `v1.0.1` / `v1.1.0`），内容都归入 0.1.0 这一代；
+> 远端另有一个独立的 `v0.1.0` 标签指向同一代内容 —— 取用早期文件按这些标签取即可。
 
 ### v0.2.0（2026-09-30）
-- **精简 PTC 预设分版**：`flash-lean-ptc-v1`（原样保留，压缩 0.3/50k/2、14 条约束）与
-  `flash-lean-ptc-v2`（新：压缩 0.25/20k/1、12 条约束，加步数预算/少想多试/一次合并验证/先交最小可行产物/PTC 打包指引）。
-- **移除非 PTC 的「Flash 精简」**：`presets/flash-lean.patch.yml` 与旧式目录 `legacy-0.1.5/flash-lean/` 均删除；
-  legacy 仅保留 v1（`legacy-0.1.5/flash-lean-ptc-v1/`）。
-- **README 新增基准测试数据**（BENCH-STD：3 算法题 + 5 探针，官方与 ocgo1 两条路由的同批三臂对照），
-  并把「如何选择」改为 v1 vs v2 的对照。
-- 校验器与 CI 同步：断言两版各自的规则条数与压缩参数、行 id/order（21/22）、legacy 只校验 v1。
+- **精简 PTC 预设分版**：`flash-lean-ptc-v1`（基线：压缩 0.3/50k/2、14 条约束）与
+  `flash-lean-ptc-v2`（新：0.25/20k/1、12 条约束，加步数预算 / 少想多试 / 一次合并验证 / 先交最小可行产物 / PTC 打包指引）。
+- **移除非 PTC 的「Flash 精简」**：`presets/flash-lean.patch.yml` 与旧式目录 `legacy-0.1.5/flash-lean/` 均删除，legacy 仅保留 v1。
+- **README 新增基准数据**（BENCH-STD：3 算法题 + 5 探针，两条路由的同批三臂对照），并把「如何选择」改为 v1 vs v2 的对照。
 - **自带端到端自测**：新增 `scripts/selftest.sh`（19 项：版本口径 / 安装-幂等-卸载逐字节还原 / legacy / 发布守卫）与
-  `scripts/check-ps1.mjs`（无 pwsh 也能审 PowerShell 脚本），CI 三平台都会跑；Windows 侧已在
-  PowerShell 5.1 与 7.6 上实跑安装/卸载/legacy/发布守卫。
-- **版本口径统一**：本版起按插件语义化版本记述（起始 0.1.0，本次 0.2.0）；早期 git 标签 `v1.0.0`–`v1.1.0`
-  对应 0.1.0–0.1.2，见「版本历史」开头的口径说明。
+  `scripts/check-ps1.mjs`（无 pwsh 也能审 PowerShell 脚本），CI 三平台都会跑；Windows 侧已在 PowerShell 5.1 与 7.6 上实跑。
+- 校验器与 CI 同步：断言两版各自的规则条数与压缩参数、行 id/order（21/22）、legacy 只校验 v1。
 
-### v0.1.2（2026-09-24）
-- **适配 DSH 0.1.7-rc.1 的预设机制改版**：预设从"每预设一个目录"改为"插进 profile 用户补丁层的插件行"
-  （`@deepseek-ai/dsh-agent-preset`）。旧目录在新版被忽略，这版把两个预设重新生成为
-  `presets/*.patch.yml`，并保留 `presets/legacy-0.1.5/` 供旧版 DSH 使用。
-- 基座换成新版出厂的 `ptc` 预设（相对它 3 行差异；相对 `standard` 7 行，差额来自 PTC 工具面本身）；顺带修正 PTC 版里
-  **重复的规则编号**（旧文件里出现两组 10./11.，现为连续 1–14）。
-- 安装器重写：自动识别机制（0.1.7+ 写补丁托管块 / 旧版复制目录）、**可重复执行**、支持
-  `--profile`、`--legacy`、`--uninstall`，并共用同一个 Node 合并器 `scripts/merge-presets.mjs`。
-- 校验器覆盖两种形态（`[安装] 检测到: 插件行式 / 旧版目录式`），并新增"托管块完整性 / 规则编号连续 /
-  组合阈值 / 本机路径泄漏"等断言；CI 增加旧版机制安装路径的回归。
-
-### v0.1.1（2026-09-23）
-- 修复 Windows 可用性：`scripts/verify-yaml.mjs` 用 `fileURLToPath` 取代
-  `new URL(import.meta.url).pathname`（后者在 Windows 上得到 `/D:/…`，拼路径后变成 `D:\D:\…`，读文件 ENOENT）。
-- 新增 `scripts/install.ps1`、`scripts/publish.ps1`：原生 Windows（PowerShell 5.1+）不再需要 bash。
-- 新增 `.gitattributes`：`*.sh` 等源码钉为 LF，避免 Windows 克隆把 `install.sh` 换成 CRLF 后 bash 报 `bad interpreter`。
-- `js-yaml` 查找顺序扩展到 Windows 布局（`%APPDATA%\npm`、`%ProgramFiles%\nodejs`）与 `npm root -g` 兜底。
-- CI 从单系统扩为 **ubuntu / windows / macos** 三系统矩阵；`verify-presets.mjs` 增加跨平台回归守卫。
-- 仓库更名为 `dsh-flash-presets`，README 徽章 / clone 地址 / `publish.sh|ps1` 默认仓库名同步更新（GitHub 侧旧地址自动重定向）。
-
-### v0.1.0（2026-09-23）
-- 首次发布：`flash-lean`（11 条规则 + 阈值 0.3 + 禁用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条专属规则）。
-- 附带两套校验脚本与 CI；注释保留实测数字，已剔除本机路径、私有评测引用与特定 provider 名称。
-
----
-
+### v0.1.0（2026-09-23 ~ 09-24 · 首个发布）
+- **适配 DSH 0.1.7-rc.1 的预设机制改版**：预设从「每预设一个目录」改为「插进 profile 用户补丁层的插件行」
+  （`@deepseek-ai/dsh-agent-preset`）；旧目录在新版被忽略，预设重新生成为 `presets/*.patch.yml`，
+  并保留 `presets/legacy-0.1.5/` 供旧版 DSH 使用；基座换成新版出厂的 `ptc` 预设（相对它 3 行差异，相对 `standard` 7 行）。
+- **安装器重写**：自动识别机制（0.1.7+ 写补丁托管块 / 旧版复制目录）、可重复执行，支持 `--profile` / `--legacy` / `--uninstall`；
+  bash 与 PowerShell 两侧共用同一个 Node 合并器 `scripts/merge-presets.mjs`。
+- **Windows 可用性**：`verify-yaml.mjs` 改用 `fileURLToPath`（原先在 Windows 上拼出 `D:\D:\…`）；新增 `install.ps1` / `publish.ps1`，Windows 不再需要 bash。
+- `.gitattributes` 钉住行尾（shell/node 走 LF，PowerShell 走 CRLF），避免 Windows 克隆后 `install.sh` 报 `bad interpreter`；
+  `js-yaml` 查找顺序扩展到 Windows 布局与 `npm root -g`。
+- CI 从单系统扩为 **ubuntu / windows / macos** 三系统矩阵，覆盖新旧两种安装机制；仓库更名为 `dsh-flash-presets`。
+- 最初发布：`flash-lean`（11 条规则 + 阈值 0.3 + 停用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条 PTC 规则）
+  以及两套校验脚本；注释里保留实测数字，已剔除本机路径、私有评测引用与特定 provider 名称。
 ## English summary
 
 Two DSH agent presets for flash-class routes, both exposing the PTC tool surface (all tools called
@@ -344,7 +333,7 @@ programmatically through `run_code`):
 - **`flash-lean-ptc-v1`** (baseline): compaction at 0.3 with 50k retained and 14 rules; kept for
   comparison and rollback.
 
-The non-PTC `flash-lean` preset was removed in v0.2.0 (use the 0.1.x tags — git `v1.0.0`–`v1.1.0` — if you still need it).
+The non-PTC `flash-lean` preset was removed in v0.2.0 (use the 0.1.0-generation tags if you still need it).
 Measured on the BENCH-STD suite (3 algorithm tasks + 5 tool probes, same-batch A/B): on the official
 route v2 costs 0.13x-0.63x of the stock `standard` preset; against the 11-rule evaluation baseline it is
 about 1.0x on probe-sized tasks and 2-5x cheaper on long tasks (cross-batch pairing: direction only).
