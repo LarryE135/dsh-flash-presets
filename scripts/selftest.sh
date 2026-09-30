@@ -9,6 +9,7 @@ ok()   { PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; }
 bad()  { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$1"; }
 step() { printf '\n[%s]\n' "$1"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+hash_file() { node -e "const c=require('crypto'),f=require('fs');process.stdout.write(c.createHash('md5').update(f.readFileSync(process.argv[1])).digest('hex'))" "$1"; }
 EXPECT="${1:-$(sed -n 's/.*当前版本：\(v[0-9][0-9.]*\).*/\1/p' README.md | head -1)}"
 
 step "版本口径"
@@ -17,7 +18,12 @@ grep -q "### $EXPECT" README.md && ok "版本历史里有 $EXPECT 条目" || bad
 grep -q "$EXPECT" scripts/verify-presets.mjs && ok "校验器断言 $EXPECT" || bad "校验器未断言 $EXPECT"
 
 step "仓库层校验"
-node scripts/verify-presets.mjs >"$TMP/vp.log" 2>&1 && ok "verify-presets 通过" || { bad "verify-presets 失败"; tail -5 "$TMP/vp.log"; }
+# 干净机器（CI / 新用户）上没有 ~/.dsh，先在一个临时 home 里装一遍再校验；
+# 否则 verify-presets 会报「未检测到安装」，把环境问题当成仓库问题。
+PRE="$TMP/pre"; mkdir -p "$PRE/profiles/web"; printf '# selftest pre\n[]\n' > "$PRE/profiles/web/cordis.patch.yml"
+DSH_HOME="$PRE" bash scripts/install.sh --profile web >"$TMP/pre.install.log" 2>&1 \
+  && ok "预安装（临时 DSH_HOME）" || { bad "预安装失败"; tail -4 "$TMP/pre.install.log"; }
+DSH_HOME="$PRE" node scripts/verify-presets.mjs >"$TMP/vp.log" 2>&1 && ok "verify-presets 通过" || { bad "verify-presets 失败"; tail -5 "$TMP/vp.log"; }
 node scripts/verify-yaml.mjs   >"$TMP/vy.log" 2>&1 && ok "verify-yaml 通过"   || { bad "verify-yaml 失败";   tail -5 "$TMP/vy.log"; }
 node scripts/check-ps1.mjs     >"$TMP/cp.log" 2>&1 && ok "check-ps1 通过"     || { bad "check-ps1 失败";     tail -5 "$TMP/cp.log"; }
 node scripts/check-bash32-cjk.mjs >"$TMP/cb.log" 2>&1 && ok "bash 3.2 多字节守卫通过" || { bad "bash 3.2 多字节守卫失败"; tail -5 "$TMP/cb.log"; }
@@ -33,9 +39,9 @@ roundtrip() { # $1=名字
   local name="$1" home="$TMP/$1"
   DSH_HOME="$home" bash scripts/install.sh --profile web >"$TMP/$1.install.log" 2>&1 \
     || { bad "${name}：安装退出码非 0"; return; }
-  local h1; h1="$(md5sum "$home/profiles/web/cordis.patch.yml" | cut -d' ' -f1)"
+  local h1; h1="$(hash_file "$home/profiles/web/cordis.patch.yml")"
   DSH_HOME="$home" bash scripts/install.sh --profile web >/dev/null 2>&1
-  local h2; h2="$(md5sum "$home/profiles/web/cordis.patch.yml" | cut -d' ' -f1)"
+  local h2; h2="$(hash_file "$home/profiles/web/cordis.patch.yml")"
   [ "$h1" = "$h2" ] && ok "${name}：重复安装幂等" || bad "${name}：重复安装不幂等"
   DSH_HOME="$home" node scripts/verify-presets.mjs >"$TMP/$1.verify.log" 2>&1 \
     && ok "${name}：安装后校验通过" || { bad "${name}：安装后校验失败"; tail -4 "$TMP/$1.verify.log"; }
