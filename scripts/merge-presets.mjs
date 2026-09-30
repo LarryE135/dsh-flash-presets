@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const FILES = ['flash-lean.patch.yml', 'flash-lean-ptc.patch.yml'];
+const FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml'];
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // never URL.pathname on Windows
 const argv = process.argv.slice(2);
@@ -48,12 +48,19 @@ function buildBlock() {
 
 function stripBlock(raw) {
   let skip = false;
-  return raw.split(/(?<=\n)/).filter(line => {
-    if (line.trim() === BEGIN) skip = true;
+  const out = [];
+  for (const line of raw.split(/(?<=\n)/)) {
+    if (line.trim() === BEGIN) {
+      skip = true;
+      // 安装时我们在块前留了一个空行做间隔，卸载时一并去掉，才能逐字节还原
+      if (out.length && out[out.length - 1].trim() === '') out.pop();
+      continue;
+    }
     const keep = !skip;
     if (line.trim() === END) skip = false;
-    return keep;
-  }).join('');
+    if (keep) out.push(line);
+  }
+  return out.join('');
 }
 
 let raw = fs.existsSync(patchPath) ? fs.readFileSync(patchPath, 'utf8') : '[]\n';
@@ -61,7 +68,13 @@ raw = stripBlock(raw);
 
 let out;
 if (flag('--remove')) {
-  out = raw;
+  const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
+  if (body.length === 0) {
+    const cmts = raw.split(/\r?\n/).filter(l => l.trim() && l.trimStart().startsWith('#')).join('\n');
+    out = (cmts ? cmts.replace(/\s+$/, '') + '\n' : '') + '[]\n';
+  } else {
+    out = raw;                      // 原样保留用户原有内容与尾随空行
+  }
 } else {
   const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
   if (body.length === 0 || (body.length === 1 && body[0].trim() === '[]')) {

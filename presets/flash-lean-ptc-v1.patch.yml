@@ -1,15 +1,10 @@
-# DSH Flash 精简预设 · flash-lean-ptc（DSH >= 0.1.7-rc.1 的插件行式声明）
-# 用法：把下面的 `- insert:` 条目追加到 ~/.dsh/profiles/<profile>/cordis.patch.yml
-#      （web 模板是 live reload，改完即生效，无需重启；其它模板需重启）
-# 与出厂 standard 预设相比只有 3 处差异：persona 规则、compaction 阈值、停用 tool-workflow。
-# DSH < 0.1.7 请用 presets/legacy-0.1.5/ 下的目录式预设。
 - insert:
-    - id: preset-flash-lean-ptc
+    - id: preset-flash-lean-ptc-v1
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: flash-lean-ptc
-        name: "Flash 精简·PTC（v4.1-flash）"
-        description: "精简模式的 PTC 版：工具调用打包进程序（run_code），实测再降约 40%（对比精简版）；含面向 PTC 的 14 条行为硬约束。适用：多题/多文件、脚本密集型任务。"
+        id: flash-lean-ptc-v1
+        name: "Flash 精简·PTC v1（v4.1-flash）"
+        description: "精简模式的 PTC 版 · v1 基线（2026-09-29）。压缩阈值 0.3 / 保留 50k；含面向 PTC 的 14 条硬约束。适用：多题/多文件、脚本密集型任务。"
         order: 21
         plugins:
           - id: persona

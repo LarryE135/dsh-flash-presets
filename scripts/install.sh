@@ -23,7 +23,7 @@ PROFILE="web"
 MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-PRESETS=(flash-lean flash-lean-ptc)
+PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -77,15 +77,18 @@ install_modern() {
   validate_patch
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
-  echo "「Flash 精简（v4.1-flash）」与「Flash 精简·PTC（v4.1-flash）」。"
-  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean'"
+  echo "「Flash 精简·PTC v1（v4.1-flash）」与「Flash 精简·PTC v2（v4.1-flash）」。"
+  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v2'"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
 }
 
 install_legacy() {
   for p in "${PRESETS[@]}"; do
     src="$HERE/presets/legacy-0.1.5/$p"
-    [ -d "$src" ] || { echo "缺少目录: $src" >&2; exit 1; }
+    if [ ! -d "$src" ]; then
+      echo "跳过 ${p}：本版未提供旧式目录（legacy 仅保留 v1）"
+      continue
+    fi
     if [ -e "$LEGACY_DIR/$p" ]; then
       echo "已存在 $LEGACY_DIR/$p → 备份为 .bak-$STAMP"
       mv "$LEGACY_DIR/$p" "$LEGACY_DIR/$p.bak-$STAMP"
@@ -95,7 +98,7 @@ install_legacy() {
     echo "已安装 $LEGACY_DIR/${p}（旧版目录式）"
   done
   echo
-  echo "安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简」/「Flash 精简·PTC」。"
+  echo "安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简·PTC v1」。"
 }
 
 uninstall_modern() {

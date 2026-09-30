@@ -1,13 +1,14 @@
 # DSH Flash 精简预设
 
-**当前版本：v1.1.0**（2026-09-24 · 适配 DSH 0.1.7-rc.1 的预设机制改版）
+**当前版本：v0.2.0**（2026-09-30 · 精简 PTC 预设分 v1/v2 两版，附 8 用例基准测试数据）
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）准备的两个 agent 预设，面向 **flash 级路由**做 token 效率优化：
 
-- **`flash-lean`** — 日常主力。压缩阈值下调到 300k 级 + 11 条行为硬约束 + 砍掉两个从未被调用的工具行。
-- **`flash-lean-ptc`** — 同上，另加 PTC 工具面（所有工具经 `run_code` 编程式调用）与 3 条 PTC 专属规则。
+- **`flash-lean-ptc-v2`** — 现行推荐。PTC 工具面（所有工具经 `run_code` 编程式调用）+ 12 条行为硬约束；压缩阈值 0.25 / 保留 20k，并加了步数预算（≤20 步）、少想多试、一次合并验证、先交最小可行产物、PTC 打包指引。
+- **`flash-lean-ptc-v1`** — v1 基线。同为 PTC 工具面 + 14 条硬约束，压缩阈值 0.3 / 保留 50k；保留用于对照与回退。
+- 自 v0.2.0 起**不再提供非 PTC 的「Flash 精简」预设**（原 `flash-lean`）；需要它的老用户请用 0.1.x（git 标签 `v1.0.0`–`v1.1.0`，见版本历史末的口径说明）。
 
 结合AA榜单上的Token efficiency和日常使用不难看出，Deepseek v4.1 flash在有过渡思考倾向的同时，意图理解较差（注意，不是指令遵从度）。在喜闻乐见的MC Benchmark中，作者仅在新的提示词中加上一句“这是一个新项目，不要参考已有的项目”，模型就直接理解为不能选用Three.js这样成熟的技术栈（且完全没有征求我的意见），而是选择自研WebGL引擎，一连开了两个对话都是这样（供应商为官方）。加上v4.1flash能力并不差，容易给人一种“时神时鬼”的感觉。实际使用时除了Linux环境外，v4.1f高度依赖准确的提示词或其他能力更强模型的指导。
 
@@ -20,7 +21,7 @@
 
 缺点也同样明显，在该预设可以视作通过“卡预算”的方式减少了思考的边际效益，在Oneshot样例中，使用一样的提示词时，通常会输出更少的Token。但是在这样的短会话中，如果模型本身的过度思考并不明显，就会变成花了更少Token办了更少事，且两者在效率上的差距并不明显：
 
-图一使用该预设（lean-PTC），报告的Token消耗为5.3M，耗时14m37s，42步
+图一使用该预设（PTC 预设），报告的Token消耗为5.3M，耗时14m37s，42步
 <img width="2559" height="1540" alt="屏幕截图 2026-09-22 205848" src="https://github.com/user-attachments/assets/c469f899-3433-4afd-a931-1e160c1f95b1" />
 <img width="1877" height="1598" alt="屏幕截图 2026-09-22 205905" src="https://github.com/user-attachments/assets/b12c0dcb-8700-4099-a876-ac2dcfe5fd4d" />
 
@@ -81,6 +82,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 npm install --no-save js-yaml@4          # verify-yaml 需要；verify-presets 无第三方依赖
 node scripts/verify-presets.mjs          # 结构 + 跨平台回归 + 安装形态（自动识别新旧机制）
 node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言（阈值/规则条数/PTC 展示层…）
+bash scripts/selftest.sh                 # 端到端自测：版本口径/安装-幂等-卸载逐字节还原/legacy/发布守卫（19 项）
+node scripts/check-ps1.mjs               # PowerShell 脚本静态审查：预设名单、tag 守卫、BOM（无需 pwsh）
 ```
 
 看排在最前面的 `[安装] 检测到: …` 一行即可确认当前生效的是哪种机制：
@@ -91,7 +94,7 @@ node scripts/verify-yaml.mjs             # YAML 解析 + 关键取值断言（�
 还可以直接问 DSH 组合结果对不对：
 
 ```bash
-dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean'
+dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v2'
 ```
 
 Windows 上若 `DSH_HOME` 不是默认值（默认 `%USERPROFILE%\.dsh`）：
@@ -101,23 +104,25 @@ $env:DSH_HOME = "$env:USERPROFILE\.dsh"
 node scripts\verify-presets.mjs
 ```
 
-两个脚本都是纯 Node，在 Windows / macOS / Linux 上行为一致；`js-yaml` 会自动从仓库 `node_modules`、
+CI（ubuntu / windows / macos）除两种安装机制外，也会跑 `bash scripts/selftest.sh` 与 `node scripts/check-ps1.mjs`。
+上面的脚本都是纯 Node 或纯 shell，在 Windows / macOS / Linux 上行为一致；`js-yaml` 会自动从仓库 `node_modules`、
 全局 DSH 安装位置或 `npm root -g` 中查找，也可以用 `DSH_JS_YAML` 直接指定。
 
-装好后预设列表里会出现「Flash 精简（v4.1-flash）」和「Flash 精简·PTC（v4.1-flash）」
+装好后预设列表里会出现「Flash 精简·PTC v1（v4.1-flash）」与「Flash 精简·PTC v2（v4.1-flash）」
 （0.1.7+ 的 web profile 无需重启，刷新页面即可）。
 
 ---
 
 ## 如何选择？
 
-| | `flash-lean` | `flash-lean-ptc` |
+| | `flash-lean-ptc-v1` | `flash-lean-ptc-v2` |
 |---|---|---|
-| 定位 | 长任务、多回合开发 | 需要"用脚本批量调用工具"的任务 |
-| 工具面 | 标准工具面（read/write/edit/bash/glob/grep…） | 工具统一走 `run_code`，一个程序里组合多步调用 |
-| 实测成本 | 长任务计费输入降 28%–47%；自出难题 −70%；USACO 单题 −37% | 多题算法任务 −57% ~ −88%，步数 −85% |
-| 代价 | 任务不诱发浪费时收益≈0，甚至 +32% | 单步短任务里反而更贵（约 +30%） |
-| 额外约束 | 11 条 | 14 条（+payload 安全、读写分离、程序输出预算） |
+| 定位 | 基线与对照，行为最可预测 | 现行推荐：多题、多文件、脚本密集型任务 |
+| 工具面 | 工具统一走 `run_code`，一个程序里组合多步调用 | 同左，另加「同一步的多个独立调用打包进一个程序」的指引 |
+| 压缩 | 阈值 0.3 / 保留 50k / 重试 2 | 阈值 0.25 / 保留 20k / 重试 1 |
+| 硬约束 | 14 条 | 12 条（去掉子代理契约与检查点，加步数预算与一次合并验证） |
+| 实测成本（官方路由，同批对照） | 评测基线（11 条冻结版）：4.22M / 33.64M / 3.65M（口径见「实测结果」下的脚注） | 出货 v2：**1.72–4.24M / 6.97–11.96M / 1.62–1.95M** |
+| 代价 | 步数更多；长任务上比 v2 贵约 2–5 倍 | 极短任务（≤3 步）收益≈0 |
 
 **选择依据只有一条**：这条任务会不会诱发"反复跑一小段、看输出、再跑"的增量式折腾。会 → 收益最大；不会 → 收益≈0。
 两者都不改变答案质量。
@@ -126,13 +131,13 @@ node scripts\verify-presets.mjs
 
 ## 关键配置
 
-与 DSH 自带 `standard` 预设相比，**只有 4 处差异**：
+基座 = 新版出厂的 **`ptc` 预设**（PTC 工具面、`delegation/workflow-ptc` 等来自基座本身）。独立审计实测：相对基座 **3 行差异**，相对 `standard` 预设 **7 行**（多出的 4 行是 PTC 工具面带来的，不能按 3 处口径类比）：
 
-| 行 | 标准预设 | 本预设 |
-|---|---|---|
-| `persona` | 只有两行（身份 + 工作目录） | 另加 11 条硬约束（PTC 版 14 条） |
-| `compaction-basic` | 用默认（`thresholdRatio` 0.8，约等于声明窗口的 80%） | `thresholdRatio: 0.3`、`retainTokens: 50000`、`compactionRetries: 2` |
-| `tool-workflow` / `tool-ralph` | 启用 | `disabled: true`（模型可见工具 29 → 27） |
+| 行 | 标准预设 | `flash-lean-ptc-v1` | `flash-lean-ptc-v2` |
+|---|---|---|---|
+| `persona` | 只有两行（身份 + 工作目录） | 另加 14 条 PTC 硬约束 | 另加 12 条（含步数预算、一次合并验证、PTC 打包指引） |
+| `compaction-basic` | 用默认（`thresholdRatio` 0.8，约等于声明窗口的 80%） | 0.3 / 保留 50k / 重试 2 | 0.25 / 保留 20k / 重试 1 |
+| `tool-workflow` / `delegation/workflow-ptc` | 启用 | `disabled: true`（`tool-ralph` 在出厂 `standard` 里本就停用，不构成差异） |
 | `tool-result-pruner` | 默认 8192/4096/1024 | **保持不变**（收紧阈值实测会亏，见下） |
 
 压缩阈值是 `floor(声明窗口 × thresholdRatio)`：本预设按"声明 1,000,000 窗口"的路由调过，阈值≈300k。
@@ -140,15 +145,16 @@ node scripts\verify-presets.mjs
 
 ---
 
-## 11 条行为约束（`flash-lean`）
+## 行为约束（v1 14 条 / v2 12 条）
 
-工具选择（用 read/glob/grep，不用 bash 浏览）· 读预算（同一路径一个阶段只读一次）· 输出预算（批量调用、截断长输出、单条结果 ≤4 KB）·
-增量建模文件（先建骨架再 edit，不重发已验证文件）· 证据优先（"通过"必须附本轮命令与关键输出）· 验收优先（先列出验收点再实现）·
-检查点（约每 40 次工具调用或上下文过 250k 就停下汇报）· 语言与范围 · 子代理契约 · **上下文纪律**（不要长期驻留整份语料）·
-转录敏感度（不要把密钥/私密原文写进会话，转录可被回读）。
+**v1（14 条）**：工具选择（用 read/glob/grep，不用 bash 浏览）· 读预算（同一路径一个阶段只读一次）· 输出预算（批量调用、截断长输出、单条结果 ≤4 KB）·
+增量建模文件（先建骨架再 edit）· 证据优先（"通过"必须附本轮命令与关键输出）· 验收优先（先列验收点再实现）· 检查点（约每 40 次调用停下汇报）·
+语言与范围 · 子代理契约 · 上下文纪律 · 转录敏感度 · payload 安全（大 payload 落盘再读）· 读与改分成两个程序 · 每个程序输出保持小。
 
-`flash-lean-ptc` 另加：payload 安全（含反引号的文本不塞进 `String.raw`，大 payload 落盘再读）· 读与改分成两个程序 ·
-每个程序输出保持小（结尾只打印 ≤40 行摘要，细节写日志）。
+**v2（12 条）**：在 v1 基础上删掉「检查点」与「子代理契约」（实测这两条只推高步数），改为：
+先给预算（≤20 步，交付物过检查即停）· 少想多试（短推理 + 一条廉价取证）· 每个交付物只做一次合并验证 ·
+提交答案型任务先交最小可行产物 · 把同一步的多个独立调用打包进一个 `run_code` 程序（单次调用则直接调）。
+上下文纪律、转录敏感度、输出预算、安全条款原样保留。
 
 ---
 
@@ -175,9 +181,9 @@ node scripts\verify-presets.mjs
 
 ## 实测结果
 
-质量与成本的完整对照（每格为一次运行的计费输入；质量项全部满分）：
+历史批次的成本对照（每格为一次运行的计费输入；已交付单元判分满分；数据来自发布前的内部评测，非本仓库脚本产出）：
 
-| 题库族 | 规模 | 标准预设 | `flash-lean` | `flash-lean-ptc` |
+| 题库族 | 规模 | 标准预设 | 精简（评测版，已下线） | 精简·PTC（评测版，已下线） |
 |---|---|---|---|---|
 | 自出 easy | 6 题 | 1.22M | 1.33M | **0.42M** |
 | 自出 hard | 4 题（矩阵快速幂/后缀自动机/懒标记线段树/斜率优化） | 2.60M | 0.77M | **0.32M** |
@@ -187,6 +193,31 @@ node scripts\verify-presets.mjs
 
 外部题库的质量项：4 题 160/160 官方隐藏测试全部通过（三条臂均满分）；校正 checker 后 USACO 14/14。
 后续会考虑增加难度更高的测试题目
+
+### 基准测试 BENCH-STD（2026-09-30）
+
+8 个用例 × 多臂、**同批对照**（批次之间同预设可差 4–9 倍，因此只比同批）：3 道算法题 + 5 个工具型探针
+（批量读取、大数据、循环、修复、检索）。质量项含隐藏测试与大数据形态测试；**已交付单元判分全部满分**（个别单元未交付或判负，见下方两处注）。
+
+**官方路由**（每格 1–4 次运行）：
+
+| 用例 | standard | 评测 v1 基线（11 条冻结版） | v2 |
+|---|---|---|---|
+| p14833 构造 | 12.40M | 4.22M | **1.72M** |
+| p15264 大数据构造 | 37.24M / 53.79M | 33.64M | **11.96M / 6.97M** |
+| p17244 提交答案型 | 2.56M（另一批 n=1）/ 3.92M[3.18–8.81]（n=3） | 3.65M[1.49–5.83]（n=3） | **1.62M（另一批 n=1）/ 1.95M[0.90–2.12]（n=3）** |
+
+> **v1 列的口径**：表里 v1 的数字来自评测用的冻结版 `frozen/lean-ptc-v1.yml`（11 条规则，仅用于基准）。
+> 仓库出货的 `flash-lean-ptc-v1` 是 GUI 版（14 条规则，0.1.x 的 `flash-lean-ptc` 延续），二者不是同一份文件；
+> 出货 v1 未单独跑基准，需要时可补测（已在待办里）。
+
+**第三方路由**（同批三臂）：p14833 37.48M → v1 14.23M → **v2 7.84M**；
+probe1 0.11M → **0.04M（v1）** → 0.05M（v2）；p17244 standard 8.03M、v1 3.98M（v2 仓在该批被中止，未交付，不计入）。
+注：p15264 在该路由上 standard 未交付、v1/v2 判负（该题在此路由交付不稳），不以单题结果判断预设差异。
+
+**结论**：v2 相对 standard 在官方路由上为 **0.13×–0.63×**（取表内最省/最费配对）；
+同批 p14833 上 v1 4.22M ≈ v2 4.24M（≈1.0×，探测型任务持平）；长任务上（p15264 6.97 vs 33.64M、p17244 1.95 vs 3.65M）v2 更低，
+但这两组是**跨批配对**，幅度里含批次差 —— 方向可信、倍数不可当精确值。
 
 ---
 
@@ -209,7 +240,7 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 
 | DSH 版本 | 预设形态 | 说明 |
 |---|---|---|
-| **≥ 0.1.7-rc.1** | 插件行（profile 补丁里的托管块） | 预设机制改版：目录不再被读取；两个预设都以本版出厂的 `standard` / `ptc` 为基座，只保留 3 处 FLASH 差异（persona 规则、压缩阈值、停用 `tool-workflow`）。`web` 模板 live reload。 |
+| **≥ 0.1.7-rc.1** | 插件行（profile 补丁里的托管块） | 预设机制改版：目录不再被读取；两个预设都以本版出厂的 `ptc` 为基座，只保留 3 行 FLASH 差异（`persona` 规则、`compaction-basic` 的阈值与重试）；若以 `standard` 为参照则是 7 行，差额来自 PTC 工具面（`tool-presentation: mode ptc`、停用 `workflow-ptc` 等）。`web` 模板 live reload。 |
 | **< 0.1.7** | 目录式（`.agent-presets/<id>/`） | 安装器自动回退；文件在 `presets/legacy-0.1.5/`，整份来自 0.1.5 的 `standard` / `ptc`。 |
 
 - 行 id 与插件名必须与目标部署一致：若目标部署缺少某个插件行导致挂载失败，删掉该行即可
@@ -224,7 +255,8 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 
 ## 已知限制
 
-- 成本数据**每臂一次运行**（除"隔离实验"是 3 次重复），方向可信、幅度有噪声。
+- 成本数据多数为每臂 1 次运行（隔离实验 3 次重复；2026-09-30 基准里 p17244 达 n=4）。方向可信、幅度有噪声；
+  **跨批次同预设可差 4–9 倍**，请只用同批对照结论。
 - 三个题库族的金标准解由同一模型族撰写（用大时间余量 + 数千次随机对拍证明其正确，但不是独立第三方实现）。
 - 未覆盖：真实 GPU/渲染负载、联网检索型任务、多子代理扇出（`flash-fanout` 不在本仓库）。
 - 规则 7（每约 40 次调用停下汇报）在实测里会被长任务拖过去，属于"最好情况下的纪律"，不是硬保证。
@@ -236,17 +268,19 @@ CI 在 **ubuntu-latest / windows-latest / macos-latest** 三个 runner 上各跑
 ```
 dsh-flash-presets/
 ├── presets/
-│   ├── flash-lean.patch.yml              # 0.1.7+ 插件行式（基座 = 新版 standard）
-│   ├── flash-lean-ptc.patch.yml          # 0.1.7+ 插件行式（基座 = 新版 ptc）
-│   └── legacy-0.1.5/<name>/              # 旧版目录式（DSH < 0.1.7 回退用）
+│   ├── flash-lean-ptc-v2.patch.yml       # 0.1.7+ 插件行式（基座 = 新版 ptc）· 现行推荐
+│   ├── flash-lean-ptc-v1.patch.yml       # 0.1.7+ 插件行式 · v1 基线（对照/回退）
+│   └── legacy-0.1.5/flash-lean-ptc-v1/   # 旧版目录式（DSH < 0.1.7 回退用，仅提供 v1）
 │       └── {preset.yml,agent.cordis.yml}
 ├── scripts/
 │   ├── install.sh / install.ps1          # 安装/卸载（bash / PowerShell，行为一致，自动选机制）
 │   ├── merge-presets.mjs                 # 两种安装器共用的补丁合并器（托管块插入/替换/移除）
 │   ├── verify-presets.mjs                # 结构 + 跨平台回归 + 安装形态检查（无依赖）
 │   ├── verify-yaml.mjs                   # YAML 解析 + 取值断言（需 js-yaml）
+│   ├── selftest.sh                       # 端到端自测（安装/幂等/卸载/legacy/发布守卫，19 项）
+│   ├── check-ps1.mjs                     # PowerShell 脚本静态审查（预设名单/BOM/tag 守卫）
 │   └── publish.sh / publish.ps1          # 推送到 GitHub（+ Release）
-├── .github/workflows/verify.yml          # CI：ubuntu / windows / macos 三系统 × 新旧两种安装机制
+├── .github/workflows/verify.yml          # CI：ubuntu / windows / macos 三系统 × 新旧安装机制 × 自测
 ├── .gitattributes                        # 行尾规范（*.sh 钉 LF，Windows 克隆后仍可直接 bash）
 ├── .gitignore
 ├── LICENSE
@@ -255,18 +289,36 @@ dsh-flash-presets/
 
 ## 版本历史
 
-### v1.1.0（2026-09-24）
+> **版本口径**：本仓库自首个版本起按插件语义化版本记述（起始 0.1.0，本次 0.2.0）。
+> 早期发布在 git 里用的标签是 `v1.0.0` / `v1.0.1` / `v1.1.0`（同一批发布），对应关系为
+> `v1.0.0` ↔ 0.1.0、`v1.0.1` ↔ 0.1.1、`v1.1.0` ↔ 0.1.2；取用早期文件请按 git 标签取。
+
+### v0.2.0（2026-09-30）
+- **精简 PTC 预设分版**：`flash-lean-ptc-v1`（原样保留，压缩 0.3/50k/2、14 条约束）与
+  `flash-lean-ptc-v2`（新：压缩 0.25/20k/1、12 条约束，加步数预算/少想多试/一次合并验证/先交最小可行产物/PTC 打包指引）。
+- **移除非 PTC 的「Flash 精简」**：`presets/flash-lean.patch.yml` 与旧式目录 `legacy-0.1.5/flash-lean/` 均删除；
+  legacy 仅保留 v1（`legacy-0.1.5/flash-lean-ptc-v1/`）。
+- **README 新增基准测试数据**（BENCH-STD：3 算法题 + 5 探针，官方与 ocgo1 两条路由的同批三臂对照），
+  并把「如何选择」改为 v1 vs v2 的对照。
+- 校验器与 CI 同步：断言两版各自的规则条数与压缩参数、行 id/order（21/22）、legacy 只校验 v1。
+- **自带端到端自测**：新增 `scripts/selftest.sh`（19 项：版本口径 / 安装-幂等-卸载逐字节还原 / legacy / 发布守卫）与
+  `scripts/check-ps1.mjs`（无 pwsh 也能审 PowerShell 脚本），CI 三平台都会跑；Windows 侧已在
+  PowerShell 5.1 与 7.6 上实跑安装/卸载/legacy/发布守卫。
+- **版本口径统一**：本版起按插件语义化版本记述（起始 0.1.0，本次 0.2.0）；早期 git 标签 `v1.0.0`–`v1.1.0`
+  对应 0.1.0–0.1.2，见「版本历史」开头的口径说明。
+
+### v0.1.2（2026-09-24）
 - **适配 DSH 0.1.7-rc.1 的预设机制改版**：预设从"每预设一个目录"改为"插进 profile 用户补丁层的插件行"
   （`@deepseek-ai/dsh-agent-preset`）。旧目录在新版被忽略，这版把两个预设重新生成为
   `presets/*.patch.yml`，并保留 `presets/legacy-0.1.5/` 供旧版 DSH 使用。
-- 基座换成新版出厂的 `standard` / `ptc` 预设，只保留 3 处 FLASH 差异；顺带修正 PTC 版里
+- 基座换成新版出厂的 `ptc` 预设（相对它 3 行差异；相对 `standard` 7 行，差额来自 PTC 工具面本身）；顺带修正 PTC 版里
   **重复的规则编号**（旧文件里出现两组 10./11.，现为连续 1–14）。
 - 安装器重写：自动识别机制（0.1.7+ 写补丁托管块 / 旧版复制目录）、**可重复执行**、支持
   `--profile`、`--legacy`、`--uninstall`，并共用同一个 Node 合并器 `scripts/merge-presets.mjs`。
 - 校验器覆盖两种形态（`[安装] 检测到: 插件行式 / 旧版目录式`），并新增"托管块完整性 / 规则编号连续 /
   组合阈值 / 本机路径泄漏"等断言；CI 增加旧版机制安装路径的回归。
 
-### v1.0.1（2026-09-23）
+### v0.1.1（2026-09-23）
 - 修复 Windows 可用性：`scripts/verify-yaml.mjs` 用 `fileURLToPath` 取代
   `new URL(import.meta.url).pathname`（后者在 Windows 上得到 `/D:/…`，拼路径后变成 `D:\D:\…`，读文件 ENOENT）。
 - 新增 `scripts/install.ps1`、`scripts/publish.ps1`：原生 Windows（PowerShell 5.1+）不再需要 bash。
@@ -275,7 +327,7 @@ dsh-flash-presets/
 - CI 从单系统扩为 **ubuntu / windows / macos** 三系统矩阵；`verify-presets.mjs` 增加跨平台回归守卫。
 - 仓库更名为 `dsh-flash-presets`，README 徽章 / clone 地址 / `publish.sh|ps1` 默认仓库名同步更新（GitHub 侧旧地址自动重定向）。
 
-### v1.0.0（2026-09-23）
+### v0.1.0（2026-09-23）
 - 首次发布：`flash-lean`（11 条规则 + 阈值 0.3 + 禁用 workflow/ralph）与 `flash-lean-ptc`（+ PTC 工具面与 3 条专属规则）。
 - 附带两套校验脚本与 CI；注释保留实测数字，已剔除本机路径、私有评测引用与特定 provider 名称。
 
@@ -283,10 +335,18 @@ dsh-flash-presets/
 
 ## English summary
 
-Two DSH agent presets tuned for token efficiency on flash-class routes. `flash-lean` lowers the
-auto-compaction threshold to ~30% of the declared context window, adds 11 hard behavioural rules,
-and disables two tool rows that were never called; `flash-lean-ptc` adds the PTC tool surface
-(`run_code`-only) plus three PTC-specific rules. Measured across four task families, answer quality
-stayed at full marks (including 4 LiveCodeBench problems × 40 official hidden tests) while billed
-input fell to 30–70% of the standard preset. Install with `bash scripts/install.sh`, verify with
-`node scripts/verify-presets.mjs`. MIT.
+Two DSH agent presets for flash-class routes, both exposing the PTC tool surface (all tools called
+programmatically through `run_code`):
+
+- **`flash-lean-ptc-v2`** (recommended): compaction at 0.25 with 20k retained, plus 12 hard behavioural
+  rules - a step budget (<=20), thinking less and probing sooner, one consolidated verification per
+  deliverable, ship the smallest viable artifact first, and pack independent tool calls into one program.
+- **`flash-lean-ptc-v1`** (baseline): compaction at 0.3 with 50k retained and 14 rules; kept for
+  comparison and rollback.
+
+The non-PTC `flash-lean` preset was removed in v0.2.0 (use the 0.1.x tags — git `v1.0.0`–`v1.1.0` — if you still need it).
+Measured on the BENCH-STD suite (3 algorithm tasks + 5 tool probes, same-batch A/B): on the official
+route v2 costs 0.13x-0.63x of the stock `standard` preset; against the 11-rule evaluation baseline it is
+about 1.0x on probe-sized tasks and 2-5x cheaper on long tasks (cross-batch pairing: direction only).
+Every delivered unit scored full marks. Install with `bash scripts/install.sh`; both presets are
+inserted into the profile patch file and hot-reload on the `web` template.

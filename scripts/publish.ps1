@@ -14,7 +14,7 @@ param(
   [string] $Repo   = $(if ($env:REPO)    { $env:REPO }    else { 'dsh-flash-presets' }),
   [ValidateSet('public', 'private')]
   [string] $Visibility = 'public',
-  [string] $Tag = 'v1.0.0'
+  [string] $Tag = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +22,14 @@ $repo = Split-Path -Parent $PSScriptRoot
 Push-Location $repo
 try {
   $remote = "https://github.com/$GhUser/$Repo.git"
+  if (-not $Tag) {
+    $m = Select-String -Path (Join-Path $repo 'README.md') -Pattern '当前版本：(v[0-9.]+)' | Select-Object -First 1
+    if ($m) { $Tag = $m.Matches[0].Groups[1].Value }
+  }
+  if (-not $Tag) { throw '无法从 README 解析当前版本，请显式传 -Tag' }
+  if (-not (git rev-parse -q --verify "refs/tags/$Tag")) {
+    throw "本地没有标签 $Tag —— 请先提交并打标签：git tag -a $Tag -m '…'"
+  }
   Write-Host "目标：$GhUser/$Repo（$Visibility），标签 $Tag"
 
   $existing = git remote get-url origin 2>$null
@@ -32,7 +40,7 @@ try {
   if ($gh) {
     gh repo view "$GhUser/$Repo" 2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) {
-      gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (flash-lean / flash-lean-ptc)'
+      gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)'
     }
     git push -u origin main
     if ($LASTEXITCODE -ne 0) { throw 'git push main 失败' }
