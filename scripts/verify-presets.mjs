@@ -31,8 +31,8 @@ const patchFile = path.join(dshHome, 'profiles', profile, 'cordis.patch.yml');
 const legacyRoot = path.join(dshHome, '.agent-presets');
 
 const EXPECT = {
-  'flash-lean': { rules: 11, ptc: false, order: 20 },
-  'flash-lean-ptc': { rules: 14, ptc: true, order: 21 },
+  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: true },
+  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
@@ -56,7 +56,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
     const legacy = path.join(repo, 'presets', 'legacy-0.1.5', name, 'agent.cordis.yml');
     check(read(modern) !== null && fs.statSync(modern).size > 5000,
           'presets/' + name + '.patch.yml（0.1.7+ 插件行式，>5 KB）');
-    check(read(legacy) !== null, 'presets/legacy-0.1.5/' + name + '/agent.cordis.yml（旧版回退）');
+    if (exp.legacy) check(read(legacy) !== null, 'presets/legacy-0.1.5/' + name + '/agent.cordis.yml（旧版回退）');
     const text = read(modern) || '';
     check(!/\/(home|Users)\/[^ ]*\/|[A-Za-z]:\\\\/.test(text), name + '.patch.yml 不含本机绝对路径');
     check(new RegExp('^- insert:$', 'm').test(text), name + '.patch.yml 含行首 - insert: 条目');
@@ -76,7 +76,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/v1\.1\.0/.test(readme), 'README 标注 v1.1.0');
+  check(/v0\.2\.0/.test(readme), 'README 标注 v0.2.0');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
 
   // 换设备才会炸的回归：ESM 路径、bash-only 安装器、CRLF 检出
@@ -134,6 +134,7 @@ if (modernInstalled) {
   check(!/\/(home|Users)\/[^ ]*\/\.dsh\//.test(block), '托管块里未写入本机 DSH_HOME 绝对路径');
 } else if (legacyInstalled) {
   for (const [name, exp] of Object.entries(EXPECT)) {
+    if (!exp.legacy) continue;                       // legacy 只出货 v1
     console.log('\n[' + name + '（已安装 · 旧式）]');
     const dir = path.join(legacyRoot, name);
     const presetYml = read(path.join(dir, 'preset.yml'));

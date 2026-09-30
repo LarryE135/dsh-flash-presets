@@ -100,7 +100,18 @@ jobs:
           else
             DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh --uninstall
           fi
-          if grep -q 'preset-flash-lean' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"; then
+          if grep -q 'preset-flash-lean-ptc-v2' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"; then
             echo "managed block still present after uninstall"; exit 1
           fi
           echo "uninstalled cleanly"
+
+      # 仓库自带端到端自测：安装/卸载/幂等/legacy/发布守卫 一次跑完
+      - name: Self-test (bash end-to-end)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash scripts/selftest.sh
+
+      # 没装 pwsh 的机器上也能审 PowerShell 脚本（三平台都跑）
+      - name: Static check (PowerShell scripts)
+        shell: bash
+        run: node scripts/check-ps1.mjs

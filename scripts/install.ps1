@@ -18,7 +18,7 @@
 param(
   [string]   $DshHome,
   [string]   $Profile = 'web',
-  [string[]] $Presets = @('flash-lean', 'flash-lean-ptc'),
+  [string[]] $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2'),
   [switch]   $Legacy,
   [switch]   $Uninstall
 )
@@ -65,7 +65,7 @@ function Invoke-Merge([string[]]$ExtraArgs) {
 function Install-Legacy {
   foreach ($p in $Presets) {
     $src = Join-Path $here "presets\legacy-0.1.5\$p"
-    if (-not (Test-Path $src)) { throw "缺少目录: $src" }
+    if (-not (Test-Path $src)) { Write-Host "跳过 ${p}：本版未提供旧式目录（legacy 仅保留 v1）"; continue }
     $dst = Join-Path $legacyDir $p
     if (Test-Path $dst) {
       Write-Host "已存在 $dst → 备份为 .bak-$stamp"
@@ -77,7 +77,7 @@ function Install-Legacy {
     Write-Host "已安装 ${dst}（旧版目录式）"
   }
   Write-Host ''
-  Write-Host '安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简」/「Flash 精简·PTC」。'
+  Write-Host '安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简·PTC v1」。'
 }
 
 function Uninstall-Legacy {
@@ -105,8 +105,8 @@ function Install-Modern {
   }
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
-  Write-Host '「Flash 精简（v4.1-flash）」与「Flash 精简·PTC（v4.1-flash）」。'
-  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean'"
+  Write-Host '「Flash 精简·PTC v1（v4.1-flash）」与「Flash 精简·PTC v2（v4.1-flash）」。'
+  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v2'"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
 }
 

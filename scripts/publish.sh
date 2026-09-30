@@ -9,7 +9,11 @@ cd "$HERE"
 GH_USER="${GH_USER:-LarryE135}"
 REPO="${REPO:-dsh-flash-presets}"
 VISIBILITY="${VISIBILITY:-public}"          # public | private
-TAG="${TAG:-$(git describe --tags --abbrev=0 2>/dev/null || echo v1.0.0)}"
+TAG="${TAG:-$(sed -n 's/.*当前版本：\(v[0-9][0-9.]*\).*/\1/p' README.md | head -1)}"
+if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  echo "✖ 本地没有标签 $TAG —— 请先提交并打标签" >&2
+  exit 1
+fi
 REMOTE="${REMOTE:-https://github.com/$GH_USER/$REPO.git}"
 
 echo "目标：$GH_USER/$REPO（$VISIBILITY），标签 $TAG"
@@ -17,7 +21,7 @@ git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
 
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
-    gh repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (flash-lean / flash-lean-ptc)"
+    gh repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)"
   git push -u origin main
   git push origin "$TAG"
   mkdir -p dist

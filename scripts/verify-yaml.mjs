@@ -76,8 +76,10 @@ console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
 console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
-  'flash-lean.patch.yml': { preset: 'flash-lean', order: 20, rules: 11, ptcRow: false },
-  'flash-lean-ptc.patch.yml': { preset: 'flash-lean-ptc', order: 21, rules: 14, ptcRow: true },
+  'flash-lean-ptc-v1.patch.yml': { preset: 'flash-lean-ptc-v1', order: 21, rules: 14, ptcRow: true,
+                                  thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2 },
+  'flash-lean-ptc-v2.patch.yml': { preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
 
 let failed = 0;
@@ -124,12 +126,13 @@ function checkPatchFile(file, exp) {
   const nums = [...suffix.matchAll(/^\s*(\d+)\. /gm)].map(m => Number(m[1]));
   check(nums.length === exp.rules, 'persona 规则条数 ' + nums.length + '（期望 ' + exp.rules + '）');
   check(nums.every((n, i) => n === i + 1), 'persona 规则编号连续无重复（1..' + exp.rules + '）');
-  check(/Context discipline/.test(suffix) && /Transcript sensitivity/.test(suffix),
-        'persona 含 Context discipline / Transcript sensitivity 两条核心规则');
+  check(/Context discipline/.test(suffix) && /(Transcript sensitivity|Never put secrets, tokens)/.test(suffix),
+        'persona 含上下文纪律 / 转录敏感两条核心规则');
 
   const cc = (flat.find(p => p.id === 'compaction-basic') || {}).config || {};
-  check(cc.thresholdRatio === 0.3, '压缩阈值 thresholdRatio = ' + cc.thresholdRatio);
-  check(cc.retainTokens === 50000, '保留预算 retainTokens = ' + cc.retainTokens);
+  check(cc.thresholdRatio === exp.thresholdRatio, '压缩阈值 thresholdRatio = ' + cc.thresholdRatio + '（期望 ' + exp.thresholdRatio + '）');
+  check(cc.retainTokens === exp.retainTokens, '保留预算 retainTokens = ' + cc.retainTokens + '（期望 ' + exp.retainTokens + '）');
+  check(cc.compactionRetries === exp.compactionRetries, '压缩重试 compactionRetries = ' + cc.compactionRetries + '（期望 ' + exp.compactionRetries + '）');
   const pc = (flat.find(p => p.id === 'tool-result-pruner') || {}).config || {};
   check(pc.thresholdChars === 8192 && pc.headChars === 4096 && pc.tailChars === 1024,
         '裁剪阈值保持出厂默认 8192/4096/1024');
@@ -165,8 +168,8 @@ if (args.length) {
     const rows = ((doc || []).flatMap(e => (e && e.insert) || []))
       .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
       .map(r => (r.config || {}).id);
-    check(rows.includes('flash-lean') && rows.includes('flash-lean-ptc'),
-          '含两个预设行（实际: ' + (rows.join(', ') || '无') + '）');
+    check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2'),
+          '含 v1/v2 两个预设行（实际: ' + (rows.join(', ') || '无') + '）');
   }
 } else {
   for (const [name, exp] of Object.entries(EXPECT)) {
@@ -175,13 +178,15 @@ if (args.length) {
     checkPatchFile(file, exp);
   }
   console.log('\n[presets/legacy-0.1.5（DSH < 0.1.7 回退用）]');
-  for (const exp of Object.values(EXPECT)) {
-    const legacy = path.join(repo, 'presets', 'legacy-0.1.5', exp.preset, 'agent.cordis.yml');
-    if (!fs.existsSync(legacy)) { check(false, '缺少 ' + exp.preset + '/agent.cordis.yml'); continue; }
+  for (const name of ['flash-lean-ptc-v1']) {
+    const legacy = path.join(repo, 'presets', 'legacy-0.1.5', name, 'agent.cordis.yml');
+    if (!fs.existsSync(legacy)) { check(false, '缺少 ' + name + '/agent.cordis.yml'); continue; }
     const text = fs.readFileSync(legacy, 'utf8');
     check(/thresholdRatio:\s*0\.3\b/.test(text) && /retainTokens:\s*50000\b/.test(text),
-          exp.preset + '：旧式文件仍带 0.3 / 50000');
+          name + '：旧式文件仍带 0.3 / 50000');
   }
+  check(!fs.existsSync(path.join(repo, 'presets', 'legacy-0.1.5', 'flash-lean')),
+        '纯精简预设的旧式目录已移除');
 }
 
 console.log('\n' + (failed ? 'YAML 校验失败：' + failed + ' 项。' : 'YAML 校验通过。'));
