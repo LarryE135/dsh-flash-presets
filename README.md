@@ -29,7 +29,7 @@
 可以看到，在面对明确超出能力的题（竞赛级、需要交付尽可能多部分分），标准预设更值得——它至少保证"写得出、交得上"；而本预设适合圈内任务——同批实测省 50–80% 且判分不掉；高难题侧的代价参考：USACO 2026 Platinum 两轮合计，标准 51.5/80 分、51.4M，精简·PTC 47.5/80 分、48.0M（省 7% 成本但掉 8% 分）
 
 这点对Oneshot样例也有效：
-图一使用该预设（PTC 预设），报告的Token消耗为5.3M，耗时14m37s，42步
+图一使用lean-PTC预设（v1），报告的Token消耗为5.3M，耗时14m37s，42步
 <img width="2559" height="1540" alt="屏幕截图 2026-09-22 205848" src="https://github.com/user-attachments/assets/c469f899-3433-4afd-a931-1e160c1f95b1" />
 <img width="1877" height="1598" alt="屏幕截图 2026-09-22 205905" src="https://github.com/user-attachments/assets/b12c0dcb-8700-4099-a876-ac2dcfe5fd4d" />
 
