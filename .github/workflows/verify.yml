@@ -138,13 +138,29 @@ jobs:
       - name: 安装 DSH 与 pnpm
         run: npm i -g pnpm @deepseek-ai/dsh
 
+      - name: 环境诊断
+        run: |
+          set -x
+          which -a dsh || true
+          dsh --version || true
+          node -v; pnpm -v; echo "HOME=$HOME DSH_HOME=\$\{DSH_HOME:-unset\}"
+          ls -la "$HOME/.dsh" 2>/dev/null || echo "(尚无 ~/.dsh)"
+
       - name: dsh plugin add（组合包一键安装）
-        run: dsh plugin --profile ci add .
+        run: |
+          set -o pipefail
+          dsh plugin --profile ci add . 2>&1 | tee /tmp/add.log
+          echo "add 退出码: \$\{PIPESTATUS[0]\}"
+          echo "--- profile 清单 ---"
+          cat "$HOME/.dsh/profiles/ci/package.json" 2>/dev/null || { echo "profile 未创建，目录树："; find "$HOME/.dsh" -maxdepth 3 2>/dev/null | head -20; }
 
       - name: 断言两个预设行进入组合配置
         run: |
           # 注意：dump-config 是旗标（--dump-config），当子命令跑会挂起且 stdout 为空
-          dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt"
+          dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt" 2> "$RUNNER_TEMP/dump.err" || echo "dump 退出码非 0"
+          echo "dump 大小: $(wc -c < "$RUNNER_TEMP/dump.txt") B；stderr 尾部："
+          tail -5 "$RUNNER_TEMP/dump.err" || true
+          echo "dump 前 5 行："; head -5 "$RUNNER_TEMP/dump.txt" || true
           for id in flash-lean-ptc-v1 flash-lean-ptc-v2; do
             n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
             grep -m2 -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
