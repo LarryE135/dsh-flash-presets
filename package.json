@@ -1,0 +1,38 @@
+{
+  "name": "dsh-flash-presets",
+  "version": "0.2.0",
+  "private": false,
+  "description": "DSH Flash 精简预设（v1/v2）：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式一键安装到 profile。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-preset",
+    "preset",
+    "flash",
+    "token-efficiency"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LarryE135/dsh-flash-presets.git"
+  },
+  "homepage": "https://github.com/LarryE135/dsh-flash-presets",
+  "bugs": {
+    "url": "https://github.com/LarryE135/dsh-flash-presets/issues"
+  },
+  "files": [
+    "presets/flash-lean-ptc-v1.patch.yml",
+    "presets/flash-lean-ptc-v2.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "presets/flash-lean-ptc-v1.patch.yml",
+        "presets/flash-lean-ptc-v2.patch.yml"
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "dsh-flash-presets",
+  "name": "DSH Flash 精简预设",
+  "version": "0.2.0",
+  "description": "面向 flash 级路由的 token 效率优化 agent 预设（v1/v2），以 dsh.bundle 组合包形式一键安装到 profile；含 8 用例基准数据与端到端自测脚本。",
+  "author": {
+    "name": "LarryE135",
+    "url": "https://github.com/LarryE135"
+  },
+  "license": "MIT",
+  "category": "workflow",
+  "install": {
+    "target": "git",
+    "spec": "github:LarryE135/dsh-flash-presets",
+    "command": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets"
+  },
+  "repository": "https://github.com/LarryE135/dsh-flash-presets",
+  "verified": false
+}
