@@ -51,7 +51,7 @@
 
 ### 一键安装（DSH 组合包 · 推荐）
 
-本仓库已声明为 DSH 组合包：`package.json` 里的 `dsh.bundle.patch` 指向两个预设补丁。因此可以直接交给 DSH 插件管理器，无需 clone、无需手改 YAML：
+本仓库已声明为 DSH 组合包：`package.json` 里的 `dsh.bundle.patch` 指向合成好的补丁层 `cordis.patch.yml`（由 `presets/flash-lean-ptc-v{1,2}.patch.yml` 合成）。因此可以直接交给 DSH 插件管理器，无需 clone、无需手改 YAML：
 
 ```bash
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets
@@ -60,6 +60,22 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 - `--profile` 换成目标 profile（`web` / `desktop` / `headless` / `acp`）。
 - 管理器会把本包写进该 profile 的 `dsh.profile.bundles`，并按顺序叠加 v1、v2 两个补丁层；之后在预设列表里就能看到 `flash-lean-ptc-v1` / `flash-lean-ptc-v2`（`web` profile 刷新即生效，其它 profile 需重启）。
 - 包内**没有 `prepare` / `postinstall` 脚本**，因此不会撞上 pnpm 11 的 `allowBuilds` 拦截。
+- 补丁层与 presets 的同步由 `scripts/compose-bundle-patch.mjs` 保证：`pnpm run build` 重新合成，`pnpm run check`（CI 也在跑）断言"提交的文件 == 合成结果"，不会漂移。
+
+### 面向插件审查者：为什么没有 `main` / `prepare`
+
+> 给 dsh-marketplace、awesome-dsh-plugin 等渠道的评审参考——本包是**纯补丁组合包**（patch-only bundle），不是代码插件。
+
+| 常见检查项 | 本包的情况 | 原因 |
+|---|---|---|
+| `dsh.bundle.patch` | ✅ `"cordis.patch.yml"`（单文件，社区惯例形态） | 只做一件事：往 profile 的 plugins 列表插入两行 `@deepseek-ai/dsh-agent-preset` 预设 |
+| `main` 入口 | ➖ 无 | 组合包由 `dsh.bundle.patch` 定义，没有任何 JS 运行时代码 |
+| `prepare` | ➖ 无（**刻意**） | `prepare` 是给"需要构建产物的代码插件"用的；本包无构建产物，加了反而会被 pnpm 11 的 `allowBuilds` 拦截导致 git 安装失败 |
+| `pnpm run build` | ✅ 有，且只做合成 | `presets/*` → `cordis.patch.yml`；不下载依赖、不改语义 |
+| CI | ✅ `.github/workflows/verify.yml` | 原有 3 平台矩阵（跑安装器安装）＋ 新增 `bundle-install` 任务：`dsh plugin add` 进全新 profile，再断言 `dump-config` 里含两个预设 id |
+| 模型工具（`ctx.tools.register`） | ➖ 无 | 本包的产物是**预设行**而非工具，因此不属于"agent 可调用插件"类目（awesome-dsh-plugin 的收录边界） |
+
+补丁里的 `disabled: !!js process.platform === 'win32'`（按平台禁用 bash / 启用 pwsh）是 **DSH 加载器自己的标签**，DSH 解析正常；用默认 schema 的第三方 YAML 解析器会报 `unknown tag`，属工具兼容性问题，不是补丁缺陷。
 - 卸载：在 profile 的 `package.json` 里把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖（或用插件管理器的 remove 子命令）；旧的手工托管块仍可用 `scripts/install.sh --uninstall` 清掉。
 
 ### 手动安装（clone 后跑脚本）

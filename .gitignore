@@ -14,3 +14,6 @@ settings.yaml
 # Build output / release artifacts
 dist/
 node_modules/
+*.tgz
+package-lock.json
+pnpm-lock.yaml
