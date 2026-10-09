@@ -21,7 +21,12 @@
   "bugs": {
     "url": "https://github.com/LarryE135/dsh-flash-presets/issues"
   },
+  "scripts": {
+    "build": "node scripts/compose-bundle-patch.mjs",
+    "check": "node scripts/compose-bundle-patch.mjs --check"
+  },
   "files": [
+    "cordis.patch.yml",
     "presets/flash-lean-ptc-v1.patch.yml",
     "presets/flash-lean-ptc-v2.patch.yml",
     "README.md",
@@ -29,10 +34,7 @@
   ],
   "dsh": {
     "bundle": {
-      "patch": [
-        "presets/flash-lean-ptc-v1.patch.yml",
-        "presets/flash-lean-ptc-v2.patch.yml"
-      ]
+      "patch": "cordis.patch.yml"
     }
   }
 }

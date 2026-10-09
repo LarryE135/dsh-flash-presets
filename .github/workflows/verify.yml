@@ -58,6 +58,10 @@ jobs:
         shell: bash
         run: node scripts/check-bash32-cjk.mjs
 
+      - name: 组合包补丁层与 presets 同步
+        shell: bash
+        run: node scripts/compose-bundle-patch.mjs --check
+
       - name: YAML parse + value assertions
         shell: bash
         run: |
@@ -119,3 +123,29 @@ jobs:
       - name: Static check (PowerShell scripts)
         shell: bash
         run: node scripts/check-ps1.mjs
+
+  # 真实安装验证（评审清单第 7 项）：把本组合包装进一个全新 profile，
+  # 再断言两个预设行确实进了组合配置——证明"装得上"且"装完真的生效"。
+  bundle-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装 DSH 与 pnpm
+        run: npm i -g pnpm @deepseek-ai/dsh
+
+      - name: dsh plugin add（组合包一键安装）
+        run: dsh plugin --profile ci add .
+
+      - name: 断言两个预设行进入组合配置
+        run: |
+          dsh --profile ci dump-config > "$RUNNER_TEMP/dump.txt"
+          for id in flash-lean-ptc-v1 flash-lean-ptc-v2; do
+            n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
+            echo "$id: $n"
+            [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
+          done
