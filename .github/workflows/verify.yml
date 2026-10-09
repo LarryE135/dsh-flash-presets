@@ -143,9 +143,11 @@ jobs:
 
       - name: 断言两个预设行进入组合配置
         run: |
-          dsh --profile ci dump-config > "$RUNNER_TEMP/dump.txt"
+          # 注意：dump-config 是旗标（--dump-config），当子命令跑会挂起且 stdout 为空
+          dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt"
           for id in flash-lean-ptc-v1 flash-lean-ptc-v2; do
             n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
+            grep -m2 -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
           done
