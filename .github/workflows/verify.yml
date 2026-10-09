@@ -133,7 +133,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'   # dsh CLI 在 Node 20 下会静默退出（0 输出 / 退出码 0）
 
       - name: 安装 DSH 与 pnpm
         run: npm i -g pnpm @deepseek-ai/dsh
@@ -143,14 +143,14 @@ jobs:
           set -x
           which -a dsh || true
           dsh --version || true
-          node -v; pnpm -v; echo "HOME=$HOME DSH_HOME=\$\{DSH_HOME:-unset\}"
+          node -v; pnpm -v; echo "HOME=$HOME DSH_HOME=${DSH_HOME:-unset}"
           ls -la "$HOME/.dsh" 2>/dev/null || echo "(尚无 ~/.dsh)"
 
       - name: dsh plugin add（组合包一键安装）
         run: |
           set -o pipefail
           dsh plugin --profile ci add . 2>&1 | tee /tmp/add.log
-          echo "add 退出码: \$\{PIPESTATUS[0]\}"
+          echo "add 退出码: ${PIPESTATUS[0]}"
           echo "--- profile 清单 ---"
           cat "$HOME/.dsh/profiles/ci/package.json" 2>/dev/null || { echo "profile 未创建，目录树："; find "$HOME/.dsh" -maxdepth 3 2>/dev/null | head -20; }
 
