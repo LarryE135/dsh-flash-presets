@@ -49,6 +49,21 @@
 > 预设现在是插进 profile 用户补丁层的插件行（`@deepseek-ai/dsh-agent-preset`）。
 > 本仓库同时提供两种形态，安装器会**按你的 DSH 自动选择**。
 
+### 一键安装（DSH 组合包 · 推荐）
+
+本仓库已声明为 DSH 组合包：`package.json` 里的 `dsh.bundle.patch` 指向两个预设补丁。因此可以直接交给 DSH 插件管理器，无需 clone、无需手改 YAML：
+
+```bash
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets
+```
+
+- `--profile` 换成目标 profile（`web` / `desktop` / `headless` / `acp`）。
+- 管理器会把本包写进该 profile 的 `dsh.profile.bundles`，并按顺序叠加 v1、v2 两个补丁层；之后在预设列表里就能看到 `flash-lean-ptc-v1` / `flash-lean-ptc-v2`（`web` profile 刷新即生效，其它 profile 需重启）。
+- 包内**没有 `prepare` / `postinstall` 脚本**，因此不会撞上 pnpm 11 的 `allowBuilds` 拦截。
+- 卸载：在 profile 的 `package.json` 里把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖（或用插件管理器的 remove 子命令）；旧的手工托管块仍可用 `scripts/install.sh --uninstall` 清掉。
+
+### 手动安装（clone 后跑脚本）
+
 ```bash
 git clone https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
