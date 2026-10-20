@@ -1,5 +1,7 @@
 # DSH Flash 精简预设 — 我问大肥鱼对了错了，她说省了
 
+> 本文档是 0.2.0 的历史快照，保留当时的数字与写法。安装步骤、版本号与预设清单以仓库根目录的 [README](../README.md) 为准。
+
 **当前版本：v0.2.0**（2026-09-30 · 精简 PTC 预设分 v1/v2 两版，附 8 用例基准数据与端到端自测）
 
 [![verify](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml/badge.svg)](https://github.com/LarryE135/dsh-flash-presets/actions/workflows/verify.yml)

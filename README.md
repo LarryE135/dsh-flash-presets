@@ -142,7 +142,10 @@ scripts/
   compose-bundle-patch.mjs        合成组合包补丁层
   verify-presets.mjs              结构与取值断言，逐预设切片
   verify-yaml.mjs                 YAML 与平台标签检查
+  check-ps1.mjs                   PowerShell 侧静态审查（BOM、完成文案、标签守卫）
+  check-bash32-cjk.mjs            macOS bash 3.2 的多字节变量守卫
   selftest.sh                     端到端自测
+  publish.sh / publish.ps1        推送与建 Release，版本号从 README 解析
 docs/                             文档与历史 README
 .github/workflows/verify.yml      三平台安装矩阵与组合包安装断言
 ```
