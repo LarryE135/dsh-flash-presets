@@ -3,8 +3,6 @@
 <p align="center"><strong>中文</strong> | <a href="#english-summary">English</a></p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/dsh-flash-presets"><img alt="npm" src="https://img.shields.io/npm/v/dsh-flash-presets?style=flat-square&color=6c5ce7"></a>
-  <a href="https://www.npmjs.com/package/dsh-flash-presets"><img alt="npm downloads" src="https://img.shields.io/npm/dm/dsh-flash-presets?style=flat-square&color=4b6fff"></a>
   <a href="https://github.com/LarryE135/dsh-flash-presets/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/LarryE135/dsh-flash-presets?style=flat-square&color=eab308"></a>
 </p>
 
@@ -39,6 +37,8 @@ v3 相对 v2 的改动集中在验证阶段：验收门通过即交付，不再�
 ```console
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 ```
+
+在 GUI 的「插件 → 添加插件」里填 `github:LarryE135/dsh-flash-presets`，效果相同。该包尚未发布到 npm，不能用裸包名 `dsh-flash-presets` 安装，请用 GitHub 地址或本地目录路径。
 
 `--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并按 `cordis.patch.yml` 依次叠加三个补丁层。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
@@ -80,6 +80,8 @@ node scripts/compose-bundle-patch.mjs --check    # 断言 cordis.patch.yml 与 p
 dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 ```
 
+在 GUI 的「插件 → 添加插件」里填 `github:LarryE135/dsh-flash-presets`，效果相同。该包尚未发布到 npm，不能用裸包名 `dsh-flash-presets` 安装，请用 GitHub 地址或本地目录路径。
+
 ## 配置
 
 - `compaction-basic`：`thresholdRatio 0.25`、`retainTokens 20000`、`compactionRetries 2`。
@@ -103,11 +105,9 @@ v3 的 persona 后缀含 13 条编号规则，可分四组：
 
 在 P15654（19 组官方样例，时限 4 s）上，v3 用原题面三次只有一次满分，两次失败分别为 4.00 s 与 4.01 s，都卡在时限上。同一预设换成要求留下可复跑 `verify.log` 且必须全过的题面后三次全部满分，合计计费 17.5 M，低于原题面的 26.8 M，其中两次由第二轮修正（16 到 19、15 到 19）。标准模式在该题两次均满分，洛谷实测 100 分。
 
-在 P15114（子任务 5 到 11 限 32 MB）上，v3b 用旧题面得 60 分，峰值 134.41 MB；题面写明 512 MB 与 32 MB 的区分以及判分口径后得 100 分，1.31 s、5.15 MB。标准模式与 v3 均为 100 分，耗时落在 1.88 s 到 4.97 s，内存落在 4.49 MB 到 15.22 MB。该题唯一的实质变量是内存，题面不写限制时模型按 512 MB 设计。
-
 在 P2099（提交答案，连续评分）上，标准模式四次比值为 0.99、1.09、1.04、1.05。v3 只判合法性时比值为 1.05 到 1.15，低于标准模式；改为判「合法且比值不超过 1.05」并回灌失败清单后为 1.05、1.03、0.98，其中两次由第二轮修正。
 
-受控复现（P15114，n=2，全部正确）中 v3 计费 4.64 M，标准模式 7.03 M，墙钟 759 s 与 719 s。样本量 2，不构成显著结论。
+P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 跨场景能成立的说法只有一条：分数差距主要来自判定标准是否写死，与模型能力关系不大。
 
