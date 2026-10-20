@@ -11,6 +11,7 @@
 #   ... -Legacy                # force the 0.1.5 directory layout
 #   ... -Uninstall             # remove the managed block
 #   ... -DshHome "D:\dsh"      # custom DSH home (default: $env:DSH_HOME or ~\.dsh)
+#   ... -Help                  # show this help
 #
 # Safe to run repeatedly: the managed block is replaced in place and the patch
 # file is backed up as cordis.patch.yml.bak-<timestamp> before every write.
@@ -19,11 +20,20 @@ param(
   [string]   $DshHome,
   [string]   $Profile = 'web',
   [string[]] $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'),
+  [switch]   $Help,
   [switch]   $Legacy,
   [switch]   $Uninstall
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+  $self = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+  foreach ($line in Get-Content -LiteralPath $self) {
+    if ($line -match '^#') { $line -replace '^# ?', '' } else { break }
+  }
+  exit 0
+}
 
 if (-not $DshHome) {
   if ($env:DSH_HOME)        { $DshHome = $env:DSH_HOME }

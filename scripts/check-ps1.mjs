@@ -70,5 +70,10 @@ const uniq = a => [...new Set(a)].sort();
 check(uniq(shNames).length > 0 && JSON.stringify(uniq(shNames)) === JSON.stringify(uniq(psNames)),
       '两个安装器的完成文案一致（' + (uniq(shNames).join(', ') || '未解析到') + '）');
 
+// 帮助入口：两个安装器都要有，且 install.ps1 的帮助段要早于任何副作用
+const shHelp = /--help\)/.test(sh);
+const psHelp = /\[switch\]\s+\$Help/.test(ps1 || '') && /if \(\$Help\)/.test(ps1 || '');
+check(shHelp && psHelp, '两个安装器都提供帮助入口（sh: --help / ps1: -Help）');
+
 console.log('\n' + (failed ? 'check-ps1：' + failed + ' 项未通过。' : 'check-ps1：全部通过（pwsh 侧仅静态审查）'));
 process.exit(failed ? 1 : 0);
