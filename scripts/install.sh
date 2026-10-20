@@ -27,7 +27,8 @@ PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3)
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --profile)   PROFILE="${2:?--profile 需要参数}"; shift 2 ;;
+    --profile)   [ -n "${2:-}" ] || { echo "--profile 需要参数" >&2; exit 2; }
+                 PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;

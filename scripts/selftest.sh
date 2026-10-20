@@ -62,6 +62,31 @@ shape empty "# ci profile patch\n[]\n"
 shape multi "# ci profile patch\n- insert:\n    - id: keep-me\n      name: '@keep/me'\n"
 for s in empty multi; do roundtrip "$s"; done
 
+step "边界：CRLF 配置 / 托管块残缺 / 流式空数组"
+CRLF="$TMP/crlf"; mkdir -p "$CRLF/profiles/web"
+printf -- "- id: keep\r\n  name: '@keep/me'\r\n" > "$CRLF/profiles/web/cordis.patch.yml"
+cp "$CRLF/profiles/web/cordis.patch.yml" "$TMP/crlf.orig"
+DSH_HOME="$CRLF" bash scripts/install.sh --profile web >/dev/null 2>&1
+DSH_HOME="$CRLF" bash scripts/install.sh --profile web --uninstall >/dev/null 2>&1
+cmp -s "$TMP/crlf.orig" "$CRLF/profiles/web/cordis.patch.yml" \
+  && ok "CRLF 配置：卸载后逐字节还原" || bad "CRLF 配置：卸载后与原始不一致"
+
+BROKEN="$TMP/broken"; mkdir -p "$BROKEN/profiles/web"
+printf -- "- id: keep\r\n# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>\r\n- insert:\r\n    - id: preset-x\r\n" > "$BROKEN/profiles/web/cordis.patch.yml"
+cp "$BROKEN/profiles/web/cordis.patch.yml" "$TMP/broken.orig"
+if DSH_HOME="$BROKEN" bash scripts/install.sh --profile web --uninstall >"$TMP/broken.log" 2>&1; then
+  bad "托管块缺结束标记时仍然执行（应拒绝）"
+else
+  cmp -s "$TMP/broken.orig" "$BROKEN/profiles/web/cordis.patch.yml" \
+    && ok "托管块缺结束标记：拒绝改动且文件未变" || bad "托管块缺结束标记：文件被改写"
+fi
+
+FLOW="$TMP/flow"; mkdir -p "$FLOW/profiles/web"
+printf '[ ]\n' > "$FLOW/profiles/web/cordis.patch.yml"
+DSH_HOME="$FLOW" bash scripts/install.sh --profile web >/dev/null 2>&1 \
+  && grep -q 'preset-flash-lean-ptc-v3' "$FLOW/profiles/web/cordis.patch.yml" \
+  && ok "流式空数组 [ ]：安装成功" || bad "流式空数组 [ ]：安装失败"
+
 step "旧版安装（< 0.1.7 目录式）"
 LEG="$TMP/legacy"; mkdir -p "$LEG/.agent-presets"
 DSH_HOME="$LEG" bash scripts/install.sh --legacy >"$TMP/legacy.log" 2>&1 \
