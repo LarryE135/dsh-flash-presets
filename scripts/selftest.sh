@@ -68,6 +68,7 @@ DSH_HOME="$LEG" bash scripts/install.sh --legacy >"$TMP/legacy.log" 2>&1 \
   && ok "legacy 安装退出码 0" || { bad "legacy 安装失败"; tail -4 "$TMP/legacy.log"; }
 [ -f "$LEG/.agent-presets/flash-lean-ptc-v1/agent.cordis.yml" ] && ok "legacy 安装出 v1" || bad "legacy 缺 v1"
 [ ! -d "$LEG/.agent-presets/flash-lean-ptc-v2" ] && ok "legacy 跳过 v2（不作失败）" || bad "legacy 不应装 v2"
+[ ! -d "$LEG/.agent-presets/flash-lean-ptc-v3" ] && ok "legacy 跳过 v3（不作失败）" || bad "legacy 不应装 v3"
 DSH_HOME="$LEG" node scripts/verify-presets.mjs >"$TMP/legacy.verify.log" 2>&1 \
   && ok "legacy 场景校验通过（CI 同款断言）" || { bad "legacy 场景校验失败"; tail -4 "$TMP/legacy.verify.log"; }
 

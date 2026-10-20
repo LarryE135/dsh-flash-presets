@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml'];
+const FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml', 'flash-lean-ptc-v3.patch.yml'];
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // never URL.pathname on Windows
 const argv = process.argv.slice(2);
@@ -43,7 +43,7 @@ function buildBlock() {
     if (!m) throw new Error(name + ': 找不到行首的 - insert: 条目');
     return text.slice(m.index + m[0].length).replace(/\s+$/, '');
   });
-  return BEGIN + '\n- insert:\n' + bodies[0] + '\n' + bodies[1] + '\n' + END + '\n';
+  return BEGIN + '\n- insert:\n' + bodies.join('\n') + '\n' + END + '\n';
 }
 
 function stripBlock(raw) {

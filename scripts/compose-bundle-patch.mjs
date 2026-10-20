@@ -16,12 +16,12 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
-const SOURCES = ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml'];
+const SOURCES = ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml', 'presets/flash-lean-ptc-v3.patch.yml'];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件按顺序叠加两个预设：v1 基线、v2 现行推荐。',
-  '# 由 presets/flash-lean-ptc-v{1,2}.patch.yml 合成；改预设请改源文件后重新合成：',
+  '# 本文件按顺序叠加三个预设：v1 基线、v2 上一代、v3 现行主版本（lean-v3）。',
+  '# 由 presets/flash-lean-ptc-v{1,2,3}.patch.yml 合成；改预设请改源文件后重新合成：',
   '#   node scripts/compose-bundle-patch.mjs',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',
@@ -36,7 +36,7 @@ function compose() {
   const out = HEADER + parts.join('\n\n') + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
-  for (const id of ['flash-lean-ptc-v1', 'flash-lean-ptc-v2']) {
+  for (const id of ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3']) {
     if (!out.includes(id)) throw new Error('合成结果里缺少预设 id: ' + id);
   }
   return out;

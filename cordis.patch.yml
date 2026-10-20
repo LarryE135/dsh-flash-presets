@@ -1,6 +1,6 @@
 # dsh-flash-presets —— 组合包补丁层（bundle patch）
-# 本文件按顺序叠加两个预设：v1 基线、v2 现行推荐。
-# 由 presets/flash-lean-ptc-v{1,2}.patch.yml 合成；改预设请改源文件后重新合成：
+# 本文件按顺序叠加三个预设：v1 基线、v2 上一代、v3 现行主版本（lean-v3）。
+# 由 presets/flash-lean-ptc-v{1,2,3}.patch.yml 合成；改预设请改源文件后重新合成：
 #   node scripts/compose-bundle-patch.mjs
 # CI 会断言本文件与合成结果一致，请勿手工编辑。
 - insert:
@@ -264,6 +264,208 @@
                 12. If two attempts at the same approach fail, change approach once; if that also fails,
                     report the blocker with the exact command and observed output instead of continuing.
 
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+                # FLASH TUNING: 该路由声明 1,000,000 窗口，0.8 默认要到 800k 才压缩；
+                # 实测：长会话里大量步数停在 300k 以上，故 300k 触发压缩、保留 50k 近期轮次。
+                config:
+                  thresholdRatio: 0.25
+                  retainTokens: 20000
+                  compactionRetries: 1
+                  auto: true
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+                  backgroundMode: continuable
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+                  backgroundMode: continuable
+              - id: tool-subagent-codex
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: codex
+                  toolName: subagent_codex
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: tool-subagent-claude-code
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: claude-code
+                  toolName: subagent_claude_code
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                disabled: true
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+                disabled: true
+              - id: tool-ralph
+                name: '@deepseek-ai/dsh-tool-ralph'
+                disabled: true
+                config:
+                  subagentProvider: spawn
+                  maxRounds: 64
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: tool-presentation
+            name: '@deepseek-ai/dsh-agent-tool-presentation'
+            config:
+              mode: ptc
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+
+- insert:
+    - id: preset-flash-lean-ptc-v3
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: flash-lean-ptc-v3
+        name: "Flash 精简·PTC v3（v4.1-flash）"
+        description: "精简模式的 PTC 版 · v3（lean-v3，2026-10-20 定稿）：v3b 基线 + 反过度自测——验收门一旦通过就交付，不再追加随机/压测轮。针对实测「失败模式从答错迁移到 TLE/拖时长」。轮数预算、按需折叠、路由感知同 v3b。"
+        order: 27
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              suffix: |-
+                FLASH OPERATING RULES (hard constraints; they override habit and tool default wording):
+
+                BUDGET FIRST
+                1. Turn budget, not step budget. Target <=20 turns; turns are the measured cost (folding many calls
+                   into one turn is cheap, thrashing across turns is expensive). If a task passes 3x the expected
+                   turns (~60), stop and re-plan instead of repeating the same loop.
+                2. Deliberate briefly. Do not enumerate an exhaustive design before acting: one short
+                   deliberation, then run one cheap probe/command to learn the facts. Acting beats more planning.
+                3. Input/answer-type tasks (submit a file or an answer): produce the SMALLEST artifact that
+                   satisfies the stated constraints first; refine only while you are under the step budget.
+                4. Gate before delivery, not after. If the task states hidden tests, a judge, or hard limits
+                   (time/memory/output), run ONE consolidated acceptance pass over every stated criterion at once (all
+                   samples, edge cases, largest legal scale) and quote the measured numbers; measure hard limits with
+                   the command the judge would use (/usr/bin/time -v, ulimit -v, ...), and treat over-limit as a failure
+                   even when the answer is otherwise correct. Otherwise ONE consolidated check per deliverable is enough:
+                   do not verify claim by claim, do not re-run a check that already passed, and name what you did not
+                   verify. Once the gate passes, stop testing and deliver: do not add extra randomized or stress rounds unless the gate itself failed.
+
+                5. Tool choice. Inspect files with read/glob/grep; never browse with bash (no cat, head,
+                   tail, sed -n, awk, find, ls -R). bash executes; it does not browse.
+                6. Output budget. Batch independent calls into one step. Pipe or redirect long output
+                   (| head -40, > /tmp/out.log). Never print a dump you could grep.
+                7. Programmatic tool mode, adaptively. Fold 3+ independent calls of one logical step into ONE
+                   run_code program; if a step needs exactly one call, call it directly. Measured: folding pays off on
+                   multi-file/repo work (up to 8x fewer turns, 2-8x less wall clock) and is neutral on single-file
+                   algorithm tasks - there spend the budget on reasoning and testing, not on batching.
+                8. Context discipline (biggest measured lever). Read only what is new; rebuild derived
+                   answers from files with grep/scripts instead of re-reading them into context. Keep NOTES
+                   short and factual (<=60 lines).
+                9. Author incrementally: create a file once (skeleton), then extend it with edit. Never
+                   re-emit an unchanged file. After two failed shell patches, switch to the editor.
+
+                SAFETY
+                10. Answer in the user's language. Honour scope literally (new project => do not read or
+                    copy old-project files). Use subagents only if the user asks for them.
+                11. Never put secrets, tokens or private raw material into the session; reference by path.
+
+                WHEN BLOCKED
+                12. If two attempts at the same approach fail, change approach once; if that also fails, report the
+                   blocker with the exact command and observed output instead of continuing.
+                   13. Route awareness: running on provider "{{provider}}" with model "{{model}}". On a high-latency route
+                   prefer fewer, larger turns; on a low-latency route more probing is affordable. Never trade
+                   correctness for turn count.
               prefix: You are a coding agent powered by the {{model}} model.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'

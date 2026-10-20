@@ -31,8 +31,9 @@ const patchFile = path.join(dshHome, 'profiles', profile, 'cordis.patch.yml');
 const legacyRoot = path.join(dshHome, '.agent-presets');
 
 const EXPECT = {
-  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: true },
-  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false },
+  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: true, thr: '0.3', retain: '50000' },
+  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
@@ -76,7 +77,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/v0\.2\.0/.test(readme), 'README 标注 v0.2.0');
+  check(/v0\.2\.1/.test(readme), 'README 标注 v0.2.1');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
 
   // 换设备才会炸的回归：ESM 路径、bash-only 安装器、CRLF 检出
@@ -115,18 +116,25 @@ if (modernInstalled) {
   const block = text.includes(BEGIN) && text.includes(END)
     ? text.slice(text.indexOf(BEGIN), text.indexOf(END) + END.length)
     : text;
+  const sliceOf = n => {
+    const a = block.indexOf('- id: preset-' + n);
+    if (a < 0) return '';
+    const b = block.indexOf('- id: preset-', a + 1);
+    return block.slice(a, b < 0 ? block.length : b);
+  };
   for (const [name, exp] of Object.entries(EXPECT)) {
     console.log('\n[' + name + '（已安装）]');
-    check(new RegExp('^\\s+- id: preset-' + name + '$', 'm').test(block), '插入行 preset-' + name);
-    check(new RegExp('^\\s+id: ' + name + '$', 'm').test(block), 'config.id = ' + name);
-    check(new RegExp('^\\s+order: ' + exp.order + '$', 'm').test(block), 'order = ' + exp.order);
-    const nums = [...block.matchAll(/^\s+(\d+)\. /gm)].map(m => Number(m[1]));
+    const slice = sliceOf(name);
+    check(new RegExp('^[ \\t]*- id: preset-' + name + '$', 'm').test(slice), '插入行 preset-' + name);
+    check(new RegExp('^[ \\t]*id: ' + name + '$', 'm').test(slice), 'config.id = ' + name);
+    check(new RegExp('^[ \\t]*order: ' + exp.order + '$', 'm').test(slice), 'order = ' + exp.order);
+    const nums = [...slice.matchAll(/^\s+(\d+)\. /gm)].map(m => Number(m[1]));
     check(nums.length >= exp.rules, '规则条数合计 ' + nums.length + '（期望 ≥ ' + exp.rules + '）');
-    check(/thresholdRatio: 0\.3/.test(block), '压缩阈值 0.3');
-    check(/retainTokens: 50000/.test(block), '保留预算 50000');
-    check(/thresholdChars: 8192/.test(block) && /headChars: 4096/.test(block) && /tailChars: 1024/.test(block),
+    check(new RegExp('thresholdRatio: ' + exp.thr.replace('.', '\\.')).test(slice), '压缩阈值 ' + exp.thr);
+    check(new RegExp('retainTokens: ' + exp.retain).test(slice), '保留预算 ' + exp.retain);
+    check(/thresholdChars: 8192/.test(slice) && /headChars: 4096/.test(slice) && /tailChars: 1024/.test(slice),
           '裁剪阈值保持 8192/4096/1024');
-    check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(block),
+    check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(slice),
           'tool-workflow 已停用');
   }
   const ptcPreset = block.includes('id: tool-presentation') && /mode: ptc/.test(block);

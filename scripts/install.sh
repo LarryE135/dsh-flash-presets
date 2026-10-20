@@ -23,7 +23,7 @@ PROFILE="web"
 MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2)
+PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -77,8 +77,8 @@ install_modern() {
   validate_patch
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
-  echo "「Flash 精简·PTC v1（v4.1-flash）」与「Flash 精简·PTC v2（v4.1-flash）」。"
-  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v2'"
+  echo "「Flash 精简·PTC v1 / v2 / v3（v4.1-flash）」，其中 v3（lean-v3）为现行主版本。"
+  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
 }
 
