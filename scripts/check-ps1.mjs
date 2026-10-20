@@ -60,8 +60,12 @@ check(/\*\.ps1[^\n]*eol=crlf/.test(ga), '.gitattributes 仍把 *.ps1 钉为 CRLF
 
 // 两个安装器的完成文案必须逐字提到同一批预设（防单侧漂移）
 const sh = read(path.join(here, 'install.sh')) || '';
-const shNames = (sh.match(/Flash 精简·PTC v[0-9]+/g) || []);
-const psNames = ((ps1 || '').match(/Flash 精简·PTC v[0-9]+/g) || []);
+const listOf = s => {
+  const lists = s.match(/Flash 精简·PTC v[0-9]+(?:\s*\/\s*v[0-9]+)*/g) || [];
+  return lists.flatMap(x => x.match(/v[0-9]+/g) || []);
+};
+const shNames = listOf(sh);
+const psNames = listOf(ps1 || '');
 const uniq = a => [...new Set(a)].sort();
 check(uniq(shNames).length > 0 && JSON.stringify(uniq(shNames)) === JSON.stringify(uniq(psNames)),
       '两个安装器的完成文案一致（' + (uniq(shNames).join(', ') || '未解析到') + '）');

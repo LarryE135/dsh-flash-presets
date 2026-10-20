@@ -48,7 +48,7 @@ const actual = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
 
 if (process.argv.includes('--check')) {
   if (actual === expected) {
-    console.log('✓ ' + TARGET + ' 与 presets/* 合成结果一致（' + expected.length + ' B）');
+    console.log('✓ ' + TARGET + ' 与 presets/* 合成结果一致（' + expected.length + ' 字符 / ' + Buffer.byteLength(expected) + ' 字节）');
     process.exit(0);
   }
   console.error('✗ ' + TARGET + ' 与 presets/* 合成结果不一致 —— 请运行: node scripts/compose-bundle-patch.mjs');
@@ -56,8 +56,8 @@ if (process.argv.includes('--check')) {
 }
 
 if (actual === expected) {
-  console.log('= ' + TARGET + ' 已是最新（' + expected.length + ' B）');
+  console.log('= ' + TARGET + ' 已是最新（' + expected.length + ' 字符 / ' + Buffer.byteLength(expected) + ' 字节）');
 } else {
   fs.writeFileSync(abs, expected);
-  console.log('✓ 已写入 ' + TARGET + '（' + expected.length + ' B）');
+  console.log('✓ 已写入 ' + TARGET + '（' + expected.length + ' 字符 / ' + Buffer.byteLength(expected) + ' 字节）');
 }

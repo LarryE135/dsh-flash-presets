@@ -13,7 +13,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前分支为 0.2.1，`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
+> 当前版本：v0.2.1（分支 0.2.1），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -40,7 +40,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `github:LarryE135/dsh-flash-presets`，效果相同。该包尚未发布到 npm，不能用裸包名 `dsh-flash-presets` 安装，请用 GitHub 地址或本地目录路径。
 
-`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并按 `cordis.patch.yml` 依次叠加三个补丁层。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
+`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的三个 insert 条目（v1、v2、v3）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
 更新时重复执行同一条 `add`，或先 `remove` 再 `add`。卸载时把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖；由脚本写入的托管块用 `scripts/install.sh --uninstall` 清除。
 
@@ -80,11 +80,9 @@ node scripts/compose-bundle-patch.mjs --check    # 断言 cordis.patch.yml 与 p
 dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 ```
 
-在 GUI 的「插件 → 添加插件」里填 `github:LarryE135/dsh-flash-presets`，效果相同。该包尚未发布到 npm，不能用裸包名 `dsh-flash-presets` 安装，请用 GitHub 地址或本地目录路径。
-
 ## 配置
 
-- `compaction-basic`：`thresholdRatio 0.25`、`retainTokens 20000`、`compactionRetries 2`。
+- `compaction-basic`：`thresholdRatio 0.25`、`retainTokens 20000`、`compactionRetries` 为 v1=2、v2 与 v3=1。
 - `compaction-tool-result-pruner`：`thresholdChars 8192`、`headChars 4096`、`tailChars 1024`。
 - `tool-presentation`：`mode: ptc`，单入口 `run_code`。
 - `tool-workflow`：停用。新版出厂默认已停用，这里显式写死，避免上游改回默认值时静默生效。

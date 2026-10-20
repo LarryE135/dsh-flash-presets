@@ -30,6 +30,8 @@
     "presets/flash-lean-ptc-v1.patch.yml",
     "presets/flash-lean-ptc-v2.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
+    "scripts/",
+    "docs/",
     "README.md",
     "LICENSE"
   ],

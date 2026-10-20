@@ -105,7 +105,7 @@ function Install-Modern {
   }
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
-  Write-Host '「Flash 精简·PTC v1（v4.1-flash）」与「Flash 精简·PTC v2（v4.1-flash）」。'
+  Write-Host '「Flash 精简·PTC v1 / v2 / v3（v4.1-flash）」，其中 v3（lean-v3）为现行主版本。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
 }
