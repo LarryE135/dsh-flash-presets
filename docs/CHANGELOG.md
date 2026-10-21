@@ -1,5 +1,16 @@
 # 变更日志
 
+## 0.2.2 — 2026-10-21
+
+**新增**
+- 发布到 npm（`dsh-flash-presets`）：`dsh plugin --profile web add dsh-flash-presets` 即可安装。README 增加 npm 徽章、npm 安装段与 GitHub 直装段。
+- `verify-presets.mjs` 新增开关：`--repo-only`（只跑仓库层，供发布前守卫与 CI 用）、`--all`（要求三个预设都已安装）。
+- `package.json` 增加 `prepublishOnly`：合成一致性 + YAML 校验 + 仓库层结构校验，任一失败即中止发布。
+
+**修复**
+- `verify-presets.mjs` 安装层误报：未安装的预设此前仍逐项断言，导致只装 v3（常态）时报 25 项失败 → 改为跳过未安装项，仅 `--all` 时要求齐全。
+- `verify-presets.mjs` 切片范围：此前只在托管块内找预设行，而 `dsh plugin` 合并后的预设行可能落在块外（实测两者并存）→ 改为在整份补丁内定位；PTC 与绝对路径检查同步改为只看已装预设。
+
 ## 0.2.1 — 2026-10-20
 
 **新增**
