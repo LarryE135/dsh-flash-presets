@@ -15,8 +15,8 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.2（分支 0.2.2），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
-> 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载无残留）；组合包合成一致性。
+> 当前版本：v0.2.3（分支 0.2.3），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
+> 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
 
@@ -43,7 +43,13 @@ dsh plugin --profile web add dsh-flash-presets
 
 包地址：<https://www.npmjs.com/package/dsh-flash-presets>。`dsh plugin add` 会自动把本包写入该 profile 的依赖并加载 `cordis.patch.yml`，无需先手动 `npm install`；上面前一行只在你需要离线副本或想让多个 profile 共用时才有必要。
 
-在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。升级版本：`dsh plugin --profile web add dsh-flash-presets@0.2.2`（不带版本号则取 `latest`）。
+在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
+
+版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.3`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
+
+```console
+dsh plugin --profile web add dsh-flash-presets@0.2.3   # 锁死
+```
 
 ### GitHub 直装
 
@@ -125,7 +131,7 @@ P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 ## 兼容性
 
-本仓库在 DSH 0.2.1-rc.2 上做过模拟安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 v1、v2、v3，重复安装幂等，卸载后无残留。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。0.1.7 以前只有 v1 提供 `presets/legacy-0.1.5/` 的目录式回退，v2 与 v3 不支持。web profile 为 live reload，desktop、headless、acp 需重启，因为 provider 补丁层只在启动时读取。
+本仓库在 DSH 0.2.1-rc.2 上做过模拟安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 v1、v2、v3，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留（pnpm 在 profile 的 `pnpm-workspace.yaml` 里留下的 `minimumReleaseAgeExclude` 记录不属于本包，卸载时不会清除，也不影响配置合成）。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。0.1.7 以前只有 v1 提供 `presets/legacy-0.1.5/` 的目录式回退，v2 与 v3 不支持。web profile 为 live reload，desktop、headless、acp 需重启，因为 provider 补丁层只在启动时读取。
 
 安装器在 Windows PowerShell、Linux、WSL 上跑过三平台 CI。macOS 未在真机验证，脚本按 bash 3.2 兼容写，变量后接非 ASCII 字符时用 ${var}。补丁里的 `!!js` 标签由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。
 
@@ -172,6 +178,13 @@ docs/                             文档与历史 README
 ```
 
 ## 版本历史
+
+### v0.2.3（2026-10-21）
+
+- 修正与事实相反的陈述：`docs/版本与兼容性.md` 里 npm 渠道仍写「registry 返回 404，尚未发布」→ 改为 0.2.2 起可用。
+- 「卸载无残留」收窄为「依赖 / `dsh.profile.bundles` 选择 / patch 层无残留」，并注明 pnpm 的 `minimumReleaseAgeExclude` 记录会留在 profile。
+- npm 安装段补充版本策略：默认写入 caret 范围，预设改行为，要可复现请写死版本。
+- 依据 Windows 侧独立 `DSH_HOME` 的安装模拟报告核对：装得上、幂等、卸得干净、7 条 preset 行各一次。
 
 ### v0.2.2（2026-10-21）
 

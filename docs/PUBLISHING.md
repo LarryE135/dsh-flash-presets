@@ -84,6 +84,10 @@ npm deprecate dsh-flash-presets@0.0.0-stage "staging placeholder; install <lates
 
 - **registry CDN 有缓存**：`npm view dsh-flash-presets version` 可能还显示旧版本，绕缓存查 `https://registry.npmjs.org/dsh-flash-presets/latest` 才是准的。
 - **pnpm 元数据缓存**：刚发完就 `dsh plugin add dsh-flash-presets` 可能解析到上一个版本，用 `@X.Y.Z` 明确指定，或 `pnpm store prune` 后再装。
+### 坑 4：profile 里会留下 pnpm 的 `minimumReleaseAgeExclude`
+
+安装时 pnpm 11 会在该 profile 的 `pnpm-workspace.yaml` 里追加 `dsh-flash-presets@X.Y.Z`，**`dsh plugin remove` 不会清掉它**。这行由 pnpm 写入、不属于本包，也不影响配置合成——写文档时不要把"卸载无残留"说成绝对。
+
 - 判断"到底发出去没有"最硬的证据：再 `npm publish` 一次，若报 `cannot publish over the previously published versions: X.Y.Z`，说明版本真实存在。
 
 ## 5. 打标签 + 推送
