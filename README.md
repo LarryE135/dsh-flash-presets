@@ -166,6 +166,7 @@ scripts/
   check-bash32-cjk.mjs            macOS bash 3.2 的多字节变量守卫
   selftest.sh                     端到端自测
   publish.sh / publish.ps1        推送与建 Release，版本号从 README 解析
+docs/PUBLISHING.md                维护者发布流程（npm + 标签 + Release + 收尾）
 docs/                             文档与历史 README
 .github/workflows/verify.yml      三平台安装矩阵与组合包安装断言
 ```
