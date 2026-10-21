@@ -4,6 +4,8 @@
 
 <p align="center">
   <a href="https://github.com/LarryE135/dsh-flash-presets/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/LarryE135/dsh-flash-presets?style=flat-square&color=eab308"></a>
+  <a href="https://www.npmjs.com/package/dsh-flash-presets"><img alt="npm" src="https://img.shields.io/npm/v/dsh-flash-presets?style=flat-square&color=cb3837"></a>
+  <a href="https://www.npmjs.com/package/dsh-flash-presets"><img alt="npm downloads" src="https://img.shields.io/npm/dm/dsh-flash-presets?style=flat-square&color=cb3837"></a>
 </p>
 
 # dsh-flash-presets
@@ -13,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.1（分支 0.2.1），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
+> 当前版本：v0.2.2（分支 0.2.2），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -32,13 +34,24 @@ v3 相对 v2 的改动集中在验证阶段：验收门通过即交付，不再�
 
 ## 安装、更新、卸载
 
-### 组合包
+### npm（推荐）
+
+```console
+npm install -g dsh-flash-presets          # 全局装一份，供任意 profile 引用
+dsh plugin --profile web add dsh-flash-presets
+```
+
+包地址：<https://www.npmjs.com/package/dsh-flash-presets>。`dsh plugin add` 会自动把本包写入该 profile 的依赖并加载 `cordis.patch.yml`，无需先手动 `npm install`；上面前一行只在你需要离线副本或想让多个 profile 共用时才有必要。
+
+在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。升级版本：`dsh plugin --profile web add dsh-flash-presets@0.2.2`（不带版本号则取 `latest`）。
+
+### GitHub 直装
 
 ```console
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 ```
 
-在 GUI 的「插件 → 添加插件」里填 `github:LarryE135/dsh-flash-presets`，效果相同。该包尚未发布到 npm，不能用裸包名 `dsh-flash-presets` 安装，请用 GitHub 地址或本地目录路径。
+适合跟未发布的分支或本地改动。同样写在 GUI 的「插件 → 添加插件」里也能装。
 
 `--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的三个 insert 条目（v1、v2、v3）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
@@ -159,6 +172,13 @@ docs/                             文档与历史 README
 
 ## 版本历史
 
+### v0.2.2（2026-10-21）
+
+- 发布到 npm：`dsh-flash-presets`，可直接 `dsh plugin --profile web add dsh-flash-presets` 安装。
+- `verify-presets.mjs` 修正安装层判定的两个误报：只装 v3（常态）时不再因 v1/v2 缺失而报 25 项失败；预设行写在托管块之外（`dsh plugin` 合并的形态）时也能正确切片。
+- 新增开关：`--repo-only` 只跑仓库层（供发布前守卫与 CI 使用），`--all` 要求三个预设都已安装。
+- `package.json` 增加 `prepublishOnly` 守卫：合成一致性 + YAML 校验 + 仓库层结构校验，任一失败即中止发布。
+
 ### v0.2.1（2026-10-20）
 
 - `v3`（lean-v3）定为主版本：order 27、13 条规则、压缩 0.25 / 20k。
@@ -202,4 +222,4 @@ Flash-tier agent presets for DSH, shipped as a patch-only bundle (`dsh.bundle`) 
 
 Measured in our runs: writing the acceptance criteria into the prompt moved P15654 from 1/3 to 3/3 at 35% lower cost; an external grader with a failing-items loop moved P2099 from 1.05-1.15 to 1.03 median. Prompt-level difficulty assessment and clarifying questions did not help.
 
-Install: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets`, or `bash scripts/install.sh --profile web`.
+Install from npm: `dsh plugin --profile web add dsh-flash-presets` (or from git: `github:LarryE135/dsh-flash-presets`), or run `bash scripts/install.sh --profile web` after cloning.

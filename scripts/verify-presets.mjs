@@ -8,7 +8,9 @@
  *   B. 安装层：按 $DSH_HOME 判断是 0.1.7+ 的插件行式安装（profile 补丁里的托管块）还是旧版目录式
  *      （.agent-presets/），并断言关键取值。
  *
- *   node scripts/verify-presets.mjs
+ *   node scripts/verify-presets.mjs                    # 仓库层 + 已装预设的取值
+ *   node scripts/verify-presets.mjs --repo-only        # 只查仓库层（发布前守卫 / CI）
+ *   node scripts/verify-presets.mjs --all              # 要求三个预设都已安装
  *   DSH_HOME=/tmp/dsh node scripts/verify-presets.mjs                   # POSIX
  *   $env:DSH_HOME = "$env:TEMP\dsh"; node scripts\verify-presets.mjs    # Windows
  *   DSH_HOME=/tmp/dsh DSH_PROFILE=headless node scripts/verify-presets.mjs
@@ -29,6 +31,13 @@ const dshHome = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = process.env.DSH_PROFILE || 'web';
 const patchFile = path.join(dshHome, 'profiles', profile, 'cordis.patch.yml');
 const legacyRoot = path.join(dshHome, '.agent-presets');
+
+// 命令行开关：
+//   --repo-only  只跑 A 层（仓库结构），不看本机安装状态 —— 发布前守卫用这个
+//   --all        要求三个预设都已安装（默认只校验"装了的那几个"）
+const ARGV = process.argv.slice(2);
+const repoOnly = ARGV.includes('--repo-only');
+const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
   'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: true, thr: '0.3', retain: '50000' },
@@ -77,7 +86,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/v0\.2\.1/.test(readme), 'README 标注 v0.2.1');
+  check(/当前版本：v0\.2\.2/.test(readme), 'README 当前版本标注 v0.2.2');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
 
   // 换设备才会炸的回归：ESM 路径、bash-only 安装器、CRLF 检出
@@ -103,7 +112,8 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/\.mjs/.test(ga) && /\.yml/.test(ga), '.gitattributes 覆盖 .mjs / .yml');
 }
 
-// ── B. 安装层 ────────────────────────────────────────────────────────────────
+// ── B. 安装层（--repo-only 时整段跳过）────────────────────────────────────────
+if (!repoOnly) {
 const modernInstalled = fs.existsSync(patchFile);
 const legacyInstalled = fs.existsSync(legacyRoot);
 console.log('\n[安装] 检测到: '
@@ -116,15 +126,22 @@ if (modernInstalled) {
   const block = text.includes(BEGIN) && text.includes(END)
     ? text.slice(text.indexOf(BEGIN), text.indexOf(END) + END.length)
     : text;
+  // 在整份补丁里定位预设切片：托管块只证明安装器跑过，预设行可能由 dsh plugin
+  // 合并在块外（实测 profile 里两者可以并存），所以搜索范围是全文而不是块内。
   const sliceOf = n => {
-    const a = block.indexOf('- id: preset-' + n);
+    const a = text.indexOf('- id: preset-' + n);
     if (a < 0) return '';
-    const b = block.indexOf('- id: preset-', a + 1);
-    return block.slice(a, b < 0 ? block.length : b);
+    const b = text.indexOf('- id: preset-', a + 1);
+    return text.slice(a, b < 0 ? text.length : b);
   };
   for (const [name, exp] of Object.entries(EXPECT)) {
-    console.log('\n[' + name + '（已安装）]');
     const slice = sliceOf(name);
+    if (!slice) {                    // 没装这个预设就跳过：装 v3 是常态，不该据此判失败
+      console.log('\n[' + name + '] 未安装（跳过）');
+      if (requireAll) check(false, '预设 ' + name + ' 未安装（--all 要求三个都在）');
+      continue;
+    }
+    console.log('\n[' + name + '（已安装）]');
     check(new RegExp('^[ \\t]*- id: preset-' + name + '$', 'm').test(slice), '插入行 preset-' + name);
     check(new RegExp('^[ \\t]*id: ' + name + '$', 'm').test(slice), 'config.id = ' + name);
     check(new RegExp('^[ \\t]*order: ' + exp.order + '$', 'm').test(slice), 'order = ' + exp.order);
@@ -137,9 +154,10 @@ if (modernInstalled) {
     check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(slice),
           'tool-workflow 已停用');
   }
-  const ptcPreset = block.includes('id: tool-presentation') && /mode: ptc/.test(block);
+  const installedSlice = Object.keys(EXPECT).map(sliceOf).join('\n');
+  const ptcPreset = /id: tool-presentation/.test(installedSlice) && /mode: ptc/.test(installedSlice);
   check(ptcPreset, 'PTC 展示层 mode: ptc');
-  check(!/\/(home|Users)\/[^ ]*\/\.dsh\//.test(block), '托管块里未写入本机 DSH_HOME 绝对路径');
+  check(!/\/(home|Users)\/[^ ]*\/\.dsh\//.test(installedSlice), '已装预设里未写入本机 DSH_HOME 绝对路径');
 } else if (legacyInstalled) {
   for (const [name, exp] of Object.entries(EXPECT)) {
     if (!exp.legacy) continue;                       // legacy 只出货 v1
@@ -159,6 +177,7 @@ if (modernInstalled) {
   }
 } else {
   check(false, '未检测到安装（先运行 scripts/install.sh 或 scripts/install.ps1）');
+}
 }
 
 console.log('\n' + (failed ? '校验失败：' + failed + ' 项未通过。' : '校验通过：预设结构与跨平台检查全部通过。'));
