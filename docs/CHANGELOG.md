@@ -1,5 +1,15 @@
 # 变更日志
 
+## 0.2.3 — 2026-10-21
+
+**修复**
+- `docs/版本与兼容性.md`：npm 渠道仍写着「不可用，registry 返回 404，尚未发布」→ 改为 0.2.2 起可用，并说明 `files` 已含 `scripts/` 与 `docs/`、tarball 22 个文件无 `dist/`。
+- README「卸载后无残留」两处收窄为「依赖 / `dsh.profile.bundles` 选择 / patch 层无残留」，并注明 pnpm 写入 profile 的 `minimumReleaseAgeExclude` 记录不在清理范围内（不影响合成）。
+
+**文档**
+- npm 安装段补充版本策略：管理器默认写入 caret 范围，预设直接改变 agent 行为，要可复现应写死 `@0.2.3`。
+- 依据 Windows 侧独立 `DSH_HOME` 的安装模拟（pnpm 11.28.5）核对安装通道：冷装 3.1 s、解析 0.2.2、重复 add 幂等、remove 后回到 4 条内置预设。
+
 ## 0.2.2 — 2026-10-21
 
 **新增**
