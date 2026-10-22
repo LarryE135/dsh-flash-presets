@@ -86,7 +86,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/当前版本：v0\.2\.3/.test(readme), 'README 当前版本标注 v0.2.3');
+  check(/当前版本：v0\.2\.2/.test(readme), 'README 当前版本标注 v0.2.2');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
 
   // 组合包补丁层：宿主自检行 + lib/selfcheck.mjs

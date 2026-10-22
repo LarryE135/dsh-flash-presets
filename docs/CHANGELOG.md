@@ -1,6 +1,8 @@
 # 变更日志
 
-## 0.2.3 — 2026-11
+## 未发布（计划 0.2.3）
+
+> 版本口径保持 0.2.2（与 npm 已发布版本一致）；合并后按 `docs/PUBLISHING.md` 发 npm 并打 tag `v0.2.3` 时，本段转正为 `## 0.2.3`。
 
 **修复**
 - `docs/版本与兼容性.md`：npm 渠道仍写着「不可用，registry 返回 404，尚未发布」→ 改为 0.2.2 起可用，并说明 `files` 已含 `scripts/` 与 `docs/`、tarball 22 个文件无 `dist/`。
@@ -17,7 +19,7 @@
 - **基准与消融管线**：`bench/`（3 道自包含 seed 题 + `judge.mjs` + `run.mjs` + `gate.mjs`）+ `docs/BENCHMARKING.md` + `.github/workflows/bench.yml`（每周自动跑；配 `DEEPSEEK_API_KEY` secret 时跑真模型并执行回归门，否则只跑 smoke）；`--strip-rules N,M` 支持规则消融对照。
 
 **文档**
-- npm 安装段补充版本策略：管理器默认写入 caret 范围，预设直接改变 agent 行为，要可复现应写死 `@0.2.3`；GitHub 直装同理写死 `#v0.2.3`（不带 tag 的 git 直装是移动目标）。
+- npm 安装段补充版本策略：管理器默认写入 caret 范围，预设直接改变 agent 行为，要可复现应写死 `@0.2.2`；GitHub 直装同理写死 `#v0.2.2`（不带 tag 的 git 直装是移动目标）；发布 0.2.3 后一键命令转正。
 - 「已知限制」新增四条：选中预设 = 会话工具面被替换；规则是软约束；冻结的上游文案会漂移；`!!js` 标签在挂载时求值（装插件 = 授权表达式执行）。
 
 **验证**

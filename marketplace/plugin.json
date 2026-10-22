@@ -1,7 +1,7 @@
 {
   "id": "dsh-flash-presets",
   "name": "DSH Flash 精简预设",
-  "version": "0.2.3",
+  "version": "0.2.2",
   "description": "Three DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface plus hard behavior rules, tunable compaction threshold and round budget. v3 (lean-v3) is the current default.",
   "descriptionZh": "DSH Flash 精简预设（v1/v2/v3）：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式一键安装到 profile。v3（lean-v3）为现行主版本。",
   "author": {

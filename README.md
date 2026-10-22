@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.3（分支 0.2.3），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
+> 当前版本：v0.2.2（分支 0.2.2，与 npm 已发布版本一致），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh --dump-config` 合成出三个预设与自检行，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；`engines.dsh` 兼容门负向（版本不满足时安装被拒）；plan-mode section 与 0.2.1-rc.2 上游逐词一致（CI 漂移检查）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md)、[基准与消融](docs/BENCHMARKING.md) 及下文「已知限制」。
@@ -45,20 +45,20 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.3`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
+版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.2`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
 
 ```console
-dsh plugin --profile web add dsh-flash-presets@0.2.3   # 锁死
+dsh plugin --profile web add dsh-flash-presets@0.2.2   # 锁死（当前已发布版本）
 ```
 
 ### GitHub 直装
 
 ```console
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.3   # 锁死 tag（推荐）
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.2   # 锁死 tag（推荐）
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets          # 跟 main，适合未发布分支/本地改动
 ```
 
-同样写在 GUI 的「插件 → 添加插件」里也能装。**不带 `#tag` 的 git 直装是移动目标**：pnpm 每次重解析都可能取到 main 的最新提交，预设行为随之漂移——要可复现就用 `#v0.2.3`。
+同样写在 GUI 的「插件 → 添加插件」里也能装。**不带 `#tag` 的 git 直装是移动目标**：pnpm 每次重解析都可能取到 main 的最新提交，预设行为随之漂移——要可复现就用 `#v0.2.2`。
 
 `--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的条目（宿主自检行 + v1、v2、v3 三个 insert）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
@@ -229,11 +229,13 @@ docs/                             文档与历史 README
 
 ## 版本历史
 
-### v0.2.3（2026-11，本 PR）
+### 未发布（计划 0.2.3）
+
+> 内容已随 PR 合入 main，但**版本口径保持 0.2.2**（与 npm 已发布版本一致）；合并后按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 发 npm 并打 tag `v0.2.3`，届时把「当前版本」与一键命令的 `@0.2.2` / `#v0.2.2` 转正为 0.2.3。
 
 - 修正与事实相反的陈述：`docs/版本与兼容性.md` 里 npm 渠道仍写「registry 返回 404，尚未发布」→ 改为 0.2.2 起可用。
 - 「卸载无残留」收窄为「依赖 / `dsh.profile.bundles` 选择 / patch 层无残留」，并注明 pnpm 的 `minimumReleaseAgeExclude` 记录会留在 profile。
-- npm / GitHub 安装段补版本策略：默认写入 caret 范围、git 直装是移动目标——预设改行为，要可复现请写死版本（`@0.2.3` / `#v0.2.3`）。
+- npm / GitHub 安装段补版本策略：默认写入 caret 范围、git 直装是移动目标——预设改行为，要可复现请写死版本（`@0.2.2` / `#v0.2.2`，发布 0.2.3 后转正）。
 - **版本兼容门**：package.json 声明 `engines.dsh: ">=0.1.7-rc.1 <0.3.0"`，不满足的 DSH 拒绝安装（CI 负向用例）；README 补 GUI 与 CLI 的更新语义差异（web/HMR 下 GUI 重装报 `already-installed`，需先移除）。
 - **plan-mode 漂移修复与防线**：三个预设的 plan-mode `section` 对齐 0.2.1-rc.2 上游措辞（「until the user approves your plan through exit_plan_mode」）；新增 `scripts/check-planmode-drift.mjs`（零依赖，逐词对比 `--dump-config` 里的上游 section）+ CI 步骤 + `docs/plan-mode-drift.json` 书面豁免通道；`verify-yaml.mjs` 加措辞守卫防回退。
 - **陈旧注释修正**：v2/v3 的 `FLASH TUNING` 注释原为 v1 的「300k 触发 / 保留 50k」，与实际配置（0.25 → 250k / 20k）矛盾，已改并注明依据。
@@ -294,4 +296,4 @@ Flash-tier agent presets for DSH, shipped as a bundle (`dsh.bundle`) whose patch
 
 Measured in our runs: writing the acceptance criteria into the prompt moved P15654 from 1/3 to 3/3 at 35% lower cost; an external grader with a failing-items loop moved P2099 from 1.05-1.15 to 1.03 median. Prompt-level difficulty assessment and clarifying questions did not help. `bench/` adds a self-contained problem set with judges, a headless runner (same billing metric: inputTokens + cacheReadTokens), rule-ablation support (`--strip-rules`), and a regression gate; a weekly workflow runs it when a `DEEPSEEK_API_KEY` secret is configured.
 
-Install from npm: `dsh plugin --profile web add dsh-flash-presets@0.2.3` (pin it), or from git: `github:LarryE135/dsh-flash-presets#v0.2.3`, or run `bash scripts/install.sh --profile web` after cloning.
+Install from npm: `dsh plugin --profile web add dsh-flash-presets@0.2.2` (pin it), or from git: `github:LarryE135/dsh-flash-presets#v0.2.2`, or run `bash scripts/install.sh --profile web` after cloning.
