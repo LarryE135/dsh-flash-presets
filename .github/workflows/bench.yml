@@ -1,0 +1,75 @@
+name: bench
+
+# 每周日 01:00 UTC 自动跑一次基准；也可手动触发（workflow_dispatch 带参数）。
+# 没有 DEEPSEEK_API_KEY secret 时只跑 smoke（--list / --dry-run / 判题器自检），
+# 有 secret 时跑真实评测并执行回归门（gate.mjs）。
+on:
+  schedule:
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+    inputs:
+      problems:
+        description: '题目 id（逗号分隔；留空 = 全部 seed 题）'
+        required: false
+        default: ''
+      preset:
+        description: '预设 id'
+        required: false
+        default: 'flash-lean-ptc-v3'
+      arm:
+        description: '实验臂标签'
+        required: false
+        default: 'nightly'
+      strip_rules:
+        description: '消融：删除的规则编号（逗号分隔，如 1,4；留空 = 不删）'
+        required: false
+        default: ''
+      dsh:
+        description: 'DSH 版本（npm 精确版本）'
+        required: false
+        default: '0.2.1-rc.2'
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af   # v4.1.0
+        with:
+          node-version: '24'
+
+      - name: 安装 DSH 与 pnpm（锁版本）
+        run: npm i -g pnpm @deepseek-ai/dsh@${{ github.event.inputs.dsh || '0.2.1-rc.2' }}
+
+      - name: smoke（不联网跑题：清单 / 干跑 / 判题器空目录自检）
+        run: |
+          node bench/run.mjs --list
+          node bench/run.mjs --dry-run --problem p-prime-gap
+          node bench/run.mjs --dry-run --print-patch --problem p-rounding --strip-rules 1,4 | head -30
+          dsh --version
+          echo "smoke OK"
+
+      - name: 真实评测（有 DEEPSEEK_API_KEY 时）
+        if: ${{ secrets.DEEPSEEK_API_KEY != '' }}
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          ARGS="--batch --preset ${{ github.event.inputs.preset || 'flash-lean-ptc-v3' }} --arm ${{ github.event.inputs.arm || 'nightly' }}"
+          [ -n "${{ github.event.inputs.problems }}" ] && ARGS="--problem ${{ github.event.inputs.problems }} $ARGS"
+          [ -n "${{ github.event.inputs.strip_rules }}" ] && ARGS="$ARGS --strip-rules ${{ github.event.inputs.strip_rules }}"
+          node bench/run.mjs $ARGS --dsh "$(command -v dsh)"
+
+      - name: 回归门
+        if: ${{ secrets.DEEPSEEK_API_KEY != '' }}
+        run: node bench/gate.mjs
+
+      - name: 上传结果
+        if: ${{ secrets.DEEPSEEK_API_KEY != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        with:
+          name: bench-results
+          path: bench/results/
+          if-no-files-found: ignore

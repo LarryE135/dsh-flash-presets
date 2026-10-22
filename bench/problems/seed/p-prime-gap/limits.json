@@ -1,0 +1,9 @@
+{
+  "timeLimitMs": 4000,
+  "memoryLimitMB": 512,
+  "maxScore": 100,
+  "answerFile": "answer.txt",
+  "runFile": "solver.mjs",
+  "runCommand": ["node", "solver.mjs"],
+  "verifyLog": "verify.log"
+}

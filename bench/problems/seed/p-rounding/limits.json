@@ -1,0 +1,10 @@
+{
+  "timeLimitMs": 4000,
+  "memoryLimitMB": 512,
+  "maxScore": 100,
+  "answerFile": "answer.txt",
+  "runFile": "calc.mjs",
+  "runCommand": ["node", "calc.mjs"],
+  "verifyLog": "verify.log",
+  "tolerance": 1e-10
+}

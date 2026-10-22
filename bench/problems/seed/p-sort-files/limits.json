@@ -1,0 +1,11 @@
+{
+  "timeLimitMs": 4000,
+  "memoryLimitMB": 512,
+  "maxScore": 100,
+  "answerFile": "result.txt",
+  "runFile": "merge.mjs",
+  "runCommand": ["node", "merge.mjs"],
+  "verifyLog": "verify.log",
+  "dataFiles": ["numbers-1.txt", "numbers-2.txt", "numbers-3.txt"],
+  "take": 100
+}
