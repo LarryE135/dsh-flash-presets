@@ -73,7 +73,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   }
 
   for (const s of ['install.sh', 'install.ps1', 'publish.sh', 'publish.ps1', 'merge-presets.mjs',
-                   'verify-presets.mjs', 'verify-yaml.mjs']) {
+                   'verify-presets.mjs', 'verify-yaml.mjs', 'sync-marketplace.mjs', 'check-planmode-drift.mjs']) {
     check(fs.existsSync(path.join(here, s)), 'scripts/' + s + ' 存在');
   }
   const merge = read(path.join(here, 'merge-presets.mjs')) || '';
@@ -86,8 +86,23 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/当前版本：v0\.2\.2/.test(readme), 'README 当前版本标注 v0.2.2');
+  check(/当前版本：v0\.2\.3/.test(readme), 'README 当前版本标注 v0.2.3');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
+
+  // 组合包补丁层：宿主自检行 + lib/selfcheck.mjs
+  const bundlePatch = read(path.join(repo, 'cordis.patch.yml')) || '';
+  check(/flash-presets-selfcheck/.test(bundlePatch), 'cordis.patch.yml 含宿主自检行 flash-presets-selfcheck');
+  check(bundlePatch.indexOf("name: './lib/selfcheck.mjs'") >= 0, '自检行 name 指向 ./lib/selfcheck.mjs');
+  check(read(path.join(repo, 'lib', 'selfcheck.mjs')) !== null, 'lib/selfcheck.mjs 存在');
+  check(/engines[\s\S]{0,80}dsh/.test(read(path.join(repo, 'package.json')) || ''),
+        'package.json 声明 engines.dsh 兼容门');
+
+  // marketplace 同步：版本必须与 package.json 一致（sync-marketplace.mjs --check 的静态等价断言）
+  const pkg = JSON.parse(read(path.join(repo, 'package.json')) || '{}');
+  const market = JSON.parse(read(path.join(repo, 'marketplace', 'plugin.json')) || '{}');
+  check(pkg.version === market.version, 'marketplace/plugin.json 版本与 package.json 一致（' + pkg.version + '）');
+  check(market.install && /github:LarryE135\/dsh-flash-presets/.test(market.install.spec),
+        'marketplace/plugin.json install.spec 指向本仓库');
 
   // 换设备才会炸的回归：ESM 路径、bash-only 安装器、CRLF 检出
   const mjs = listScripts().filter(f => f.endsWith('.mjs'));

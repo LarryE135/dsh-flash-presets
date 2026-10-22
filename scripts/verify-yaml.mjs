@@ -80,6 +80,8 @@ const EXPECT = {
                                   thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2 },
   'flash-lean-ptc-v2.patch.yml': { preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3.patch.yml': { preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
 
 let failed = 0;
@@ -136,6 +138,15 @@ function checkPatchFile(file, exp) {
   const pc = (flat.find(p => p.id === 'tool-result-pruner') || {}).config || {};
   check(pc.thresholdChars === 8192 && pc.headChars === 4096 && pc.tailChars === 1024,
         '裁剪阈值保持出厂默认 8192/4096/1024');
+
+  // plan-mode section 措辞守卫：对齐 DSH 0.2.1 上游（「用户经 exit_plan_mode 批准」），
+  // 防旧措辞（「until exit_plan_mode succeeds」）回退；完整对比由 check-planmode-drift.mjs 负责。
+  const plan = flat.find(p => p.id === 'plan-mode');
+  const section = (plan && plan.config && plan.config.section) || '';
+  check(/until the user approves your plan through exit_plan_mode/.test(section),
+        'plan-mode section 使用上游「user approves your plan through exit_plan_mode」措辞');
+  check(!/until exit_plan_mode succeeds/.test(section),
+        'plan-mode section 不含已废弃的「until exit_plan_mode succeeds」措辞');
 
   const wf = flat.find(p => p.id === 'tool-workflow');
   check(!!wf && wf.disabled === true, 'tool-workflow 已停用');
