@@ -62,6 +62,11 @@ jobs:
         shell: bash
         run: node scripts/compose-bundle-patch.mjs --check
 
+      # marketplace/plugin.json 与 package.json 同步（版本/描述/安装指向）
+      - name: marketplace 清单同步
+        shell: bash
+        run: node scripts/sync-marketplace.mjs --check
+
       - name: YAML parse + value assertions
         shell: bash
         run: |
@@ -136,7 +141,7 @@ jobs:
           node-version: '24'   # dsh CLI 在 Node 20 下会静默退出（0 输出 / 退出码 0）
 
       - name: 安装 DSH 与 pnpm
-        run: npm i -g pnpm @deepseek-ai/dsh
+        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.2   # 锁版本：漂移检查以该版本的 shipped section 为基准
 
       - name: 环境诊断
         run: |
@@ -167,3 +172,51 @@ jobs:
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
           done
+          n=$(grep -c -- 'flash-presets-selfcheck' "$RUNNER_TEMP/dump.txt" || true)
+          echo "flash-presets-selfcheck: $n"
+          [ "$n" -ge 1 ] || { echo "::error::自检行未进入组合配置"; exit 1; }
+
+      # plan-mode section 与上游（0.2.1-rc.2 的 shipped 预设）漂移检查。
+      # 基准来自 web profile 的 dump：自建裸 profile 缺 web-app，没有 shipped 预设的 section。
+      - name: plan-mode section 漂移检查
+        run: |
+          dsh --profile web --dump-config > "$RUNNER_TEMP/web-dump.txt" 2> "$RUNNER_TEMP/web-dump.err" || true
+          echo "web dump: $(wc -c < "$RUNNER_TEMP/web-dump.txt") B"
+          node scripts/check-planmode-drift.mjs --dump "$RUNNER_TEMP/web-dump.txt" --dsh 0.2.1-rc.2
+
+      # engines.dsh 兼容门负向验证：改坏版本范围后安装必须被拒绝
+      - name: engines.dsh 兼容门（负向）
+        run: |
+          set -o pipefail
+          cp -r . "$RUNNER_TEMP/neg" && rm -rf "$RUNNER_TEMP/neg/.git"
+          cd "$RUNNER_TEMP/neg"
+          npm pkg set engines.dsh='>=99.0.0'
+          if dsh plugin --profile ci-neg add . 2>&1 | tee /tmp/neg.log; then
+            echo "::error::engines.dsh=99 竟然装上了（兼容门未生效）"
+            exit 1
+          fi
+          grep -qi 'incompatible' /tmp/neg.log || grep -qi '99.0.0' /tmp/neg.log \
+            || { echo "::error::负向安装失败的报错里没有 incompatible/版本信息："; tail -20 /tmp/neg.log; exit 1; }
+          echo "✓ 兼容门生效：engines.dsh 不满足时拒绝安装"
+
+      # 自检插件不阻断启动：装进 headless profile 后真实 boot 一次（空任务；
+      # 没有 API key 时会在 provider 阶段失败，但只要自检行不炸、进程能走到
+      # 模型调用即算通过）。
+      - name: 自检插件启动冒烟
+        run: |
+          set +e
+          dsh plugin --profile headless add . > /tmp/hl-install.log 2>&1
+          irc=$?
+          set -e
+          [ "$irc" -eq 0 ] || { echo "::error::headless 安装失败："; tail -20 /tmp/hl-install.log; exit 1; }
+          set +e
+          dsh headless --json "reply with the single word ok" > /tmp/boot.jsonl 2> /tmp/boot.err
+          rc=$?
+          set -e
+          echo "headless 退出码: $rc（无 key 时预期非 0）"
+          grep -E 'flash-presets-selfcheck|selfcheck' /tmp/boot.err /tmp/boot.jsonl || true
+          if grep -qi 'flash-presets-selfcheck.*failed\|selfcheck.*throw\|Cannot find module.*selfcheck' /tmp/boot.err; then
+            echo "::error::自检行在启动时炸了"
+            exit 1
+          fi
+          echo "✓ 自检行未阻断启动"

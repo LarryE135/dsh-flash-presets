@@ -1,14 +1,28 @@
 # 变更日志
 
-## 未发布（计划 0.2.3）
+## 0.2.3 — 2026-11
 
 **修复**
 - `docs/版本与兼容性.md`：npm 渠道仍写着「不可用，registry 返回 404，尚未发布」→ 改为 0.2.2 起可用，并说明 `files` 已含 `scripts/` 与 `docs/`、tarball 22 个文件无 `dist/`。
 - README「卸载后无残留」两处收窄为「依赖 / `dsh.profile.bundles` 选择 / patch 层无残留」，并注明 pnpm 写入 profile 的 `minimumReleaseAgeExclude` 记录不在清理范围内（不影响合成）。
+- `presets/flash-lean-ptc-v{2,3}.patch.yml` 的 `FLASH TUNING` 注释与配置矛盾（注释说 300k/50k，配置是 0.25 → 250k/20k）→ 修正注释并注明依据。
+- 三个预设的 plan-mode `section` 冻结的是旧措辞（「until exit_plan_mode succeeds」）→ 对齐 DSH 0.2.1-rc.2 上游（「until the user approves your plan through exit_plan_mode」）。
+
+**新增**
+- **版本兼容门**：package.json 声明 `engines.dsh: ">=0.1.7-rc.1 <0.3.0"`；CI 新增负向用例（改坏版本范围后 `dsh plugin add` 必须被拒）。README 补 GUI 与 CLI 的更新语义差异。
+- **漂移防线**：`scripts/check-planmode-drift.mjs`（零依赖，逐词对比 `--dump-config` 里的上游 section）+ CI 步骤 + `docs/plan-mode-drift.json` 书面豁免通道；`verify-yaml.mjs` 加措辞守卫防回退。
+- **按路由调压缩**：v3 增加 `modelPolicies` 注释模板（精确匹配 provider/model，不匹配回退全局默认），persona 规则 13 联动，README「按路由调压缩」说明启用方法。
+- **宿主自检插件**：`lib/selfcheck.mjs` + bundle 里的 `flash-presets-selfcheck` 行——校验预设行存在性、关键配置键、registry broken 状态；只写日志、永不阻断启动，可 `disabled: true` 关闭。CI 加真实 boot 冒烟。
+- **marketplace 同步**：`scripts/sync-marketplace.mjs` 从 package.json 派生 version/descriptionZh/安装指向，CI 断言同步（修复 marketplace 停留在 0.2.1 的漂移）。
+- **基准与消融管线**：`bench/`（3 道自包含 seed 题 + `judge.mjs` + `run.mjs` + `gate.mjs`）+ `docs/BENCHMARKING.md` + `.github/workflows/bench.yml`（每周自动跑；配 `DEEPSEEK_API_KEY` secret 时跑真模型并执行回归门，否则只跑 smoke）；`--strip-rules N,M` 支持规则消融对照。
 
 **文档**
-- npm 安装段补充版本策略：管理器默认写入 caret 范围，预设直接改变 agent 行为，要可复现应写死 `@0.2.3`。
+- npm 安装段补充版本策略：管理器默认写入 caret 范围，预设直接改变 agent 行为，要可复现应写死 `@0.2.3`；GitHub 直装同理写死 `#v0.2.3`（不带 tag 的 git 直装是移动目标）。
+- 「已知限制」新增四条：选中预设 = 会话工具面被替换；规则是软约束；冻结的上游文案会漂移；`!!js` 标签在挂载时求值（装插件 = 授权表达式执行）。
+
+**验证**
 - 依据 Windows 侧独立 `DSH_HOME` 的安装模拟（pnpm 11.28.5）核对安装通道：冷装 3.1 s、解析 0.2.2、重复 add 幂等、remove 后回到 4 条内置预设。
+- 本轮新增：DSH 0.2.1-rc.2 真实安装（dump 含三预设 + 自检行）、engines 负向、plan-mode 逐词对齐、判题器 AC/WA 双向、`--dry-run`/消融 smoke。
 
 ## 0.2.2 — 2026-10-21
 
