@@ -1,6 +1,6 @@
 {
   "name": "dsh-flash-presets",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "description": "DSH Flash 精简预设（v1/v2/v3）：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式一键安装到 profile。v3（lean-v3）为现行主版本。",
   "keywords": [
@@ -13,6 +13,9 @@
     "token-efficiency"
   ],
   "license": "MIT",
+  "engines": {
+    "dsh": ">=0.1.7-rc.1 <0.3.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/LarryE135/dsh-flash-presets.git"
@@ -23,16 +26,20 @@
   },
   "scripts": {
     "build": "node scripts/compose-bundle-patch.mjs",
-    "check": "node scripts/compose-bundle-patch.mjs --check",
+    "check": "node scripts/compose-bundle-patch.mjs --check && node scripts/sync-marketplace.mjs --check",
     "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only",
-    "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only"
+    "sync:marketplace": "node scripts/sync-marketplace.mjs",
+    "bench:list": "node bench/run.mjs --list",
+    "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/sync-marketplace.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only"
   },
   "files": [
     "cordis.patch.yml",
+    "lib/",
     "presets/flash-lean-ptc-v1.patch.yml",
     "presets/flash-lean-ptc-v2.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
     "scripts/",
+    "bench/",
     "docs/",
     "README.md",
     "LICENSE"

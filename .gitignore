@@ -17,3 +17,6 @@ node_modules/
 *.tgz
 package-lock.json
 pnpm-lock.yaml
+
+# bench 结果产物（baseline 由维护者人工挑选后单独加入版本控制）
+bench/results/*.csv
