@@ -52,7 +52,7 @@
                 12. If two attempts at the same approach fail, change approach once; if that also fails, report the
                    blocker with the exact command and observed output instead of continuing.
                    13. Route awareness: running on provider "{{provider}}" with model "{{model}}". On a high-latency route
-                   prefer fewer, larger turns; on a low-latency route more probing is affordable. Never trade
+                   prefer fewer, larger turns; on a low-latency route more probing is affordable. Compaction pressure is tuned per route by the preset config (modelPolicies); do not second-guess it in prose. Never trade
                    correctness for turn count.
               prefix: You are a coding agent powered by the {{model}} model.
           - id: agent-instructions
@@ -91,7 +91,7 @@
                 name: '@deepseek-ai/dsh-plan-mode'
                 config:
                   section: |
-                    You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
                     Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
 
@@ -111,8 +111,18 @@
             config:
               - id: compaction-basic
                 name: '@deepseek-ai/dsh-compaction-basic'
-                # FLASH TUNING: 该路由声明 1,000,000 窗口，0.8 默认要到 800k 才压缩；
-                # 实测：长会话里大量步数停在 300k 以上，故 300k 触发压缩、保留 50k 近期轮次。
+                # FLASH TUNING: 该路由声明 1,000,000 窗口，0.8 默认要到 800k 才压缩。
+                # 0.25 → 250k 触发压缩、保留 20k 近期轮次（比 v1 的 0.3/50k 更早、更省；
+                # 依据与 v1 同源的实测：长会话大量步数停在 250k 以上区段）。
+                # 按路由微调（DSH 0.2.1+ 的 modelPolicies 按 provider/model 精确匹配，
+                # 不匹配即回退到上方全局默认；示例——官方默认 flash 路由更早压缩）：
+                #   modelPolicies:
+                #     - provider: deepseek-official
+                #       model: deepseek-flash
+                #       thresholdRatio: 0.2
+                #       retainTokens: 16000
+                # 启用方法：去掉注释，并按 `dsh --profile <p> --dump-config` 里
+                # agent-default-model 的实际 provider/model 改写；详见 README「按路由调压缩」。
                 config:
                   thresholdRatio: 0.25
                   retainTokens: 20000
