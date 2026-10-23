@@ -1,0 +1,25 @@
+{
+  "name": "dsh-plan-rounds",
+  "version": "0.1.0",
+  "description": "Session-scoped planning-rounds control: /plan-rounds 0|2|4, a planRounds projection, and a matching system-prompt contract.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "zod": "*"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "bundle.patch.yml"
+    }
+  },
+  "files": [
+    "lib/",
+    "bundle.patch.yml",
+    "README.md"
+  ]
+}

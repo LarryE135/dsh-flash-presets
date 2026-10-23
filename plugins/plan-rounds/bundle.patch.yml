@@ -1,0 +1,8 @@
+# dsh-plan-rounds —— 组合包补丁层
+# 以 profile 插件层形式插入本插件；config.defaultRounds 默认 0（关闭）。
+- insert:
+    - id: plan-rounds
+      name: "dsh-plan-rounds"
+      config:
+        defaultRounds: 0
+        sectionOrder: 41
