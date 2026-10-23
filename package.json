@@ -1,6 +1,6 @@
 {
   "name": "dsh-flash-presets",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": false,
   "description": "DSH Flash 精简预设（v1/v2/v3）：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式一键安装到 profile。v3（lean-v3）为现行主版本。",
   "keywords": [
@@ -34,6 +34,8 @@
     "presets/flash-lean-ptc-v1.patch.yml",
     "presets/flash-lean-ptc-v2.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
+    "presets/legacy-0.1.5/",
+    ".gitattributes",
     "scripts/",
     "docs/",
     "README.md",
