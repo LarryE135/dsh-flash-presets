@@ -1,5 +1,13 @@
 # 变更日志
 
+## 0.2.4 — 2026-10-24
+
+**修复**
+- npm 包缺 `presets/legacy-0.1.5/`：DSH 0.1.7 以前的目录式回退只有 v1 提供，此前只存在于仓库、没进 tarball，从 npm 安装的用户拿不到。
+- npm 包缺 `.gitattributes`：包内自带的 `scripts/verify-presets.mjs` 依赖它判断行尾，导致在解包目录里跑自检直接 3 项失败。
+
+**验证**：`npm pack` 后解包、在包内跑 `node scripts/verify-presets.mjs --repo-only` 应全绿（已实测）。
+
 ## 0.2.3 — 2026-10-24
 
 **预设**
