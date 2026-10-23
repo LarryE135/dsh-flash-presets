@@ -53,10 +53,10 @@ check(/当前版本：/.test(pub || ''), 'publish.ps1 从 README 解析版本');
 check(/git rev-parse -q --verify/.test(pub || '') && /throw/.test(pub || ''),
       'publish.ps1 对不存在的标签会报错退出');
 
-// 行尾规范：shell/node 走 LF；.ps1 由 .gitattributes 钉成 CRLF 检出（BOM 见上）
+// 行尾规范：shell/node 走 LF；.ps1 同样走 LF（PowerShell 5.1/7 都能读，且声明与实际必须一致）
 const ga = read(path.join(repo, '.gitattributes')) || '';
 check(/\*\.sh[^\n]*eol=lf/.test(ga), '.gitattributes 仍把 *.sh 钉为 LF');
-check(/\*\.ps1[^\n]*eol=crlf/.test(ga), '.gitattributes 仍把 *.ps1 钉为 CRLF（Windows 检出）');
+check(/\*\.ps1[^\n]*eol=lf/.test(ga), '.gitattributes 把 *.ps1 钉为 LF（声明须与实际一致）');
 
 // 两个安装器的完成文案必须逐字提到同一批预设（防单侧漂移）
 const sh = read(path.join(here, 'install.sh')) || '';

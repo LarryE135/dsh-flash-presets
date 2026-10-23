@@ -15,7 +15,7 @@ EXPECT="${1:-$(sed -n 's/.*当前版本：\(v[0-9][0-9.]*\).*/\1/p' README.md | 
 step "版本口径"
 [ -n "$EXPECT" ] && ok "README 当前版本 = $EXPECT" || bad "README 里没有「当前版本：vX.Y.Z」"
 grep -q "### $EXPECT" README.md && ok "版本历史里有 $EXPECT 条目" || bad "版本历史缺少 $EXPECT"
-grep -q "$EXPECT" scripts/verify-presets.mjs && ok "校验器断言 $EXPECT" || bad "校验器未断言 $EXPECT"
+grep -q "package.json" scripts/verify-presets.mjs && ok "校验器按 package.json 判定版本" || bad "校验器没读 package.json 版本"
 
 step "仓库层校验"
 # 干净机器（CI / 新用户）上没有 ~/.dsh，先在一个临时 home 里装一遍再校验；
