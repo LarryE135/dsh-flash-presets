@@ -45,10 +45,10 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.3`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
+版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.2`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
 
 ```console
-dsh plugin --profile web add dsh-flash-presets@0.2.3   # 锁死
+dsh plugin --profile web add dsh-flash-presets@0.2.2   # 锁死
 ```
 
 ### GitHub 直装

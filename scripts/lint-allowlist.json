@@ -1,0 +1,40 @@
+{
+  "note": "已确认但暂不改动的历史缺陷（改了会让旧实验不可复现）。修好后请从本文件删除对应条目。",
+  "entries": [
+    {
+      "file": "flash-lean-ptc-v1.patch.yml",
+      "match": "规则 1 禁用 shell 工具",
+      "reason": "v1 基线冻结，历史实验依赖它"
+    },
+    {
+      "file": "flash-lean-ptc-v1.patch.yml",
+      "match": "规则 3 含POSIX 专属临时目录",
+      "reason": "同上"
+    },
+    {
+      "file": "flash-lean-ptc-v2.patch.yml",
+      "match": "规则 5 禁用 shell 工具",
+      "reason": "v2 冻结"
+    },
+    {
+      "file": "flash-lean-ptc-v2.patch.yml",
+      "match": "规则 6 含POSIX 专属临时目录",
+      "reason": "v2 冻结"
+    },
+    {
+      "file": "flash-lean-ptc-v3.patch.yml",
+      "match": "规则 13 缩进",
+      "reason": "PR #3 已提出修正，合并后删除本行"
+    },
+    {
+      "file": "flash-lean-ptc-v3.patch.yml",
+      "match": "规则 5 禁用 shell 工具",
+      "reason": "PR #3 已提出修正"
+    },
+    {
+      "file": "flash-lean-ptc-v3.patch.yml",
+      "match": "规则 6 含POSIX 专属临时目录",
+      "reason": "PR #3 已提出修正"
+    }
+  ]
+}

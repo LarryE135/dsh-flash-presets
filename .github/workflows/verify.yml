@@ -54,6 +54,10 @@ jobs:
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/dsh" node scripts/verify-presets.mjs
 
+      - name: 预设文本审计（编号/缩进/自相矛盾/平台路径/版本引用）
+        shell: bash
+        run: node scripts/lint-presets.mjs
+
       - name: Guard against the bash 3.2 multibyte trap (no dependencies)
         shell: bash
         run: node scripts/check-bash32-cjk.mjs
