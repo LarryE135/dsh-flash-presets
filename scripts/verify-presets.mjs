@@ -112,6 +112,71 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/\.mjs/.test(ga) && /\.yml/.test(ga), '.gitattributes 覆盖 .mjs / .yml');
 }
 
+// ── A2. 仓库层取值断言（直接读预设文件，不依赖安装状态）──────────────────────
+// 2026-10-24 审计补：此前取值断言只在 --repo-only 之外跑，导致本地 `npm run verify`
+// 改了阈值或 id 也能过（CI 因为有安装步骤才挡住）。这里补一份不依赖 DSH_HOME 的版本。
+console.log('\n[仓库层取值]');
+for (const [name, exp] of Object.entries(EXPECT)) {
+  const file = path.join(repo, 'presets', name + '.patch.yml');
+  const text = read(file);
+  check(text !== null, name + ' 预设文件存在');
+  if (text === null) continue;
+  check(new RegExp('^\\s*- id: preset-' + name + '$', 'm').test(text), '插入行 preset-' + name);
+  check(new RegExp('^\\s*id: ' + name + '$', 'm').test(text), 'config.id = ' + name);
+  check(new RegExp('^\\s*order: ' + exp.order + '$', 'm').test(text), 'order = ' + exp.order);
+  const nums = [...text.matchAll(/^\s+(\d+)\. /gm)].map(m => Number(m[1]));
+  check(nums.length === exp.rules, '规则条数 ' + nums.length + '（期望 ' + exp.rules + '）');
+  check(new RegExp('thresholdRatio: ' + exp.thr.replace('.', '\\.')).test(text), '压缩阈值 ' + exp.thr);
+  check(new RegExp('retainTokens: ' + exp.retain).test(text), '保留预算 ' + exp.retain);
+  check(/thresholdChars: 8192/.test(text) && /headChars: 4096/.test(text) && /tailChars: 1024/.test(text), '裁剪阈值 8192/4096/1024');
+  check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(text), 'tool-workflow 已停用');
+  check(/mode: ptc/.test(text), 'PTC 展示层 mode: ptc');
+}
+
+// ── A3. 行尾与文档链接（2026-10-24 审计补）───────────────────────────────────
+// 行尾检查以 .gitattributes 为准：eol=lf 的文件不许有 CR，eol=crlf 的（*.ps1/.cmd/.bat）必须是 CRLF。
+const attrText = read(path.join(repo, '.gitattributes')) || '';
+const lfPatterns = [];
+const crlfPatterns = [];
+for (const line of attrText.split(/\r?\n/)) {
+  const m = /^\s*(\S+)\s+.*\beol=(lf|crlf)\b/.exec(line);
+  if (m) (m[2] === 'lf' ? lfPatterns : crlfPatterns).push(m[1]);
+}
+const matches = (pattern, name) => (pattern === '*' ? true : pattern.startsWith('*.') ? name.endsWith(pattern.slice(1)) : name === pattern);
+const lfViolations = [];
+const crlfViolations = [];
+const walkRepo = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walkRepo(full); continue; }
+    const rel = path.relative(repo, full);
+    const buf = fs.readFileSync(full);
+    if (lfPatterns.some((p) => matches(p, entry.name)) && buf.includes(13)) lfViolations.push(rel);
+    if (crlfPatterns.some((p) => matches(p, entry.name)) && !buf.includes(13)) crlfViolations.push(rel);
+  }
+};
+walkRepo(repo);
+check(lfViolations.length === 0, 'eol=lf 的文件无 CRLF' + (lfViolations.length ? '（' + lfViolations.slice(0, 3).join(', ') + '）' : ''));
+check(crlfViolations.length === 0, 'eol=crlf 的文件确实是 CRLF' + (crlfViolations.length ? '（' + crlfViolations.slice(0, 3).join(', ') + '）' : ''));
+
+const mdFiles = ['README.md', 'CONTRIBUTING.md',
+  ...fs.readdirSync(path.join(repo, 'docs')).filter((f) => f.endsWith('.md')).map((f) => 'docs/' + f)];
+const brokenLinks = [];
+for (const rel of mdFiles) {
+  const full = path.join(repo, rel);
+  if (!fs.existsSync(full)) continue;
+  const body = fs.readFileSync(full, 'utf8');
+  for (const m of body.matchAll(/\]\(([^)\s]+)\)/g)) {
+    const target = m[1];
+    if (/^(https?:|mailto:|#)/.test(target)) continue;
+    const clean = target.split('#')[0];
+    if (!clean) continue;
+    if (!fs.existsSync(path.resolve(path.dirname(full), clean))) brokenLinks.push(rel + ' -> ' + target);
+  }
+}
+check(brokenLinks.length === 0, '文档内相对链接都指向存在的文件' + (brokenLinks.length ? '（' + brokenLinks.slice(0, 3).join('; ') + '）' : ''));
+
 // ── B. 安装层（--repo-only 时整段跳过）────────────────────────────────────────
 if (!repoOnly) {
 const modernInstalled = fs.existsSync(patchFile);

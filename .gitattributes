@@ -7,7 +7,8 @@
 *.yml   text eol=lf
 *.yaml  text eol=lf
 *.md    text eol=lf
-*.ps1   text eol=crlf
+# PowerShell 5.1/7 都能读 LF；仓库统一 LF，避免“声明 CRLF 实际 LF”的自欺（2026-10-24 审计）
+*.ps1   text eol=lf
 *.cmd   text eol=crlf
 *.bat   text eol=crlf
 *.png   binary
