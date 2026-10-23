@@ -1,5 +1,23 @@
 # 变更日志
 
+## 0.2.3 — 2026-10-24
+
+**预设**
+- v3 规则 5/6 的 shell 工具表述改为「不用 shell 浏览文件，但命令自身输出可管道给 head」，消除自相矛盾（PR #3）。
+- v3 规则 6 的临时目录写法改为 PowerShell / cmd / POSIX 三态（`$env:TEMP`、`%TEMP%`、`/tmp`），此前 `$TEMP` 在 cmd 下不成立。
+- v3 规则 13 缩进对齐，块标量里不再视觉脱离列表。
+
+**文档**
+- 删除「未发布（计划 0.2.3）」幽灵版本章节；npm 渠道版本引用统一到 0.2.3。
+- tarball 文件数更正为 28（原写 22），README 仓库结构补上 `plugins/`、`candidates/`、`marketplace/`。
+
+**工具与 CI**
+- 新增 `scripts/lint-presets.mjs`：规则编号、缩进、自相矛盾（双向）、平台路径、版本引用漂移。
+- 新增 `scripts/verify-runtime.mjs`：核对 `dsh --dump-config` 里的 order / 阈值 / 规则条数 / PTC。
+- `verify-presets.mjs` 补仓库层取值断言（此前 `--repo-only` 会跳过全部取值检查）、行尾与文档链接检查。
+- CI 增加最小权限 `permissions: contents: read` 与两步新校验；`.gitattributes` 的 `*.ps1` 改为 LF（原先声明 CRLF 但实际是 LF）。
+
+**新增文档**：`CONTRIBUTING.md`、PR 模板、三份审计报告（结构 / 深挖 / 运行时）。
 ## 0.2.2 — 2026-10-21
 
 **新增**

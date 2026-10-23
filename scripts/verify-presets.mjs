@@ -86,7 +86,10 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';
-  check(/当前版本：v0\.2\.2/.test(readme), 'README 当前版本标注 v0.2.2');
+  // 版本号以 package.json 为唯一事实来源，避免每次发版都要改两处（2026-10-24 审计）
+  const pkgVersion = JSON.parse(read(path.join(repo, 'package.json')) || '{}').version || '';
+  check(pkgVersion !== '' && new RegExp('当前版本：v' + pkgVersion.replace(/\./g, '\\.')).test(readme),
+        'README 当前版本标注与 package.json 一致（v' + pkgVersion + '）');
   check(/0\.1\.7/.test(readme), 'README 说明 0.1.7 的预设机制变化');
 
   // 换设备才会炸的回归：ESM 路径、bash-only 安装器、CRLF 检出
