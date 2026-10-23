@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.35（分支 0.2.35），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
+> 当前版本：v0.2.4（分支 0.2.4），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -48,7 +48,7 @@ dsh plugin --profile web add dsh-flash-presets
 版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.2`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
 
 ```console
-dsh plugin --profile web add dsh-flash-presets@0.2.35   # 锁死
+dsh plugin --profile web add dsh-flash-presets@0.2.4   # 锁死
 ```
 
 ### GitHub 直装
@@ -182,7 +182,7 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 版本历史
 
-### v0.2.35（2026-10-24）
+### v0.2.4（2026-10-24）
 
 - 修复 npm 包内容：`presets/legacy-0.1.5/`（DSH 0.1.7 以前的目录式回退）与 `.gitattributes` 之前没被打包，导致「从 npm 装」的人拿不到旧版回退，且包内自带的 `verify-presets.mjs` 会报 3 项失败。
 
