@@ -174,6 +174,9 @@ scripts/
   publish.sh / publish.ps1        推送与建 Release，版本号从 README 解析
 docs/PUBLISHING.md                维护者发布流程（npm + 标签 + Release + 收尾）
 docs/                             文档与历史 README
+plugins/plan-rounds/              实验插件：会话级计划轮数控制（不随 npm 包发布）
+candidates/                       候选预设：未并入主版本的实验分支（不随包发布）
+marketplace/                      插件市场提交材料（不随包发布）
 .github/workflows/verify.yml      三平台安装矩阵与组合包安装断言
 ```
 
