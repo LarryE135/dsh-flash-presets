@@ -32,7 +32,8 @@
                 5. Tool choice. Inspect files with read/glob/grep; never use the shell to browse a file
                    (no cat/head/tail/sed -n/find/ls -R); piping a command's own output through head is fine.
                 6. Output budget. Batch independent calls into one step. Pipe or redirect long output
-                   (| head -40, > "$TEMP/out.log" on Windows or /tmp/out.log on POSIX). Never print a dump you could grep.
+                   (| head -40; redirect to "$env:TEMP/out.log" in PowerShell, %TEMP%\out.log in cmd, /tmp/out.log on POSIX).
+                   Never print a dump you could grep.
                 7. Programmatic tool mode, adaptively. Fold 3+ independent calls of one logical step into ONE
                    run_code program; if a step needs exactly one call, call it directly. Measured: folding pays off on
                    multi-file/repo work (up to 8x fewer turns, 2-8x less wall clock) and is neutral on single-file
