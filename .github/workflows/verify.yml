@@ -174,3 +174,7 @@ jobs:
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
           done
+
+      # 只断言"id 出现过"还不够：order / 阈值 / 规则条数 / PTC 才是预设真正的行为参数
+      - name: 断言合成结果里的取值
+        run: node scripts/verify-runtime.mjs "$RUNNER_TEMP/dump.txt"
