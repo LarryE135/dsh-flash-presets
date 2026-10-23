@@ -20,21 +20,6 @@
       "file": "flash-lean-ptc-v2.patch.yml",
       "match": "规则 6 含POSIX 专属临时目录",
       "reason": "v2 冻结"
-    },
-    {
-      "file": "flash-lean-ptc-v3.patch.yml",
-      "match": "规则 13 缩进",
-      "reason": "PR #3 已提出修正，合并后删除本行"
-    },
-    {
-      "file": "flash-lean-ptc-v3.patch.yml",
-      "match": "规则 5 禁用 shell 工具",
-      "reason": "PR #3 已提出修正"
-    },
-    {
-      "file": "flash-lean-ptc-v3.patch.yml",
-      "match": "规则 6 含POSIX 专属临时目录",
-      "reason": "PR #3 已提出修正"
     }
   ]
 }
