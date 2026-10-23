@@ -57,8 +57,9 @@ for (const file of fs.readdirSync(path.join(ROOT, 'presets')).filter((f) => f.en
     const low = r.body.toLowerCase();
     const explicitlyAllows = /piping[^.]{0,40}head[^.]{0,20}fine|head[^.]{0,20}is fine/i.test(low);
     if (!explicitlyAllows && /never|no /.test(low) && BANNED.test(low)) {
-      const later = rules.find((r2) => r2.num > r.num && USES.test(r2.body));
-      if (later) problems.push(file + ': 规则 ' + r.num + ' 禁用 shell 工具，规则 ' + later.num + ' 又使用 -> ' + later.body.slice(0, 70));
+      // 禁用词出现在使用之后同样矛盾：两个方向都查
+      const other = rules.find((r2) => r2.num !== r.num && USES.test(r2.body));
+      if (other) problems.push(file + ': 规则 ' + r.num + ' 禁用 shell 工具，规则 ' + other.num + ' 又使用 -> ' + other.body.slice(0, 70));
     }
     const portable = /%TEMP%|\$env:TEMP/i.test(r.body); // 同时给出 Windows 变体即视为可移植
     for (const [p, why] of PLATFORM_PATHS) {
