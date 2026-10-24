@@ -17,7 +17,7 @@ npm run build
 
 ## 预设文本审计会拦什么
 
-`scripts/lint-presets.mjs` 检查四类历史踩过的坑：
+`scripts/lint-presets.mjs` 检查五类历史踩过的坑：
 
 | 检查 | 典型的错法 |
 |---|---|

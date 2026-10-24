@@ -113,7 +113,9 @@ function Install-Modern {
   } elseif ($LASTEXITCODE -eq 2) {
     Write-Host '⚠ YAML 校验已跳过（未安装 js-yaml）。安装后可用：node `"$verifyYaml`" `"$patch`"'
   } else {
-    Write-Warning "YAML 校验未通过，请运行：node `"$verifyYaml`" `"$patch`""
+    Write-Warning "YAML 校验未通过：回滚到安装前备份后退出（$patch.bak-${stamp}）"
+    if (Test-Path "$patch.bak-$stamp") { Copy-Item "$patch.bak-$stamp" $patch -Force }
+    throw "YAML 校验未通过，未完成安装。复查：node `"$verifyYaml`" `"$patch`""
   }
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'

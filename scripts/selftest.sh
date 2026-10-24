@@ -24,7 +24,12 @@ PRE="$TMP/pre"; mkdir -p "$PRE/profiles/web"; printf '# selftest pre\n[]\n' > "$
 DSH_HOME="$PRE" bash scripts/install.sh --profile web >"$TMP/pre.install.log" 2>&1 \
   && ok "预安装（临时 DSH_HOME）" || { bad "预安装失败"; tail -4 "$TMP/pre.install.log"; }
 DSH_HOME="$PRE" node scripts/verify-presets.mjs >"$TMP/vp.log" 2>&1 && ok "verify-presets 通过" || { bad "verify-presets 失败"; tail -5 "$TMP/vp.log"; }
-node scripts/verify-yaml.mjs   >"$TMP/vy.log" 2>&1 && ok "verify-yaml 通过"   || { bad "verify-yaml 失败";   tail -5 "$TMP/vy.log"; }
+_vyrc=0; node scripts/verify-yaml.mjs >"$TMP/vy.log" 2>&1 || _vyrc=$?
+case "$_vyrc" in
+  0) ok "verify-yaml 通过" ;;
+  2) ok "verify-yaml 跳过（未装 js-yaml，退出码 2）" ;;
+  *) bad "verify-yaml 失败"; tail -5 "$TMP/vy.log" ;;
+esac
 node scripts/check-ps1.mjs     >"$TMP/cp.log" 2>&1 && ok "check-ps1 通过"     || { bad "check-ps1 失败";     tail -5 "$TMP/cp.log"; }
 node scripts/check-bash32-cjk.mjs >"$TMP/cb.log" 2>&1 && ok "bash 3.2 多字节守卫通过" || { bad "bash 3.2 多字节守卫失败"; tail -5 "$TMP/cb.log"; }
 
@@ -117,6 +122,26 @@ fi
 grep -q '校验已跳过' "$TMP/ns.log" && ok "安装器如实提示「跳过」" || bad "安装器未提示跳过"
 grep -c 'dsh-flash-presets: managed block' "$NS/profiles/web/cordis.patch.yml" | grep -qx 2 \
   && ok "跳过校验后托管块仍完整写入" || bad "跳过校验后托管块不完整"
+
+step "安装器失败即失败（P1-1）"
+SHIM2="$TMP/shim1"; mkdir -p "$SHIM2"
+cat > "$SHIM2/node" <<'SHIM2EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *verify-yaml*) exit 1 ;;
+esac
+exec "$REAL_NODE" "$@"
+SHIM2EOF
+chmod +x "$SHIM2/node"
+NF="$TMP/nf"; mkdir -p "$NF/profiles/web"; printf '# original\n[]\n' > "$NF/profiles/web/cordis.patch.yml"
+BEFORE="$(hash_file "$NF/profiles/web/cordis.patch.yml")"
+if PATH="$SHIM2:$PATH" REAL_NODE="$REAL_NODE" DSH_HOME="$NF" bash scripts/install.sh --profile web >"$TMP/nf.log" 2>&1; then
+  bad "verify-yaml 返回 1 时安装器竟然报成功"
+else
+  ok "verify-yaml 返回 1 时安装器失败退出"
+fi
+AFTER="$(hash_file "$NF/profiles/web/cordis.patch.yml")"
+[ "$BEFORE" = "$AFTER" ] && ok "失败时 profile 已回滚到安装前" || bad "失败后 profile 未回滚（内容被改动）"
 
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then

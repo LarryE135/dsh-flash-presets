@@ -7,7 +7,7 @@
  *   node scripts/verify-runtime.mjs dump.txt        # 校验已导出的 dump
  *   DSH_PROFILE=ci node scripts/verify-runtime.mjs
  *
- * 没有 dsh 时退出码 0 并打印 skip —— 三平台安装矩阵里的 job 不装 CLI，不该因此变红。
+ * 没有 dsh 时退出码 2（跳过）—— 调用方应把它当「跳过」而不是「通过」。
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -32,7 +32,8 @@ if (arg) {
     });
   } catch (error) {
     console.log('skip: 没有可用的 dsh CLI（' + (error.code || error.message) + '）');
-    process.exit(0);
+    console.log('退出码 2 = 跳过，不等于通过。');
+    process.exit(2);
   }
 }
 

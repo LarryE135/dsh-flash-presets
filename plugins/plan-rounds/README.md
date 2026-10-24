@@ -14,6 +14,8 @@
 |---|---|---|
 | `defaultRounds` | 0 | 未设命令时的轮数 |
 | `sectionOrder` | 41 | 注入 system prompt 的顺序位 |
+| `mode` | `rounds` | `rounds` = 会话内多轮计划；`acceptance` = 由外部规划子进程产出清单，主会话只执行 |
+| `acceptanceFile` | `ACCEPTANCE.md` | `mode: acceptance` 时要读的清单文件名 |
 
 ## 实测（M1，单次冒烟）
 
