@@ -22,6 +22,11 @@ jobs:
         with:
           node-version: '20'
 
+      # js-yaml 必须早于安装步骤：安装器会调用 verify-yaml，缺依赖时它会返回 2（跳过）。
+      - name: Install js-yaml
+        shell: bash
+        run: npm install --no-save --silent js-yaml@4
+
       # A DSH home that looks like 0.1.7+: the profile patch layer exists, so the
       # installers take the plugin-row path instead of the legacy directory path.
       - name: Prepare a DSH home (0.1.7 layout)
@@ -72,7 +77,6 @@ jobs:
       - name: YAML parse + value assertions
         shell: bash
         run: |
-          npm install --no-save --silent js-yaml@4
           node scripts/verify-yaml.mjs
           node scripts/verify-yaml.mjs "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"
 

@@ -97,6 +97,27 @@ DSH_HOME="$LEG" bash scripts/install.sh --legacy >"$TMP/legacy.log" 2>&1 \
 DSH_HOME="$LEG" node scripts/verify-presets.mjs >"$TMP/legacy.verify.log" 2>&1 \
   && ok "legacy 场景校验通过（CI 同款断言）" || { bad "legacy 场景校验失败"; tail -4 "$TMP/legacy.verify.log"; }
 
+step "安装器容错（js-yaml 缺失不得中止）"
+SHIM="$TMP/shim"; mkdir -p "$SHIM"
+REAL_NODE="$(command -v node)"
+cat > "$SHIM/node" <<'SHIMEOF'
+#!/usr/bin/env bash
+case "$*" in
+  *verify-yaml*) exit 2 ;;
+esac
+exec "$REAL_NODE" "$@"
+SHIMEOF
+chmod +x "$SHIM/node"
+NS="$TMP/ns"; mkdir -p "$NS/profiles/web"; printf '# ns\n[]\n' > "$NS/profiles/web/cordis.patch.yml"
+if PATH="$SHIM:$PATH" REAL_NODE="$REAL_NODE" DSH_HOME="$NS" bash scripts/install.sh --profile web >"$TMP/ns.log" 2>&1; then
+  ok "verify-yaml 退出 2 时安装器不中止（set -e 下）"
+else
+  bad "verify-yaml 退出 2 时安装器中止了"; tail -4 "$TMP/ns.log"
+fi
+grep -q '校验已跳过' "$TMP/ns.log" && ok "安装器如实提示「跳过」" || bad "安装器未提示跳过"
+grep -c 'dsh-flash-presets: managed block' "$NS/profiles/web/cordis.patch.yml" | grep -qx 2 \
+  && ok "跳过校验后托管块仍完整写入" || bad "跳过校验后托管块不完整"
+
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then
   bad "publish.sh 对不存在的 tag 竟然放行"; tail -3 "$TMP/pub.log"
