@@ -110,6 +110,8 @@ function Install-Modern {
   & node $verifyYaml $patch | Out-Null
   if ($LASTEXITCODE -eq 0) {
     Write-Host 'YAML 校验通过。'
+  } elseif ($LASTEXITCODE -eq 2) {
+    Write-Host '⚠ YAML 校验已跳过（未安装 js-yaml）。安装后可用：node `"$verifyYaml`" `"$patch`"'
   } else {
     Write-Warning "YAML 校验未通过，请运行：node `"$verifyYaml`" `"$patch`""
   }

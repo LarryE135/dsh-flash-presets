@@ -60,8 +60,11 @@ strip_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH" --remov
 
 validate_patch() {
   if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/verify-yaml.mjs" ]; then
-    if node "$HERE/scripts/verify-yaml.mjs" "$PATCH" >/dev/null 2>&1; then
+    node "$HERE/scripts/verify-yaml.mjs" "$PATCH" >/dev/null 2>&1; _yrc=$?
+    if [ "$_yrc" -eq 0 ]; then
       echo "YAML 校验通过。"
+    elif [ "$_yrc" -eq 2 ]; then
+      echo "⚠ YAML 校验已跳过（未安装 js-yaml）。安装后可用：node $HERE/scripts/verify-yaml.mjs $PATCH"
     else
       echo "✖ YAML 校验未通过，请运行：node $HERE/scripts/verify-yaml.mjs $PATCH" >&2
     fi

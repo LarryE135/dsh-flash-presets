@@ -1,5 +1,24 @@
 # 变更日志
 
+## 0.2.5 — 2026-10-24
+
+响应 issue #4（Gold-Ballon）。四条缺陷已复核，全部属实，已逐条修复。
+
+**校验器**
+- `verify-yaml.mjs`：`EXPECT` 补入 v3（order 27 / 13 条规则 / 0.25 / 20000）；默认分支新增对合成产物 `cordis.patch.yml` 的解析断言；安装器分支由「含 v1/v2」改为「含 v1/v2/v3」。此前 v3 的 YAML 损坏可完整绕过 `npm run verify`。
+- `verify-yaml.mjs`：未找到 js-yaml 时退出码由 0 改为 2（原为 fail-open）；`install.sh` / `install.ps1` 区分「通过 / 跳过 / 失败」三态，不再把跳过打印成通过。
+- `verify-presets.mjs`：安装层行尾断言由字面 `\n` 改为 `\r?\n`，CRLF profile 下不再误报。
+
+**文档与产物**
+- v2/v3 的压缩参数注释对齐实际值（0.25 / 保留 20000，原注释残留 v1 的 300k/50k）。
+- `docs/版本与兼容性.md` 版本表补 0.2.2–0.2.4；`marketplace/plugin.json` 版本同步 0.2.4。
+- `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` 改为 `- insert:` 形态：扁平 `- id:` 行在预设包里会被静默忽略，此前该候选实际不生效。
+
+**变异测试**（新增防线均实测通过）
+- 破坏 v3 缩进 → `verify-yaml` exit 1（js-yaml 报 bad indentation）
+- CRLF profile → 安装层校验 exit 0（原会 3 项误报）
+- 移除 js-yaml → exit 2 且打印「跳过，不等于通过」
+
 ## 0.2.4 — 2026-10-24
 
 **修复**

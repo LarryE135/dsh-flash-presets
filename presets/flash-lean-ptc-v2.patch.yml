@@ -108,7 +108,7 @@
               - id: compaction-basic
                 name: '@deepseek-ai/dsh-compaction-basic'
                 # FLASH TUNING: 该路由声明 1,000,000 窗口，0.8 默认要到 800k 才压缩；
-                # 实测：长会话里大量步数停在 300k 以上，故 300k 触发压缩、保留 50k 近期轮次。
+                # 实测：长会话里大量步数停在 300k 以上，本预设取 0.25 阈值 / 保留 20000 近期轮次。
                 config:
                   thresholdRatio: 0.25
                   retainTokens: 20000

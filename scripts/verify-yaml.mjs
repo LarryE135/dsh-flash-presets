@@ -69,7 +69,8 @@ function loadYaml() {
 const found = loadYaml();
 if (!found) {
   console.log('SKIP：未找到 js-yaml（npm i --no-save js-yaml@4，或用 DSH_JS_YAML=<路径> 指定）。');
-  process.exit(0);
+  console.log('退出码 2 = 跳过，不等于通过。');
+  process.exit(2);
 }
 const yaml = found.mod;
 console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
@@ -80,7 +81,10 @@ const EXPECT = {
                                   thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2 },
   'flash-lean-ptc-v2.patch.yml': { preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3.patch.yml': { preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
+const EXPECT_IDS = Object.values(EXPECT).map(e => e.preset);
 
 let failed = 0;
 const check = (cond, msg) => {
@@ -168,14 +172,36 @@ if (args.length) {
     const rows = ((doc || []).flatMap(e => (e && e.insert) || []))
       .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
       .map(r => (r.config || {}).id);
-    check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2'),
-          '含 v1/v2 两个预设行（实际: ' + (rows.join(', ') || '无') + '）');
+    check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2') && rows.includes('flash-lean-ptc-v3'),
+          '含 v1/v2/v3 三个预设行（实际: ' + (rows.join(', ') || '无') + '）');
   }
 } else {
   for (const [name, exp] of Object.entries(EXPECT)) {
     const file = path.join(repo, 'presets', name);
     if (!fs.existsSync(file)) { console.log('\n[' + name + ']'); check(false, '文件缺失'); continue; }
     checkPatchFile(file, exp);
+  }
+  console.log('\n[cordis.patch.yml（合成产物）]');
+  {
+    const composed = path.join(repo, 'cordis.patch.yml');
+    if (!fs.existsSync(composed)) {
+      check(false, '合成产物缺失');
+    } else {
+      let cdoc = null;
+      try {
+        cdoc = load(composed);
+        check(true, '可被 YAML 解析');
+      } catch (e) {
+        check(false, 'YAML 解析: ' + String(e.message).split('\n')[0]);
+      }
+      if (cdoc) {
+        const ids = (cdoc || []).flatMap(e => (e && e.insert) || [])
+          .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
+          .map(r => (r.config || {}).id);
+        check(EXPECT_IDS.every(id => ids.includes(id)),
+              '合成产物含 ' + EXPECT_IDS.join('/') + '（实际: ' + (ids.join(', ') || '无') + '）');
+      }
+    }
   }
   console.log('\n[presets/legacy-0.1.5（DSH < 0.1.7 回退用）]');
   for (const name of ['flash-lean-ptc-v1']) {

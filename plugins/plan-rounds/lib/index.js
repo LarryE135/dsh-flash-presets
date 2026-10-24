@@ -10,7 +10,11 @@ export const Config = z.object({
   /** 默认轮数（0 = 关闭）。外部按钮/命令会覆盖它。 */
   defaultRounds: z.number().default(0),
   /** 注入 system prompt 的顺序位。 */
-  sectionOrder: z.number().default(41)
+  sectionOrder: z.number().default(41),
+  /** rounds = 会话内多轮计划；acceptance = 由外部规划子进程产出清单，主会话只执行 */
+  mode: z.enum(["rounds", "acceptance"]).default("rounds"),
+  /** acceptance 模式下要读的清单文件 */
+  acceptanceFile: z.string().default("ACCEPTANCE.md")
 });
 
 function normalizeRounds(value) {
@@ -53,6 +57,17 @@ function contract(rounds) {
   ].join("\n");
 }
 
+function acceptanceContract(file) {
+  return [
+    `ACCEPTANCE-DRIVEN MODE: a planning subprocess has already frozen the checklist at ${file} in the working directory.`,
+    `- Read ${file} first. Do NOT read PLAN-*.md: those are the planner notes, not your instructions.`,
+    `- Implement the deliverable, then execute every acceptance item and record pass / fail / na / blocked`,
+    '  with the observed evidence (command plus output) in ACCEPTANCE-RESULT.md.',
+    '- Any item you cannot verify must be listed as NOT DONE. Never soften or silently drop an item.',
+    '- If the checklist is missing or empty, say so and proceed without it.'
+  ].join('\n');
+}
+
 class PlanRounds extends Service {
   static inject = ["systemPrompt", "sessionProjections"];
 
@@ -60,6 +75,8 @@ class PlanRounds extends Service {
     super(ctx, "planRounds");
     const defaultRounds = normalizeRounds(config.defaultRounds) ?? 0;
     const sectionOrder = config.sectionOrder ?? 41;
+    const mode = config.mode ?? "rounds";
+    const acceptanceFile = config.acceptanceFile ?? "ACCEPTANCE.md";
 
     ctx.inject(["commands"], (commandCtx) => {
       commandCtx.commands.register({
@@ -84,6 +101,7 @@ class PlanRounds extends Service {
       name: "plan-rounds:contract",
       order: sectionOrder,
       text: (context) => {
+        if (mode === "acceptance") return acceptanceContract(acceptanceFile);
         const agent = context.agent;
         if (agent === undefined) return contract(defaultRounds);
         const state = this.ctx.sessionProjections.stateOf(agent.session, KEY);

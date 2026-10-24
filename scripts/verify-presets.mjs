@@ -132,7 +132,7 @@ for (const [name, exp] of Object.entries(EXPECT)) {
   check(new RegExp('thresholdRatio: ' + exp.thr.replace('.', '\\.')).test(text), '压缩阈值 ' + exp.thr);
   check(new RegExp('retainTokens: ' + exp.retain).test(text), '保留预算 ' + exp.retain);
   check(/thresholdChars: 8192/.test(text) && /headChars: 4096/.test(text) && /tailChars: 1024/.test(text), '裁剪阈值 8192/4096/1024');
-  check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(text), 'tool-workflow 已停用');
+  check(/id: tool-workflow\r?\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\r?\n\s+disabled: true/.test(text), 'tool-workflow 已停用');
   check(/mode: ptc/.test(text), 'PTC 展示层 mode: ptc');
 }
 
@@ -219,7 +219,7 @@ if (modernInstalled) {
     check(new RegExp('retainTokens: ' + exp.retain).test(slice), '保留预算 ' + exp.retain);
     check(/thresholdChars: 8192/.test(slice) && /headChars: 4096/.test(slice) && /tailChars: 1024/.test(slice),
           '裁剪阈值保持 8192/4096/1024');
-    check(/id: tool-workflow\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\n\s+disabled: true/.test(slice),
+    check(/id: tool-workflow\r?\n\s+name: '@deepseek-ai\/dsh-tool-workflow'\r?\n\s+disabled: true/.test(slice),
           'tool-workflow 已停用');
   }
   const installedSlice = Object.keys(EXPECT).map(sliceOf).join('\n');
