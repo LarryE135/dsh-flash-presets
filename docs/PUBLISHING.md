@@ -4,9 +4,9 @@
 
 ## 0. 前置
 
-- 在 **WSL (Ubuntu)** 里执行，仓库在 `/home/larry/Common/dsh-flash-presets`。Windows 侧没有意义：npm 凭据在 `/home/larry/.npmrc`，profile 在 `~/.dsh`。
+- 在 **WSL (Ubuntu)** 里执行，仓库在 `~/Common/dsh-flash-presets`。Windows 侧没有意义：npm 凭据在 `~/.npmrc`，profile 在 `~/.dsh`。
 - Node ≥ 20、npm ≥ 10（当前实测 node 24.19 / npm 11.17）。
-- 推 GitHub 用 PAT 脚本：`bash /home/larry/Work/_tmp_push_pat_tag.sh <tag>`（脚本内含 PAT 与代理配置，用完自动删临时凭据文件）。
+- 推 GitHub 用系统凭据助手（本机是 Windows GCM，`git config credential.helper` 指向它），**不要把 token 写进仓库或贴在聊天里**。
 
 ## 1. 改预设并重新合成
 
@@ -19,7 +19,7 @@ npm run verify     # verify-yaml + verify-presets --repo-only
 bash scripts/selftest.sh
 ```
 
-四项全绿再往下走。`prepublishOnly` 会再跑前三条，**任何一项失败都会中止发布**。
+四项全绿再往下走。`prepublishOnly` 会把这四项再跑一遍（含 selftest），**任何一项失败都会中止发布**。
 
 另外**人工过一遍文档陈述**：README 与 `docs/` 都在包里，脚本查不出"这句话还与事实相反"。发布前对照实测核一遍安装渠道、版本号、依赖写法、已知限制——0.2.2 → 0.2.3 就是因为 `docs/版本与兼容性.md` 还写着"npm 未发布"才需要重发。
 
@@ -32,7 +32,7 @@ npm version patch --no-git-tag-version      # package.json
 同时把 README 顶部那行改掉：
 
 ```
-> 当前版本：vX.Y.Z（分支 X.Y.Z）
+> 当前版本：vX.Y.Z（分支 main）
 ```
 
 **为什么两处**：`selftest.sh` 会从 README 解析版本去校验 `publish.sh` 取到的 tag，`verify-presets.mjs` 也会断言 README 里的版本串。漏改一处就报 `校验器未断言 vX.Y.Z`。
@@ -48,7 +48,7 @@ npm 现在**强制要求发布时存在 2FA**。三种情况：
 | 已开 2FA | `npm publish --otp=123456`（验证码 30 秒过期） |
 | 未开 2FA | 网页建 **Granular Access Token + Bypass 2FA**，短期用 |
 
-建 token 的要点（<https://www.npmjs.com/settings/larrye/tokens>）：
+建 token 的要点（<https://www.npmjs.com/settings/~/tokens>）：
 
 - Permissions: **Read and write (publish and stage)**，`stage only` 发不出去。
 - Expiration: **7 days**。
@@ -59,7 +59,7 @@ npm 现在**强制要求发布时存在 2FA**。三种情况：
 
 ```bash
 npm config set //registry.npmjs.org/:_authToken=<token>
-npm whoami          # 应打印 larrye
+npm whoami          # 应打印你的 npm 用户名
 ```
 
 ## 4. 发布
@@ -98,7 +98,7 @@ npm deprecate dsh-flash-presets@0.0.0-stage "staging placeholder; install <lates
 git add -A
 git commit -m "feat|fix: ..."
 git tag -a vX.Y.Z -m "vX.Y.Z：一句话说明"
-bash /home/larry/Work/_tmp_push_pat_tag.sh vX.Y.Z      # 推 main + 该 tag
+git push origin main --follow-tags          # 用一个好的凭据助手推 main + 该 tag
 ```
 
 远端确认：`git ls-remote --tags origin | grep vX.Y.Z`。
@@ -108,7 +108,7 @@ bash /home/larry/Work/_tmp_push_pat_tag.sh vX.Y.Z      # 推 main + 该 tag
 标签推上去后，用 API 建（正文取 `docs/CHANGELOG.md` 对应段落）：
 
 ```bash
-T=$(cat /home/larry/Common/flash-eval9/.ghtok)
+T=$(printf 'protocol=https\nhost=github.com\n\n' | git credential fill | sed -n 's/^password=//p')
 curl -s -X POST -H "Authorization: token $T" -H 'Accept: application/vnd.github+json' \
   https://api.github.com/repos/LarryE135/dsh-flash-presets/releases \
   -d '{"tag_name":"vX.Y.Z","name":"vX.Y.Z — 摘要","body":"...","draft":false}'

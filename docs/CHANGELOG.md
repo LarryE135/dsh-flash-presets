@@ -11,7 +11,7 @@
 
 **文档与产物**
 - v2/v3 的压缩参数注释对齐实际值（0.25 / 保留 20000，原注释残留 v1 的 300k/50k）。
-- `docs/版本与兼容性.md` 版本表补 0.2.2–0.2.4；`marketplace/plugin.json` 版本同步 0.2.4。
+- `docs/版本与兼容性.md` 版本表补到当前版本；`marketplace/plugin.json` 版本同步（改版本时两处一起动）。
 - `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` 改为 `- insert:` 形态：扁平 `- id:` 行在预设包里会被静默忽略，此前该候选实际不生效。
 
 **变异测试**（新增防线均实测通过）

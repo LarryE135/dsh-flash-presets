@@ -73,6 +73,10 @@ for (const file of fs.readdirSync(path.join(ROOT, 'presets')).filter((f) => f.en
 // ---- 2. 版本引用漂移 --------------------------------------------------------
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const VERSION = pkg.version;
+// 允许引用「已发布版本」：仓库版本可能已升到未发布的下一个号，而文档里的安装/锁死命令
+// 必须指向 npm 上真实可装的版本。publishedVersion 由维护者在发版时同步。
+const PUBLISHED = pkg.publishedVersion || VERSION;
+const ACCEPTED = new Set([VERSION, PUBLISHED]);
 const DOCS = ['README.md', ...fs.readdirSync(path.join(ROOT, 'docs')).filter((f) => f.endsWith('.md')).map((f) => 'docs/' + f)]
   .filter((f) => !/README-0\.\d+\.\d+\.md$/.test(f)); // 历史 README 保留旧版本号
 
@@ -81,7 +85,7 @@ for (const doc of DOCS) {
   if (!fs.existsSync(full)) continue;
   const text = fs.readFileSync(full, 'utf8');
   for (const m of text.matchAll(/dsh-flash-presets(?:@|\^)?(\d+\.\d+\.\d+)(?![-\w])/g)) {
-    if (m[1] !== VERSION) problems.push(doc + ': 引用了 ' + m[1] + '，当前版本是 ' + VERSION + '（未发布的版本号会让照抄命令的人踩空）');
+    if (!ACCEPTED.has(m[1])) problems.push(doc + ': 引用了 ' + m[1] + '，当前版本是 ' + VERSION + '、已发布版本是 ' + PUBLISHED + '（照抄会踩空）');
   }
   if (/^##+\s*未发布/m.test(text)) {
     problems.push(doc + ': 仍有「未发布」章节；若该版本已放弃发布，请删除或改标题');

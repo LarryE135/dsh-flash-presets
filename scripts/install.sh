@@ -67,7 +67,10 @@ validate_patch() {
     elif [ "$_yrc" -eq 2 ]; then
       echo "⚠ YAML 校验已跳过（未安装 js-yaml）。安装后可用：node $HERE/scripts/verify-yaml.mjs $PATCH"
     else
-      echo "✖ YAML 校验未通过，请运行：node $HERE/scripts/verify-yaml.mjs $PATCH" >&2
+      echo "✖ YAML 校验未通过：已回滚到安装前的备份（$(basename "$PATCH").bak-${STAMP}），未完成安装。" >&2
+      echo "  复查：node $HERE/scripts/verify-yaml.mjs $PATCH" >&2
+      [ -f "$PATCH.bak-$STAMP" ] && cp "$PATCH.bak-$STAMP" "$PATCH"
+      exit 1
     fi
   fi
 }
