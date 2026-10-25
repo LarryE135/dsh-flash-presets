@@ -79,7 +79,7 @@ bash scripts/install.sh --uninstall
 DSH_HOME=/path/to/.dsh bash scripts/install.sh
 ```
 
-Windows（PowerShell 5.1+ 或 7）：
+Windows（推荐 PowerShell 7；5.1 能跑，但见「注意事项」第 4 条）：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
@@ -143,13 +143,13 @@ P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 ## 注意事项（人 和 AI 都要看）
 
-1. 使用本插件时把输出上限设到 120K 以上，有条件直接拉满 384K，避免长时间集中思考被截断。
+1. 把「最大输出」设到 120K 以上，有条件直接拉满 384K（GUI：设置 → 模型 → 最大输出）。低于这条线时，长时间集中思考会在半截被截断，表现为答案突然收尾、工具调用中断。
 
 2. 本插件只保证对 DeepSeek V4.1 Flash 有效，不保证对其他模型有效。
 
 3. 实际使用时先给出明确的目标或验收标准，越明确效果越好；边界不清楚时可以配合 plan mode 或 goal mode 使用。
 
-4. 桌面版或 Windows 端用户，建议先安装并启用 MSI 版 PowerShell 7 或 Git Bash——实测这一项本身就能带来不少提升；不知道怎么装可以问大肥鱼。
+4. 桌面版或 Windows 端用户，先装并启用 MSI 版 PowerShell 7（或 Git Bash）——实测这一项本身就能带来不少提升。自检：`$PSVersionTable.PSVersion.Major`，返回 5 就装上再来。5.1 在 UTF-8 输出、长参数转义、中文路径上的坑，会被 agent 读成乱码或半截命令。不知道怎么装可以问大肥鱼（她不喜欢这个称呼，但确实会）。
 
 5. 本包只安装预设行，不携带工具：profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
 
