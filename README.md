@@ -14,6 +14,9 @@
 
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
+> [!NOTE]
+> **这是一个目标导向的插件，不是通用加速器。** 它只在目标明确、验收标准准确的前提下才稳定跑到上限，标准越清晰效果越好；验收标准不明确的前端工作、以及 Oneshot 一次性样例，效果可能不及预期。怎么把标准给到位，见下文「注意事项」。
+
 > [!IMPORTANT]
 > 当前版本：v0.2.5（分支 main，**未发布**；npm 上最新为 0.2.4，随 plan mode 一同发布），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
@@ -143,15 +146,17 @@ P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 ## 注意事项（人 和 AI 都要看）
 
-1. 使用本插件时把输出上限设到 120K 以上，有条件直接拉满 384K，避免长时间集中思考被截断。
+1. **先把运行环境打底。** 桌面版或 Windows 端用户，建议先安装并启用 MSI 版 PowerShell 7 或 Git Bash——这一项本身就能带来不少提升，不比调预设的收益小；不知道怎么装，可以问大肥鱼。
 
-2. 本插件只保证对 DeepSeek V4.1 Flash 有效，不保证对其他模型有效。
+2. **输出上限设到 120K 以上。** 有条件直接拉满 384K。额度给小了，长时间集中思考会被截断，省下来的轮数等于白省。
 
-3. 实际使用时先给出明确的目标或验收标准，越明确效果越好；边界不清楚时可以配合 plan mode 或 goal mode 使用。
+3. **目标与验收标准写得越死越好。** 这是本插件能不能发挥上限的前提：目标越具体、验收标准越可判（要过的样例、能跑的命令、可复跑的证据文件），效果越好。验收标准不明确的前端工作、以及 Oneshot 一次性样例，效果可能不及预期。边界说不清时，配合 plan mode 或 goal mode 使用。
 
-4. 桌面版或 Windows 端用户，建议先安装并启用 MSI 版 PowerShell 7 或 Git Bash——实测这一项本身就能带来不少提升；不知道怎么装可以问大肥鱼。
+4. **写提示词时可以对大肥鱼狠一点。** 主动要求 Token maxxing（「按最高标准做，别省 token」「做到你认为的上限」），或直接点明高标准验收，原理有点像 RP 里的立人设——你给的强度，决定它自我要求的强度。拿不准该给到什么强度时，先用 plan mode 把验收标准谈清楚再开跑。
 
-5. 本包只安装预设行，不携带工具：profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
+5. **只对 DeepSeek V4.1 Flash 有保证。** 其他模型不保证效果，路由换了请自行评估。
+
+6. **本包只安装预设行，不携带工具。** profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
 
 ## 仓库结构
 
@@ -240,6 +245,14 @@ marketplace/                      插件市场提交材料（不随包发布）
   </tbody>
 </table>
 
+## 支持这个项目
+
+如果这个项目对你有用，就点个 ⭐ Star 吧——不花什么力气，但能让更多人看到它，也方便你之后更新时找回这里：
+
+<https://github.com/LarryE135/dsh-flash-presets>
+
+发现 bug、想要其他方向的适配，欢迎开 issue。
+
 ---
 
 ## English summary
@@ -248,4 +261,8 @@ Flash-tier agent presets for DSH, shipped as a patch-only bundle (`dsh.bundle`) 
 
 Measured in our runs: writing the acceptance criteria into the prompt moved P15654 from 1/3 to 3/3 at 35% lower cost; an external grader with a failing-items loop moved P2099 from 1.05-1.15 to 1.03 median. Prompt-level difficulty assessment and clarifying questions did not help.
 
+Goal-oriented by design: the presets reach their ceiling only when the goal and the acceptance criteria are explicit, and the more checkable the criteria, the better. Work without a clear acceptance bar — frontend/UI tasks, one-shot samples — may underperform. Set the output budget at 120K tokens or more (384K if you can) and ask for a high bar plus token-maxing explicitly; pair it with plan mode when the boundary is fuzzy.
+
 Install from npm: `dsh plugin --profile web add dsh-flash-presets` (or from git: `github:LarryE135/dsh-flash-presets`), or run `bash scripts/install.sh --profile web` after cloning.
+
+If this project helps you, a ⭐ star is the easiest way to say thanks: <https://github.com/LarryE135/dsh-flash-presets>.
