@@ -1,0 +1,10 @@
+# Dependabot only reads the repository-root .github/dependabot.yml, where this package is
+# already covered by an npm entry. This mirror keeps the subpackage dependency policy visible
+# to scanners that evaluate a package directory in isolation.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
