@@ -30,6 +30,7 @@
     "verify:runtime": "node scripts/verify-runtime.mjs"
   },
   "files": [
+    "lib/",
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v1.patch.yml",
     "presets/flash-lean-ptc-v2.patch.yml",
@@ -46,5 +47,10 @@
       "patch": "cordis.patch.yml"
     }
   },
-  "publishedVersion": "0.2.4"
+  "publishedVersion": "0.2.4",
+  "main": "lib/index.mjs",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./package.json": "./package.json"
+  }
 }

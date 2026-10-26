@@ -17,3 +17,6 @@ node_modules/
 *.tgz
 package-lock.json
 pnpm-lock.yaml
+# 但这两个锁文件要进库：供供应链扫描（依赖图可复现）与子包独立安装使用
+!package-lock.json
+!plugins/plan-rounds/package-lock.json
