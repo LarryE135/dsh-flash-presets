@@ -1,0 +1,41 @@
+name: npm downloads badge
+
+# npm 的 relative-window 端点（last-day/week/month）会返回陈旧区间，刚发布的包会一直显示 0/月。
+# 这个 workflow 每天按「显式日期区间」查一次，把结果写进 badges/downloads.json，
+# README 用 shields.io 的 endpoint badge 读它（见 README 顶部 npm downloads 徽章）。
+on:
+  schedule:
+    - cron: "23 3 * * *" # 每天 03:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: npm-downloads-badge
+  cancel-in-progress: false
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "20"
+
+      - name: Regenerate badges/downloads.json
+        run: node scripts/npm-downloads-badge.mjs
+
+      - name: Commit when the number moved
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- badges/downloads.json; then
+            echo "downloads unchanged — nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add badges/downloads.json
+          git commit -m "chore(badge): npm downloads $(date -u +%F)"
+          git push
