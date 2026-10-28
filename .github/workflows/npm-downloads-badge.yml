@@ -1,11 +1,20 @@
 name: npm downloads badge
 
 # npm 的 relative-window 端点（last-day/week/month）会返回陈旧区间，刚发布的包会一直显示 0/月。
-# 这个 workflow 每天按「显式日期区间」查一次，把结果写进 badges/downloads.json，
+# 这个 workflow 按「显式日期区间」查一次，把结果写进 badges/downloads.json，
 # README 用 shields.io 的 endpoint badge 读它（见 README 顶部 npm downloads 徽章）。
+#
+# 触发策略（2026-10-28 调整）：
+#   push      —— 每次往 main 推代码时顺手刷新（实测一次约 13s），README 不会落后几天；
+#   schedule  —— 每天兜底一次。GitHub 的 cron 是 best-effort，可能延迟甚至整次漏跑
+#                （2026-10-28 03:23Z 那次就没有出现运行记录），所以不能只靠它；
+#   dispatch  —— 手动兜底：gh workflow run npm-downloads-badge.yml --ref main
+# 防自激有两层：bot 自己的提交不再触发（job 级 if），且脚本发现数值没动就不提交。
 on:
+  push:
+    branches: [main]
   schedule:
-    - cron: "23 3 * * *" # 每天 03:23 UTC
+    - cron: "23 5 * * *" # 每天 05:23 UTC，避开整点拥塞
   workflow_dispatch:
 
 permissions:
@@ -17,6 +26,7 @@ concurrency:
 
 jobs:
   badge:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
