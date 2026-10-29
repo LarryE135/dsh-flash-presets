@@ -87,6 +87,7 @@ install_modern() {
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「Flash 精简·PTC v1 / v2 / v3（v4.1-flash）」，其中 v3（lean-v3）为现行主版本。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
+  echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
 }
 

@@ -1,5 +1,23 @@
 # 变更日志
 
+## 0.2.6 — 2026-10-29
+
+起因：用户报告"装完预设后不能选工作区"。排查后确认预设补丁不碰工作区/目录选择器/终端插件（全仓库 grep 0 命中），但过程中暴露出两个真实缺陷，加上一个缺失的诊断入口，一并补上。
+
+**安装器**
+- `merge-presets.mjs`：新增"认领历史残留"。旧安装方式写的裸行（`- id: preset-flash-lean-ptc-vN` 不在托管块内）以前不会被清理，重装即产生第二份同名预设。现在整条摘掉并入托管块；只摘"直接子行全部是本仓库预设 id"的条目，别人的行不动。
+- `merge-presets.mjs`：写盘前调用 `lib/platform-tags.mjs` 解析 `!!js`，profile 补丁里只留 true/false。未知的 `!!js` 表达式直接报错，避免把非标准 YAML 写进用户配置。
+
+**新增**
+- `scripts/doctor.mjs`：体检 DSH 版本、托管块数量、块外残留、`!!js` 行号、标准 YAML 解析（报错带行号）；`--fix` 就地解析标签并备份，`--dump` 额外跑 `dsh --dump-config` 确认预设被合成进去。
+- `lib/platform-tags.mjs`：平台标签解析的唯一实现，安装器与医生共用。
+
+**验证**
+- 合成"用户行 + 老式残留"的补丁：安装后 v3 只出现 1 次、`!!js` 为 0、js-yaml 直接解析通过、用户自己的行保持原样。
+- 连跑两次安装：字节级幂等。
+- 真实 profile（`zz-duptest`）：`dsh --profile zz-duptest --dump-config` 正常，linux 下 `tool-pwsh` 落成 `disabled: true`。
+- `bash scripts/selftest.sh`：30 项通过。
+
 ## 0.2.5 — 2026-10-24
 
 响应 issue #4（Gold-Ballon）。四条缺陷已复核，全部属实，已逐条修复。
