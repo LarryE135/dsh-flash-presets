@@ -26,7 +26,7 @@
 |---|---|---|---|---|---|
 | v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | 上下文余量优先，任务偏长 |
 | v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | 与 v1 同代，更省，保守选择 |
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | 默认 |
+| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | 默认，当前适用版本 |
 
 三者可同时安装，在预设列表里逐项选择，但考虑到模型和框架更新，一般使用最新版本（v3）即可，具体适配情况可见release说明。
 
@@ -40,10 +40,10 @@ v3 相对 v2 的改动集中在验证阶段：验收门通过即交付，不再�
 npm install -g dsh-flash-presets          # 全局装一份，供任意 profile 引用
 dsh plugin --profile web add dsh-flash-presets
 ```
+在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
+<img width="419" height="288" alt="image" src="https://github.com/user-attachments/assets/af89bdfc-25b4-4283-b9e6-e4e9f1c0cf1b" />
 
 包地址：<https://www.npmjs.com/package/dsh-flash-presets>。`dsh plugin add` 会自动把本包写入该 profile 的依赖并加载 `cordis.patch.yml`，无需先手动 `npm install`；上面前一行只在你需要离线副本或想让多个 profile 共用时才有必要。
-
-在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
 版本策略：不带版本号时管理器写入的是 caret 范围（如 `^0.2.2`），后续任何 pnpm 操作都可能把它带到 0.2.x 最新版。预设直接决定 agent 行为，**要可复现就写死版本**：
 
@@ -62,33 +62,6 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 `--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的三个 insert 条目（v1、v2、v3）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
 更新时重复执行同一条 `add`，或先 `remove` 再 `add`。卸载时把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖；由脚本写入的托管块用 `scripts/install.sh --uninstall` 清除。
-
-### 脚本
-
-```bash
-git clone https://github.com/LarryE135/dsh-flash-presets.git
-cd dsh-flash-presets
-```
-
-Linux / macOS / WSL / Git Bash：
-
-```bash
-bash scripts/install.sh                         # DSH 0.1.7+ 写 profile 补丁；更旧版本回退到目录式
-bash scripts/install.sh --profile desktop       # 默认 web
-bash scripts/install.sh --uninstall
-DSH_HOME=/path/to/.dsh bash scripts/install.sh
-```
-
-Windows（PowerShell 5.1+ 或 7）：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-.\scripts\install.ps1 -Profile desktop
-.\scripts\install.ps1 -Uninstall
-.\scripts\install.ps1 -DshHome D:\tmp\.dsh
-```
-
-两个安装器共用 `scripts/merge-presets.mjs`：先备份 `cordis.patch.yml.bak-<时间戳>`，再整块替换托管块，可重复执行。
 
 ### 校验
 
@@ -182,11 +155,12 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 版本历史
 
-### v0.2.5（2026-10-24）
+### v0.2.5（发布预告）
 
 - 校验器防线修复（issue #4）：v3 纳入 YAML 解析断言、合成产物 `cordis.patch.yml` 也参与校验、安装器分支覆盖 v1/v2/v3；js-yaml 缺失改为退出码 2（不再 fail-open）；CRLF profile 不再误报安装层失败。
 - 文档对齐：v2/v3 压缩参数注释改为实际值（0.25 / 20000）；版本表补 0.2.2–0.2.5；`marketplace/plugin.json` 与包版本同步。
 - `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` 改为 `- insert:` 形态（扁平 `- id:` 行在预设包里会被静默忽略，此前该候选不生效）。
+- 新增Plan mode
 
 ### v0.2.4（2026-10-24）
 
