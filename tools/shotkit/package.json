@@ -1,0 +1,8 @@
+{
+  "name": "shotkit",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}

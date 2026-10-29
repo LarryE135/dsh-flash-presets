@@ -1,0 +1,16 @@
+# plan-scope 的本地挂载补丁（示例）
+#
+# 这不是 npm 包，DSH 只能按绝对路径挂本地文件。装之前把下面的占位符
+# 换成你这台机器上的真实路径（仓库根 + /plugins/plan-scope/lib/index.js）：
+#
+#   node -e "const p=require('path').resolve('plugins/plan-scope/lib/index.js');console.log('file://'+p)"
+#
+# 然后把输出粘到 name 里。原文件 bundle.patch.yml 不入库，避免把某台机器的
+# 绝对路径带进仓库。
+- insert:
+    - id: plan-scope
+      name: "file:///ABS/PATH/TO/dsh-flash-presets/plugins/plan-scope/lib/index.js"
+      config:
+        scope: always
+        sectionOrder: 42
+        acceptanceFile: ACCEPTANCE.md

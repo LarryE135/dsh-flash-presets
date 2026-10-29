@@ -129,6 +129,20 @@ P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 跨场景能成立的说法只有一条：分数差距主要来自判定标准是否写死，与模型能力关系不大。
 
+## 已知偏差（相对官方 `preset-ptc`）
+
+三份精简预设都是"官方 PTC 预设的裁剪版"，裁剪清单如下（2026-10-29 审计补记）：
+
+| 官方有、我们没有 | 影响 | 为什么 |
+|---|---|---|
+| `time-context` | 提示词里没有"今天几号/现在几点" | 省 token；需要日期的任务要自己带日期 |
+| `tool-schedule` | 没有定时/周期调度工具 | 精简面里用不上 |
+| `tool-plugin-market` | 不能从对话里装插件 | 装插件走 `dsh plugin`，不在 agent 工具面里 |
+
+反过来我们多了三个（官方 `preset-ptc` 没有）：`tool-subagent-codex`、`tool-subagent-claude-code`、`tool-ralph`。
+
+**这不是缺陷，但必须知道**：如果某类任务依赖"当前日期"或"对话内装插件"，用官方预设更省事。
+
 ## 兼容性
 
 本仓库在 DSH 0.2.1-rc.2 上做过模拟安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 v1、v2、v3，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留（pnpm 在 profile 的 `pnpm-workspace.yaml` 里留下的 `minimumReleaseAgeExclude` 记录不属于本包，卸载时不会清除，也不影响配置合成）。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。0.1.7 以前只有 v1 提供 `presets/legacy-0.1.5/` 的目录式回退，v2 与 v3 不支持。web profile 为 live reload，desktop、headless、acp 需重启，因为 provider 补丁层只在启动时读取。

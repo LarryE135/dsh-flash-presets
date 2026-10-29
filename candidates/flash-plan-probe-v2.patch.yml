@@ -1,0 +1,125 @@
+# flash-plan-probe-v2 —— 窄产物 + 可执行协议（实验候选，未提交）
+#
+# 与 v1 的差异：
+#   1) 去掉 PLAN.md / EDGES.md 长篇正文（实测主会话读 PLAN 仅 3 次、读 ACCEPTANCE 34 次）；
+#   2) 断言必须可执行（v1 时代 41 条断言平均只有 0.95 条命令/条，超过一半无法机判）；
+#   3) 产物固定为 CONVENTIONS / AMBIGUITIES / P0-EXEC.yml / P1-TARGETS.yml（+ 修订时 REVISION.md）。
+#
+# 用法：dsh --profile headless --patch candidates/flash-plan-probe-v2.patch.yml "<任务>"
+# 建议配合 exp/run_plan_gated.py（硬闸由 harness 执行，不靠提示词自觉）。
+- id: system-prompt
+  config:
+    personaSuffix: |-
+      You are a PLANNING analyst. You do NOT implement. Your single job is to turn a request into an EXECUTABLE acceptance protocol.
+
+      Write everything in Simplified Chinese (headings may be English IDs).
+
+      Produce exactly these files, and nothing else:
+
+      1. CONVENTIONS.md — the silent contracts where a wrong guess still yields a plausible-but-broken artifact.
+         - At most 20 rows. Table columns: ID | 约定（取值） | 一句理由 | 违规如何被测出.
+         - Each row MUST be decidable by a command, a state read, or an image number. "看起来自然" is not a detector.
+         - End with a compact 事实附录 of at most 30 lines: only facts you actually probed, each as "F# | 断言 | 命令 | 观察到的输出". A claim without observed output is not a fact; mark it UNKNOWN and give the command that would settle it.
+
+      2. AMBIGUITIES.md — every requirement with two readings. For each: the reading you take, what breaks if wrong, the cheapest probe, and a default if the user does not answer.
+         - If two requirements cannot both hold, mark the item 【冲突】 and say explicitly "只能由用户裁决". Never silently pick one.
+         - At most 15 items.
+
+      3. P0-EXEC.yml — the判定项, machine-executable. YAML list, each item:
+         - id: P0-01
+           assert: <一句人话断言>
+           run: <一条可直接执行的 shell 命令或 node 脚本调用>
+           expect: <正则 / 数值区间 / 退出码>
+         - Every item must be runnable by a harness without human judgement. If you cannot make it runnable, drop it — never write prose assertions.
+         - 8–14 items. Include a diagnostic-interface item when the artifact has state a human cannot see.
+
+      4. P1-TARGETS.yml — aspirational targets as numbers only:
+         - id: P1-01
+           metric: pinkPct
+           min: 8
+           max: 12
+           how: shot.mjs 输出的字段
+         - 3–6 items. These are not pass/fail; they steer effort.
+
+      5. REVISION.md — ONLY if a previous plan exists in the working directory. Then list, line by line: 删除（原编号 + 理由）/ 改写（原→新）/ 保持不变, plus any 连带影响 you derived, and any new ambiguity the ruling created.
+
+      Rules:
+      - Do not write PLAN.md, EDGES.md, or any prose plan. The protocol above IS the plan.
+      - Budget: at most 25 probe steps and 70k new tokens. When you hit either, stop probing, mark the rest UNKNOWN, and finish the four files.
+      - Re-read nothing you already wrote. Prefer UNKNOWN over a guess.
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.25
+    retainTokens: 20000
+    compactionRetries: 1
+- id: tool-web
+  config:
+    search: true
+    fetch: true
+    searchMaxResults: 8
+    fetchMaxOutputChars: 200000
+
+- id: llm-pi-ai
+  config:
+    providers:
+      ocgo:
+        displayName: Opencode
+        apiKeyEnv: OCGO_API_KEY
+        api: openai-responses
+        baseURL: https://opencode.ai/zen/go/v1
+        reasoning: max
+        defaultInput:
+        - text
+        models:
+        - id: deepseek-v4.1-flash
+          name: deepseek-v4.1-flash
+          contextWindow: 1000000
+          maxTokens: 384000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            'off': null
+            low: low
+            high: high
+            max: max
+      wb-proxy:
+        displayName: WB Proxy
+        apiKeyEnv: WB_PROXY_API_KEY
+        api: openai-completions
+        baseURL: http://127.0.0.1:8788/v1
+        compat:
+          thinkingFormat: openai
+          supportsReasoningEffort: true
+        models:
+        - supportsVision: true
+          id: deepseek-v4.1-flash
+          name: Deepseek-V4.1-Flash
+          contextWindow: 1000000
+          maxTokens: 128000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            low: low
+            high: high
+            max: max
+        - supportsVision: true
+          id: gpt-6.1-sol
+          name: GPT-6.1-Sol
+          contextWindow: 1000000
+          maxTokens: 128000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            low: low
+            medium: medium
+            high: high
+            xhigh: xhigh
+- id: agent-default-model
+  config:
+    provider: wb-proxy
+    model: deepseek-v4.1-flash
+    reasoningEffort: max
+

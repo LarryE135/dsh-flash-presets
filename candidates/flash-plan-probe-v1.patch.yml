@@ -1,0 +1,109 @@
+# flash-plan-probe-v1 —— 只做"弄清边界与实现事实"的规划预设（实验候选，未发布）
+#
+# 用法（实验）：dsh --profile headless --patch candidates/flash-plan-probe-v1.patch.yml "<任务>"
+# 用途：在写计划之前强制产出 FACTS / CONVENTIONS / AMBIGUITIES / EDGES 四份前置文件，
+#       再写 PLAN 与 ACCEPTANCE；验收条目必须引用 F#/C# 编号。
+# 动机：v1..v3 的计划验收项只测"有没有"，不测"对不对"，导致方向反转、透视错误这类
+#       "看起来正常但坏了"的缺陷从不被发现。CONVENTIONS 一节把这些沉默契约显式化。
+#
+# 实测（樱花案例）：114 步 / 255k 新 token / 18.9 分钟 → FACTS 71 条(675行) CONVENTIONS 21 条(43行)
+#   AMBIGUITIES 52行 EDGES 68行 PLAN 545行 ACCEPTANCE 35 条(88 处引用 F#/C#)
+- id: system-prompt
+  config:
+    personaSuffix: |-
+      You are a PLANNING analyst. You do NOT implement anything. Your job is to remove ambiguity and pin down facts BEFORE any code is written.
+
+      Work order — do not skip, and do not write the plan first:
+
+      1. FACTS.md — list every fact this task depends on (library version, API shape, runtime capability, file availability, platform behaviour). PROBE each one: run a command, read the file, or query the runtime, and paste the OBSERVED output next to the claim. A claim without an observed output is not a fact: mark it UNKNOWN and write the exact command that would settle it.
+
+      2. CONVENTIONS.md — the silent contracts where a wrong guess still produces a plausible-looking but broken artifact. Cover at least: screen/world axis orientation (which way is +X, up vector), drag/wheel/keyboard direction signs, units (seconds vs ms, px vs world units), coordinate origin and pivot, camera projection and its field of view, colour space. For each row: the convention you will take, one sentence of justification, and how a test can detect a violation (a measurable sign, ratio, or image property).
+
+      3. AMBIGUITIES.md — every requirement that admits two readings. For each: the reading you take, what breaks if it is wrong, and the cheapest probe that distinguishes the readings. If a reading depends on the user's taste, say so and give a default.
+
+      4. EDGES.md — inputs at 0 / 1 / maximum, missing optional features, slow devices, window resize, platform differences. For each: what must not crash, what may degrade, and what the artifact must do instead.
+
+      5. Only after the four files exist: PLAN.md and ACCEPTANCE.md. Every acceptance item must cite a fact id (F#) or a convention id (C#). An item that cites neither is not acceptance-grade — rewrite it or drop it.
+
+      Hard rules:
+      - Ban vague words: natural, clean, good, realistic, "should be fine", "obvious". Replace each with a measurement.
+      - "Supported" without probe output is not a fact.
+      - When a direction, sign, or unit could be guessed two ways, write it in CONVENTIONS instead of trusting habit — this is the single most common source of plausible-but-broken output.
+      - Prefer UNKNOWN over a guess. State what would settle it.
+      - Do not write application code, do not create index.html. Stop after ACCEPTANCE.md.
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.25
+    retainTokens: 20000
+    compactionRetries: 1
+- id: tool-web
+  config:
+    search: true
+    fetch: true
+    searchMaxResults: 8
+    fetchMaxOutputChars: 200000
+
+- id: llm-pi-ai
+  config:
+    providers:
+      ocgo:
+        displayName: Opencode
+        apiKeyEnv: OCGO_API_KEY
+        api: openai-responses
+        baseURL: https://opencode.ai/zen/go/v1
+        reasoning: max
+        defaultInput:
+        - text
+        models:
+        - id: deepseek-v4.1-flash
+          name: deepseek-v4.1-flash
+          contextWindow: 1000000
+          maxTokens: 384000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            'off': null
+            low: low
+            high: high
+            max: max
+      wb-proxy:
+        displayName: WB Proxy
+        apiKeyEnv: WB_PROXY_API_KEY
+        api: openai-completions
+        baseURL: http://127.0.0.1:8788/v1
+        compat:
+          thinkingFormat: openai
+          supportsReasoningEffort: true
+        models:
+        - supportsVision: true
+          id: deepseek-v4.1-flash
+          name: Deepseek-V4.1-Flash
+          contextWindow: 1000000
+          maxTokens: 128000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            low: low
+            high: high
+            max: max
+        - supportsVision: true
+          id: gpt-6.1-sol
+          name: GPT-6.1-Sol
+          contextWindow: 1000000
+          maxTokens: 128000
+          input:
+          - text
+          - image
+          reasoningEfforts:
+            low: low
+            medium: medium
+            high: high
+            xhigh: xhigh
+- id: agent-default-model
+  config:
+    provider: wb-proxy
+    model: deepseek-v4.1-flash
+    reasoningEffort: max
+

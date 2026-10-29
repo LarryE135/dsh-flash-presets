@@ -172,8 +172,15 @@ if (args.length) {
     const rows = ((doc || []).flatMap(e => (e && e.insert) || []))
       .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
       .map(r => (r.config || {}).id);
-    check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2') && rows.includes('flash-lean-ptc-v3'),
-          '含 v1/v2/v3 三个预设行（实际: ' + (rows.join(', ') || '无') + '）');
+    // 安装目标（profile 补丁）必须含三行；候选/实验文件不含我们的预设行是正常的，
+    // 以前一律硬断言，导致 candidates/*.yml 全被误判为"校验失败"
+    const isInstallTarget = rows.length > 0 || /[\\/]profiles[\\/]/.test(file);
+    if (isInstallTarget) {
+      check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2') && rows.includes('flash-lean-ptc-v3'),
+            '含 v1/v2/v3 三个预设行（实际: ' + (rows.join(', ') || '无') + '）');
+    } else {
+      console.log('  · 非安装目标（不含本仓库预设行），跳过预设行断言');
+    }
   }
 } else {
   for (const [name, exp] of Object.entries(EXPECT)) {
