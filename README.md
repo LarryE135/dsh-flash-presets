@@ -41,6 +41,7 @@ npm install -g dsh-flash-presets          # 全局装一份，供任意 profile 
 dsh plugin --profile web add dsh-flash-presets
 ```
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
+
 <img width="419" height="288" alt="image" src="https://github.com/user-attachments/assets/af89bdfc-25b4-4283-b9e6-e4e9f1c0cf1b" />
 
 包地址：<https://www.npmjs.com/package/dsh-flash-presets>。`dsh plugin add` 会自动把本包写入该 profile 的依赖并加载 `cordis.patch.yml`，无需先手动 `npm install`；上面前一行只在你需要离线副本或想让多个 profile 共用时才有必要。
