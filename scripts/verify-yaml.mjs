@@ -178,8 +178,12 @@ if (args.length) {
     // 以前一律硬断言，导致 candidates/*.yml 全被误判为"校验失败"
     const isInstallTarget = rows.length > 0 || /[\\/]profiles[\\/]/.test(file);
     if (isInstallTarget) {
-      check(rows.includes('flash-lean-ptc-v1') && rows.includes('flash-lean-ptc-v2') && rows.includes('flash-lean-ptc-v3'),
-            '含 v1/v2/v3 三个预设行（实际: ' + (rows.join(', ') || '无') + '）');
+      // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
+      check(rows.includes('flash-lean-ptc-v3'),
+            '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
+      const known = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'];
+      check(rows.every(id => known.includes(id)),
+            '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {
       console.log('  · 非安装目标（不含本仓库预设行），跳过预设行断言');
     }

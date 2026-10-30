@@ -18,7 +18,16 @@ import { resolvePlatformTags } from '../lib/platform-tags.mjs';
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml', 'flash-lean-ptc-v3.patch.yml'];
+const ALL_FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml', 'flash-lean-ptc-v3.patch.yml'];
+// --only a,b：只合并指定预设（0.2.5 起默认只装 v3，安装器会显式指定）
+const onlyArg = (() => {
+  const i = process.argv.indexOf('--only');
+  const v = i >= 0 ? process.argv[i + 1] : undefined;
+  return typeof v === 'string' && v.length > 0 && !v.startsWith('--') ? v : null;
+})();
+const FILES = onlyArg === null
+  ? ALL_FILES
+  : onlyArg.split(',').map(s => s.trim()).filter(Boolean).map(id => (id.endsWith('.patch.yml') ? id : id + '.patch.yml'));
 
 const here = path.dirname(fileURLToPath(import.meta.url)); // never URL.pathname on Windows
 const argv = process.argv.slice(2);

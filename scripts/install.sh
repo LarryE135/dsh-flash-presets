@@ -64,7 +64,7 @@ if [ "$MODE" = "auto" ]; then
 fi
 
 # ── 补丁改写（交给跨平台助手，Windows 安装器共用同一实现）──────────────────
-merge_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH"; }
+merge_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH" --only "$(IFS=,; echo "${PRESETS[*]}")"; }
 strip_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH" --remove >/dev/null; }
 
 validate_patch() {
@@ -94,7 +94,8 @@ install_modern() {
   validate_patch
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
-  echo "「Flash 精简·PTC v1 / v2 / v3（v4.1-flash）」，其中 v3（lean-v3）为现行主版本。"
+  echo "「Flash 精简·PTC v3（v4.1-flash，lean-v3）」。"
+  echo "  v1/v2 是对照版本，默认不装；需要 A/B 时重跑：bash scripts/install.sh --all-presets"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
