@@ -164,3 +164,29 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
     console.log("PASS A8 无头开关 =off → 不桥接、无注入、indicator=off");
   } finally { delete process.env.DSH_PLAN_MODE_UI_HEADLESS; }
 }
+
+// A9（自愈）：簿记说"开着"、投影说"已关" —— 必须以真相为准重新进入计划模式
+{
+  const c = await boot({ tier: "light", projections: { stateOf: (s, n) => (n === "plan" ? { active: false } : undefined) } });
+  c.fire("session/event", c.session, { type: "plan/mode", data: { active: true } });   // 造出陈旧簿记
+  if ((await c.state()).native !== true) throw new Error("A9 前置：簿记没建起来");
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
+  c.fire("session/event", c.session, userMsg(1));
+  await tick();
+  if (!c.seen.includes("/plan")) throw new Error("A9 投影说已关，却没有重新进入计划模式，seen=" + JSON.stringify(c.seen));
+  const d = await c.state();
+  if (d.debug.plan && d.debug.plan.available !== true) throw new Error("A9 状态里没有暴露投影真相");
+  console.log("PASS A9 簿记陈旧时按会话投影自愈并重新进入计划模式");
+}
+
+// A10：投影说"开着" —— 不得重复桥接
+{
+  const c = await boot({ tier: "light", projections: { stateOf: (s, n) => (n === "plan" ? { active: true } : undefined) } });
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
+  c.fire("session/event", c.session, userMsg(1));
+  await tick();
+  if (c.seen.includes("/plan")) throw new Error("A10 投影说已在计划模式，却又发了一次 /plan");
+  const d = await c.state();
+  if (d.debug.gate.builtin < 1) throw new Error("A10 没有走『沿用』分支");
+  console.log("PASS A10 投影说已开 → 不再重复 /plan（沿用）");
+}

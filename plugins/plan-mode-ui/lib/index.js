@@ -293,6 +293,18 @@ function sessionHeader(session) {
 }
 // 内置计划模式（/plan）是否正在生效：生效时不抢它的流程
 let planModeService;
+// 会话投影里的真实计划状态（planMode 被 isolate 时这是唯一可靠来源）
+function planProjection(ctx, session) {
+  try {
+    const proj = ctx.sessionProjections;
+    if (proj !== null && proj !== undefined && typeof proj.stateOf === "function") {
+      const st = proj.stateOf(session, "plan");
+      if (st !== null && st !== undefined && typeof st.active === "boolean") return { available: true, active: st.active };
+    }
+  } catch (error) { /* 没有该投影 */ }
+  return { available: false, active: false };
+}
+
 function builtinPlanActive(ctx, session) {
   try {
     if (planModeService === undefined || planModeService === null) { // 服务可能稍后才注册
@@ -356,7 +368,17 @@ function decidePlanning(ctx, session, key, evTurn, prompt) {
   // 这时绝不能再注入 PHASE 文本 —— 两套纪律同时进上下文会互相打架。
   // light 档本来就不注入，这里只是省掉一次多余的 /plan。
   const nativeAgent = agents.get(key);
-  if (nativeOpen.has(key) || builtinPlanActive(ctx, session)) {
+  // 以会话投影为准（真实状态），投影不可用时才退回本地簿记。
+  const proj = planProjection(ctx, session);
+  const nativeActive = proj.available ? proj.active : (nativeOpen.has(key) || builtinPlanActive(ctx, session));
+  // 自愈：簿记与真实状态不一致时，以真相覆盖簿记 —— 否则会出现
+  // "插件以为在计划模式里、其实 DSH 早就关了"，于是每轮都不再进入、也不再出计划。
+  if (proj.available && nativeActive !== nativeOpen.has(key)) {
+    gateStats.reconcile = (gateStats.reconcile || 0) + 1;
+    if (nativeActive) nativeOpen.add(key);
+    else { nativeOpen.delete(key); bridgeTier.delete(key); }
+  }
+  if (nativeActive) {
     gateStats.builtin += 1;
     if (st.tier === "light" && st.scope === "first") rememberPlanned(key);
     flushPendingPhase2(key, nativeAgent);
@@ -871,7 +893,12 @@ async function handleState(req, res, ctx) {
       updatedAt: state.updatedAt, phase, session: sessionIdOut, phases,
       planning: phase === "planning",
       headless: headlessForced(),
-      debug: { ...sectionStats, headless: headlessForced(), bridge: { ...bridgeStats, sessions: bridgeTier.size }, gate: { ...gateStats }, records: phaseRecords.size, planned: plannedSessions.size,
+      debug: { ...sectionStats, headless: headlessForced(),
+        plan: (function () {
+          const ag = requested === null ? undefined : agents.get("id:" + requested);
+          if (ag === undefined || ag === null) return { available: false, active: null };
+          return planProjection(ctx, ag.session);
+        })(), bridge: { ...bridgeStats, sessions: bridgeTier.size }, gate: { ...gateStats }, records: phaseRecords.size, planned: plannedSessions.size,
         planCheck: requested === null ? lastPlanCheck : (planChecks.get("id:" + requested) ?? null),
         ttl: { planning: PLANNING_TTL_MS, active: ACTIVE_TURN_MAX_MS } } });
   } catch (error) {
