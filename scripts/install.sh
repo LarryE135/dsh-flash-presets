@@ -37,6 +37,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# profile 只能是单层目录名：挡掉 "a/b"、".." 之类，避免把补丁写到预期目录之外
+case "$PROFILE" in
+  ""|.|..|.*|*/*|*\\*)
+    echo "✖ 非法 profile 名称：${PROFILE}（只接受单层目录名，如 web / desktop / headless）" >&2
+    exit 2 ;;
+esac
+
 PATCH="$DSH_DIR/profiles/$PROFILE/cordis.patch.yml"
 LEGACY_DIR="$DSH_DIR/.agent-presets"
 

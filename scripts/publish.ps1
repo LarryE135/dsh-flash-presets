@@ -14,7 +14,9 @@ param(
   [string] $Repo   = $(if ($env:REPO)    { $env:REPO }    else { 'dsh-flash-presets' }),
   [ValidateSet('public', 'private')]
   [string] $Visibility = 'public',
-  [string] $Tag = ''
+  [string] $Tag = '',
+  # 远端地址与目标不一致时默认报错；确实要改写 origin 才加 -Force
+  [switch] $Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,8 +35,16 @@ try {
   Write-Host "目标：$GhUser/$Repo（$Visibility），标签 $Tag"
 
   $existing = git remote get-url origin 2>$null
-  if (-not $existing)            { git remote add origin $remote }
-  elseif ($existing -ne $remote) { git remote set-url origin $remote }
+  if (-not $existing) {
+    git remote add origin $remote
+  } elseif ($existing -ne $remote) {
+    # 与 publish.sh 对齐：默认不改用户的远端配置，只在显式 -Force 时改写
+    if (-not $Force) {
+      throw "origin 指向 $existing，与目标 $remote 不一致。确认要改写请加 -Force，或先手工 git remote set-url。"
+    }
+    Write-Host "origin 由 $existing 改写为 $remote（-Force）"
+    git remote set-url origin $remote
+  }
 
   $gh = Get-Command gh -ErrorAction SilentlyContinue
   if ($gh) {

@@ -40,6 +40,7 @@
     "scripts/",
     "docs/",
     "README.md",
+    "README.en.md",
     "LICENSE"
   ],
   "dsh": {

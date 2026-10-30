@@ -42,6 +42,12 @@ if (-not $DshHome) {
   else                      { throw '无法确定 DSH 主目录，请用 -DshHome 指定。' }
 }
 
+# profile 只能是单层目录名：挡掉 "a/b"、".." 之类，避免把补丁写到预期目录之外
+if ([string]::IsNullOrWhiteSpace($Profile) -or $Profile -in @('.', '..') -or
+    $Profile.StartsWith('.') -or $Profile -match '[\\/]') {
+  throw "非法 profile 名称：${Profile}（只接受单层目录名，如 web / desktop / headless）"
+}
+
 $here = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $patch = Join-Path $DshHome "profiles\$Profile\cordis.patch.yml"
