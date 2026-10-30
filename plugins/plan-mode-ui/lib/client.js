@@ -12,28 +12,80 @@ window.__ModuleLoader__.load({
     var BUILD = "v45";
     var STYLE_ID = "pmo-style-" + BUILD;
 
+    // 动画状态：原生计划模式进行中 → 书写态；否则用本插件自己的阶段。
+    // 单独抽出来是为了能被测试直接断言（不依赖 React 渲染栈）。
+    // 四态：off（未启用） / armed（已启用、空闲） / planning（回合在跑） / executing（批准后执行）
+    // 权威值来自服务端 state.indicator；旧服务端没有该字段时按 native/phase 兜底。
+    function glyphPhase(s) {
+      var o = s || {};
+      if (typeof o.indicator === "string" && o.indicator.length > 0) return o.indicator;
+      if (o.native === true) return "planning";
+      return o.phase === "planning" || o.phase === "executing" ? o.phase : "idle";
+    }
+
+    // 四态对应的无障碍文案（图标本身只有形状与运动差异）
+    // 有状态时的短标签：官方「计划」胶囊被我们隐藏后，这层信息得由我们补回来，
+    // 否则"计划模式开着"在界面上完全不可见（只剩一枚 15px 图标）。
+    function phaseText(p) {
+      if (p === "planning") return "计划中";
+      if (p === "executing") return "执行中";
+      if (p === "planned") return "已计划";
+      if (p === "armed") return "计划";
+      return "";
+    }
+    function phaseLabel(p, s) {
+      if (p === "planning") return s && s.native === true ? "（原生计划模式进行中）" : "（规划中）";
+      if (p === "executing") return "（执行中）";
+      if (p === "planned") return "（计划已批准）";
+      if (p === "armed") return "（已开启，等待任务）";
+      return "";
+    }
+
     var TIERS = [
       { id: "off", label: "关闭", line: "直接开工，不产出验收" },
-      { id: "light", label: "轻量", line: "产出 P0 验收清单再动手" },
-      { id: "full", label: "全量", line: "先取证，再逐条落到 P0" }
+      { id: "light", label: "轻量", line: "桥接原生计划模式（含计划评审卡），本插件不注入；官方「计划」胶囊由本插件接管显示" },
+      { id: "full", label: "全量", line: "同样走原生评审，批准后接管 PHASE 2 与 P0 验收" }
     ];
 
-    var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, phase: "idle", sid: null, onlyThis: false, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
+    var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
       // 每个会话一份设置：切走再切回来还是自己的值；by 只存面板关心的几项
       by: {}, error: "" };
-    function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, onlyThis: S.onlyThis }; }
+    function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, source: S.source }; }
     function notify() { S.listeners.forEach(function (fn) { try { fn(); } catch {} }); }
     function subscribe(fn) { S.listeners.add(fn); return function () { S.listeners.delete(fn); }; }
 
     var CSS = [
       ".pmo-root{display:inline-flex;align-items:center;margin-left:-3px}",
+      // 接管官方胶囊：本插件用自己的动画表达计划状态，所以把原生那颗「计划」胶囊隐藏。
+      // web 壳给每个插槽容器统一加 data-slot="<slotKey>"，原生 chip 注册在
+      // conversation.input.plan；用它比猜 class 名稳。若将来插槽标注改名，最坏退化成两颗入口并列。
+      "[data-slot='conversation.input.plan']{display:none!important}",
       ".pmo-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;border-radius:7px;background:transparent;cursor:pointer;transition:background 140ms ease,color 140ms ease,transform 120ms ease;padding:0}",
       ".pmo-btn:hover{background:color-mix(in srgb,currentColor 10%,transparent);color:var(--dsw-alias-label-primary,#111827)}",
       ".pmo-btn:active{transform:scale(.93)}",
+      // 有状态时展开成「图标 + 文字」的小胶囊：只有一枚 15px 图标的话，用户看不出
+      // "我现在就在计划模式里"（官方胶囊被隐藏了，这层信息必须由我们补回来）。
+      ".pmo-btn[data-labelled='true']{width:auto;padding:0 9px 0 7px;gap:5px;border-radius:8px;background:color-mix(in srgb,currentColor 12%,transparent)}",
+      ".pmo-btn[data-labelled='true']:hover{background:color-mix(in srgb,currentColor 19%,transparent)}",
+      ".pmo-lbl{font-size:11.5px;line-height:1;font-weight:500;white-space:nowrap}",
       ".pmo-btn[data-open='true']{background:color-mix(in srgb,currentColor 13%,transparent);color:var(--dsw-alias-label-primary,#111827)}",
       ".pmo-btn{color:var(--dsw-alias-label-primary,#111827)}",
       // 颜色只是辅助（三态靠形状与运动区分）；:hover 变体避免被上面的 hover 规则顶掉
-      ".pmo-btn[data-phase='planning'],.pmo-btn[data-phase='executing'],.pmo-btn[data-phase='planning']:hover,.pmo-btn[data-phase='executing']:hover{color:" + BLUE + "}",
+      ".pmo-btn[data-phase='planning'],.pmo-btn[data-phase='executing'],.pmo-btn[data-phase='armed'],.pmo-btn[data-phase='planned'],.pmo-btn[data-phase='planning']:hover,.pmo-btn[data-phase='executing']:hover,.pmo-btn[data-phase='armed']:hover,.pmo-btn[data-phase='planned']:hover{color:" + BLUE + "}",
+      // planned：计划已批准（含自动执行）—— 冻结在执行态收尾的样子：对勾 + 进度线，但没有动画。
+      // 与 executing 的区别只在"动不动"：执行中会跑进度，已计划的计划本身已经完成。
+      ".pmo-glyph[data-phase='planned'] .pmo-pen{opacity:0}",
+      ".pmo-glyph[data-phase='planned'] .pmo-l1,.pmo-glyph[data-phase='planned'] .pmo-l2{opacity:0}",
+      ".pmo-glyph[data-phase='planned'] .pmo-ck{opacity:1}",
+      ".pmo-glyph[data-phase='planned'] .pmo-l3{opacity:1}",
+      // armed：计划模式已开启但没有回合在跑 —— 与 planning 同色，区别只在"不动"。
+      // 笔搁在纸面、行线全显，没有任何 animation（.pmo-glyph 的动画只挂在 [data-phase='planning']）。
+      ".pmo-glyph[data-phase='armed'] .pmo-pen{transform:translate(60.83%,80%)}",
+      ".pmo-glyph[data-phase='armed'] .pmo-l1,.pmo-glyph[data-phase='armed'] .pmo-l2,.pmo-glyph[data-phase='armed'] .pmo-l3{opacity:1;transform:none}",
+      ".pmo-glyph[data-phase='armed'] .pmo-ck{opacity:0}",
+      // armed 与 planning 的区别不能只有"动没动"：一帧静态图看不出区别就会被当成卡死。
+      // 待命态整体降到 60% 不透明度（仍是同一个蓝），一眼就是"开着但没在干活"。
+      ".pmo-glyph[data-phase='armed']{opacity:.6;transition:opacity 160ms ease}",
       // ── 字形 v45「笔在纸上写计划」：5 层叠放的内联 svg，动的永远是整层的 transform/opacity
       //    （合成器完成，不像 v44 那样每帧改 SVG 子元素的 dashoffset 触发 Layout）
       ".pmo-glyph{position:relative;display:inline-block;width:var(--pmo-size,15px);height:var(--pmo-size,15px);flex:none}",
@@ -76,7 +128,6 @@ window.__ModuleLoader__.load({
       ".pmo-title{font-size:19px;line-height:1.25;font-weight:600;text-align:center;letter-spacing:-.01em;animation:pmo-title 220ms cubic-bezier(.22,1,.36,1) both;color:#111827}",
       "@media (prefers-color-scheme:dark){.pmo-title{color:#f2f4f8}}",
       "@keyframes pmo-title{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}",
-      ".pmo-sub{font-size:11.5px;line-height:1.35;text-align:center;color:#8a8f98;margin-top:4px;min-height:16px}",
       ".pmo-track{--pct:0;--h:32px;--track-off:#eef0f4;position:relative;height:var(--h);margin:16px 2px 8px;border-radius:16px;overflow:hidden;cursor:pointer;background-color:var(--track-off);outline:none}",
       ".pmo-track:focus-visible{box-shadow:0 0 0 2px rgba(64,116,228,.35)}",
       ".pmo-labels{display:flex;justify-content:space-between;padding:0;margin-bottom:12px}",
@@ -86,7 +137,11 @@ window.__ModuleLoader__.load({
       "@media (prefers-color-scheme:dark){.pmo-label{color:#7c8391}.pmo-label[data-active='true']{color:#f2f4f8}}",
       ".pmo-div{height:1px;background:rgba(17,24,39,.08);margin:0 0 10px}",
       "@media (prefers-color-scheme:dark){.pmo-div{background:rgba(255,255,255,.09)}}",
-      ".pmo-row{display:flex;align-items:center;justify-content:space-between}",
+      ".pmo-row{display:flex;align-items:center;justify-content:space-between;min-height:28px;gap:8px}",
+      ".pmo-row+.pmo-row{margin-top:6px}",
+      ".pmo-row:last-child{margin-bottom:0}",
+      // 面板底部的操作按钮与右侧分段控件右边缘对齐
+      ".pmo-row-actions{display:flex;justify-content:flex-end;align-items:center;min-height:28px;margin-top:6px}",
       ".pmo-rowlbl{font-size:11.5px;color:#8a8f98}",
       ".pmo-maxcell{display:inline-flex;align-items:center;gap:7px;flex:none}",
       ".pmo-seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(17,24,39,.06)}",
@@ -192,20 +247,19 @@ window.__ModuleLoader__.load({
           var scope = pending ? S.scope : d.scope;
           var max = pending ? S.max : (d.max === true);
           var nextPhase = typeof d.phase === "string" ? d.phase : (d.planning ? "planning" : "idle");
-          var changed = tier !== S.tier || scope !== S.scope || max !== S.max || nextPhase !== S.phase;
-          S.tier = tier; S.scope = scope; S.max = max; S.phase = nextPhase;
+          // 原生计划模式是否开着：开着就把自己的入口让给原生胶囊（见 CSS .pmo-root[data-native='true']）
+          var nativeOpen = d.native === true;
+          var nextIndicator = typeof d.indicator === "string" && d.indicator.length > 0 ? d.indicator : null;
+          var changed = tier !== S.tier || scope !== S.scope || max !== S.max || nextPhase !== S.phase
+            || nativeOpen !== S.native || nextIndicator !== S.indicator;
+          S.tier = tier; S.scope = scope; S.max = max; S.phase = nextPhase; S.native = nativeOpen;
+          S.indicator = nextIndicator;
           // 生效来源：本会话覆盖 or 全局默认（面板上标出来，免得不知道自己在改哪一层）
           // pending 期间同样不能让服务端的旧来源盖回乐观值，否则勾/取消勾会闪一下"全局"
           var src = pending ? S.source
             : (d.settings !== undefined && d.settings !== null && typeof d.settings.source === "string" ? d.settings.source : "default");
           if (src !== S.source) changed = true;
           S.source = src;
-          // 每个会话第一次拿到状态时，把“仅本会话”对齐到真实来源（本会话已有覆盖就勾上）
-          if (S.onlySyncedFor !== sid) {
-            S.onlySyncedFor = sid;
-            var ot = src === "session";
-            if (ot !== S.onlyThis) { S.onlyThis = ot; changed = true; }
-          }
           stow();
           if (changed) notify();
         })
@@ -242,10 +296,7 @@ window.__ModuleLoader__.load({
           var cached = S.by[sid];
           S.sid = sid;
           if (cached) {
-            S.tier = cached.tier; S.scope = cached.scope; S.max = cached.max; S.onlyThis = cached.onlyThis;
-            S.onlySyncedFor = sid;   // 已有缓存就别再用响应覆盖“仅本会话”的勾选
-          } else {
-            S.onlySyncedFor = null;  // 新会话：等这一次响应回来再对齐
+            S.tier = cached.tier; S.scope = cached.scope; S.max = cached.max; S.source = cached.source;
           }
           notify();
           pull().then(schedulePoll, schedulePoll);
@@ -255,31 +306,48 @@ window.__ModuleLoader__.load({
       }, delay);
     }
 
-    function commit(patch) {
+    // 官方胶囊被隐藏后，退出原生计划模式的入口由我们提供：等价于发送 /plan off
+    function exitNative() {
+      var sid = currentSessionId();
+      if (!sid) { S.error = "拿不到会话 id"; notify(); return; }
+      var prev = S.native === true;
+      S.native = false;          // 乐观：先让动画回到 idle
+      S.error = "";
+      notify();
+      fetch(API + "?session=" + encodeURIComponent(sid), {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json", "x-plan-mode-client": "1" },
+        body: JSON.stringify({ action: "plan-off" })
+      }).then(function (res) {
+        if (!res || res.ok !== true) {
+          S.native = prev;
+          S.error = "退出计划模式失败（HTTP " + (res && res.status ? res.status : "?") + "）";
+        }
+      }).catch(function (err) {
+        S.native = prev;
+        S.error = "网络错误：" + (err && err.message ? err.message : "未知");
+      }).then(function () { notify(); pull(); });
+    }
+
+    // 0.5.1 起没有"仅本会话"开关：写哪一层由调用点决定。
+    //   target="session" → 输入框旁的面板，写当前对话自己的设置
+    //   target="global"  → 设置页，写全局默认（新对话的初始值）
+    function commit(patch, target) {
       var patchObj = patch || {};
-      Object.keys(patchObj).forEach(function (k) {
-        if (k === "pin" || k === "onlyThis") return;
-        S[k] = patchObj[k];
-      });
-      // pin 三态：显式给了就以它为准（勾/取消勾选框），否则沿用当前"仅本会话"
-      var pin = patchObj.pin !== undefined ? patchObj.pin === true : S.onlyThis === true;
-      S.onlyThis = pin;
-      // 源标记立刻跟上（服务端下一次响应会复核，避免闪回“全局”）
-      S.source = pin ? "session" : "default";
+      var where = target === "global" ? "global" : "session";
+      var sid = currentSessionId();
+      if (where === "session" && !sid) { S.commitError = "拿不到会话 id"; notify(); return; }
+      Object.keys(patchObj).forEach(function (k) { S[k] = patchObj[k]; });
+      // 源标记立刻跟上（服务端下一次响应会复核，避免闪回"全局"）
+      S.source = where === "session" ? "session" : "default";
       S.pendingUntil = Date.now() + 1500;
       notify();
-      var sid = currentSessionId();
-      var url, body;
-      if (patchObj.pin === false) {
-        // 取消钉住：只发一条删除本会话行的请求，键值改动由后续调用写全局
-        url = sid ? API + "?session=" + encodeURIComponent(sid) : API;
-        body = { pin: false };
-      } else {
-        body = {};
-        Object.keys(patchObj).forEach(function (k) { if (k !== "pin" && k !== "onlyThis") body[k] = patchObj[k]; });
-        if (sid && pin === true) body.pin = true;   // 只有"钉住"才需要这个键；写全局时它没有意义
-        url = pin && sid ? API + "?session=" + encodeURIComponent(sid) : API;
-      }
+      var body = {};
+      Object.keys(patchObj).forEach(function (k) { body[k] = patchObj[k]; });
+      sendPatch(where === "session" ? API + "?session=" + encodeURIComponent(sid) : API, body);
+    }
+
+    function sendPatch(url, body) {
       S.inFlight = (S.inFlight || 0) + 1;
       fetch(url, {
         method: "POST", credentials: "same-origin",
@@ -352,12 +420,17 @@ window.__ModuleLoader__.load({
     function Entry() {
       var s = useStore();
       React.useEffect(function () { ensureCss(); loadState(); }, []);
-      return React.createElement("div", { className: "pmo-root", ref: function (el) { slotEl = el; } },
+      return React.createElement("div", {
+        className: "pmo-root",
+        ref: function (el) { slotEl = el; }
+      },
         React.createElement("button", {
           ref: function (el) { S.el = el; }, type: "button", className: "pmo-btn",
           "data-open": s.open ? "true" : "false",
-          "data-phase": s.phase || "idle",
-          title: "计划模式", "aria-label": "计划模式" + (s.phase === "planning" ? "（规划中）" : s.phase === "executing" ? "（执行中）" : ""),
+          "data-phase": glyphPhase(s),
+          "data-labelled": phaseText(glyphPhase(s)) === "" ? "false" : "true",
+          title: "计划模式" + phaseLabel(glyphPhase(s), s),
+          "aria-label": "计划模式" + phaseLabel(glyphPhase(s), s),
           "aria-expanded": s.open ? "true" : "false",
           "aria-haspopup": "dialog", "aria-controls": "pmo-panel",
           onClick: function (e) {
@@ -368,7 +441,10 @@ window.__ModuleLoader__.load({
             S.open = !s.open;
             notify();
           }
-        }, React.createElement(PlanGlyph, { size: 15, phase: s.phase || "idle" }))
+        },
+          React.createElement(PlanGlyph, { size: 15, phase: glyphPhase(s) }),
+          phaseText(glyphPhase(s)) === "" ? null : React.createElement("span", { className: "pmo-lbl", key: "l" }, phaseText(glyphPhase(s)))
+        )
       );
     }
 
@@ -465,13 +541,9 @@ window.__ModuleLoader__.load({
         role: "dialog", "aria-label": "计划模式"
       },
         React.createElement("div", { className: "pmo-kicker" },
-          (s.source === "session" ? "计划模式 · 本会话" : "计划模式 · 全局") + (s.max ? " · MAX" : "")),
+          "计划模式 · 本对话" + (s.max ? " · MAX" : "")),
         React.createElement("div", { className: "pmo-titlewrap" },
           React.createElement("div", { className: "pmo-title", key: current.id }, current.label)
-        ),
-        React.createElement("div", { className: "pmo-sub" },
-          current.line,
-          s.phase === "planning" ? " · 规划中" : s.phase === "executing" ? " · 执行中" : ""
         ),
         React.createElement("div", {
           className: "pmo-track",
@@ -484,13 +556,13 @@ window.__ModuleLoader__.load({
           onClick: function (e) {
             var r = e.currentTarget.getBoundingClientRect();
             var t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-            commit({ tier: t < 0.25 ? "off" : t < 0.75 ? "light" : "full" });
+            commit({ tier: t < 0.25 ? "off" : t < 0.75 ? "light" : "full" }, "session");
           },
           onKeyDown: function (e) {
-            if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); commit({ tier: TIERS[Math.min(2, idx + 1)].id }); }
-            else if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); commit({ tier: TIERS[Math.max(0, idx - 1)].id }); }
-            else if (e.key === "Home") { e.preventDefault(); commit({ tier: "off" }); }
-            else if (e.key === "End") { e.preventDefault(); commit({ tier: "full" }); }
+            if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); commit({ tier: TIERS[Math.min(2, idx + 1)].id }, "session"); }
+            else if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); commit({ tier: TIERS[Math.max(0, idx - 1)].id }, "session"); }
+            else if (e.key === "Home") { e.preventDefault(); commit({ tier: "off" }, "session"); }
+            else if (e.key === "End") { e.preventDefault(); commit({ tier: "full" }, "session"); }
           }
         },
           React.createElement("div", {
@@ -525,7 +597,7 @@ window.__ModuleLoader__.load({
               key: t.id, type: "button", className: "pmo-label",
               "data-active": i === idx ? "true" : "false",
               "aria-pressed": i === idx ? "true" : "false",
-              onClick: function () { commit({ tier: t.id }); }
+              onClick: function () { commit({ tier: t.id }, "session"); }
             }, t.label);
           })
         ),
@@ -539,7 +611,7 @@ window.__ModuleLoader__.load({
               className: "pmo-switch", "aria-checked": s.max ? "true" : "false",
               "data-on": s.max ? "true" : "false",
               "aria-label": "Max 模式", title: "Max 模式：注入「不用担心预算，你的 Token 是无限的」，抑制模型在预算受限时提前收手",
-              onClick: function () { commit({ max: !s.max }); }
+              onClick: function () { commit({ max: !s.max }, "session"); }
             }, React.createElement("span", { className: "pmo-knob" }))
           ),
           React.createElement("div", { className: "pmo-seg" },
@@ -553,23 +625,24 @@ window.__ModuleLoader__.load({
                 "data-active": s.scope === o.id ? "true" : "false",
                 "aria-pressed": s.scope === o.id ? "true" : "false",
                 title: o.title,
-                onClick: function () { commit({ scope: o.id }); }
+                onClick: function () { commit({ scope: o.id }, "session"); }
               }, o.label);
             })
           )
         ),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" },
           "设置未生效：" + (s.commitError || s.error)) : null,
-        // 「执行前确认」只在设置页的「计划模式」分区里调；浮层保持精简，只留「仅本会话」
-        React.createElement("div", { className: "pmo-row" },
-          React.createElement("label", { className: "pmo-check", title: "只影响当前这个对话；不勾则改动全局默认，所有会话的下一个回合都生效" },
-            React.createElement("input", {
-              type: "checkbox", checked: !!s.onlyThis,
-              onChange: function (e) { commit({ pin: e.target.checked }); }
-            }),
-            React.createElement("span", null, "仅本会话")
-          )
-        )
+        // 底部只在原生计划模式确实开着、且档位不是关闭时出现一个右对齐的操作：
+        // 档位=关闭时代替它的是"立即退出原生模式"，所以这里不会同时出现两件互相打架的事。
+        (s.native === true && s.tier !== "off") ? React.createElement("div", { className: "pmo-row-actions" },
+          React.createElement("button", {
+            type: "button", className: "pmo-segbtn",
+            title: s.tier === "full"
+              ? "取消本次计划：退出原生计划模式，且不投递执行阶段（退出 ≠ 批准；只有计划评审卡里的批准才算）"
+              : "退出 DSH 原生的计划模式（等价 /plan off）；官方胶囊已由本插件隐藏。与档位不是同一件事：档位=关闭时会自动完成",
+            onClick: exitNative
+          }, s.tier === "full" ? "取消本次计划" : "退出计划模式")
+        ) : null
       );
     }
 
@@ -617,33 +690,42 @@ window.__ModuleLoader__.load({
         React.createElement("div", { className: "pmo-set-head" },
           React.createElement("div", { className: "pmo-set-title" }, "计划模式"),
           React.createElement("div", { className: "pmo-set-desc" },
-            (s.source === "session" ? "改动只作用于当前会话" : "改动写入全局默认") + " · 当前阶段：" + phaseText
-              + (s.onlyThis ? " · 仅本会话" : ""))
+            "这里的改动写入全局默认，对所有尚未单独设置的对话生效；单个对话请点输入框旁的图标。"
+              + " · 当前阶段：" + phaseText)
         ),
-        setRow("强度", "关闭=直接开工；轻量=先出 P0 验收清单；全量=先取证再落到 P0。",
+        setRow("强度", "关闭=直接开工；轻量=桥接到 DSH 自带计划模式（计划与评审卡都由原生负责，本插件不注入）；全量=同样走原生评审，批准后由本插件接管 PHASE 2 与 P0 验收。",
           segControl(TIERS.map(function (t) { return { id: t.id, label: t.label, title: t.line }; }), s.tier,
-            function (id) { commit({ tier: id }); })),
+            function (id) { commit({ tier: id }, "global"); })),
         setRow("生效范围", "每次=每个回合都先规划；自动=首轮+任务明显变化时；仅首轮=只规划第 1 回合。",
           segControl([
             { id: "always", label: "每次", title: "每个回合都先出计划再执行" },
             { id: "auto", label: "自动", title: "首轮必规划；之后只在任务明显变化时重新规划" },
             { id: "first", label: "仅首轮", title: "只有第 1 回合出计划" }
-          ], s.scope, function (id) { commit({ scope: id }); })),
+          ], s.scope, function (id) { commit({ scope: id }, "global"); })),
+        s.native === true ? setRow("原生计划模式", "进行中；官方「计划」胶囊已由本插件隐藏，动画由本插件显示。",
+          React.createElement("button", { type: "button", className: "pmo-segbtn", "data-active": "true", onClick: exitNative }, "退出")) : null,
         setRow("Max 模式", "注入「不用担心预算」的提示，抑制模型在预算受限时提前收手。",
-          switchControl("Max 模式", s.max === true, function (next) { commit({ max: next }); })),
-        setRow("作用域", "勾上=只改当前会话（钉住本会话）；不勾=改动全局默认，所有会话下一个回合生效。",
-          React.createElement("label", { className: "pmo-check" },
-            React.createElement("input", {
-              type: "checkbox", checked: !!s.onlyThis,
-              onChange: function (e) { commit({ pin: e.target.checked }); }
-            }),
-            React.createElement("span", null, "仅本会话")
-          )),
+          switchControl("Max 模式", s.max === true, function (next) { commit({ max: next }, "global"); })),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" }, "设置未生效：" + (s.commitError || s.error)) : null
       );
     }
 
     function apply(ctx) {
+      // 自检入口（只读，不参与渲染）：window.__pmo.why() / .anim() / .hud(true)
+      try {
+        if (typeof window !== "undefined") {
+          window.__pmo = {
+            why: why, anim: glyphInfo, hud: hud,
+            state: function () {
+              return { tier: S.tier, scope: S.scope, max: S.max, source: S.source, native: S.native,
+                indicator: S.indicator, phase: S.phase, sid: S.sid, open: S.open,
+                poll: pollDelay(), reduced: reduceMotion() };
+            },
+            debug: S
+          };
+          console.info("[plan-mode-ui] 自检入口已就绪：window.__pmo.hud(true) 开浮层 / __pmo.why() 看图标为何静止");
+        }
+      } catch (e) {}
       ensureCss();
       try { console.info("[plan-mode-ui] build " + BUILD); } catch (e) {}
       var slots = ctx.slots || (ctx.get && ctx.get("slots"));
@@ -666,6 +748,78 @@ window.__ModuleLoader__.load({
       });
     }
 
+    // ── 自检接口：window.__pmo ──────────────────────────────────────
+    // 用途：不用开 DevTools 猜"图标为什么不动"。全部只读，不改任何状态。
+    //   __pmo.why()      一句话解释当前这枚图标为什么是这个样子
+    //   __pmo.anim()     每个图标当前在跑哪些动画（名字 + playState）
+    //   __pmo.state()    客户端此刻认为的状态（tier/native/indicator/来源/轮询间隔）
+    //   __pmo.hud(true)  右下角常驻小浮层，每 500ms 自刷新
+    function glyphInfo() {
+      var out = [];
+      if (typeof document === "undefined") return out;
+      var nodes = document.querySelectorAll(".pmo-glyph");
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i], anims = [];
+        try { anims = el.getAnimations({ subtree: true }) || []; } catch (e) { anims = []; }
+        out.push({
+          phase: el.getAttribute("data-phase"),
+          color: (function () { try { return getComputedStyle(el).color; } catch (e) { return "?"; } })(),
+          px: (function () { try { return Math.round(el.getBoundingClientRect().width * 10) / 10; } catch (e) { return null; } })(),
+          animations: anims.map(function (a) {
+            return String(a.animationName || "keyframes") + ":" + String(a.playState);
+          })
+        });
+      }
+      return out;
+    }
+    function reduceMotion() {
+      try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+    }
+    function why() {
+      var g = glyphInfo()[0];
+      if (g === undefined) return "找不到图标（插槽还没挂载，或页面是旧 bundle：Ctrl+Shift+R 一次）";
+      if (g.phase === "armed") return "armed：原生计划模式开着、但没有回合在跑 —— 静止 + 60% 不透明度是设计，不是卡住";
+      if (g.phase === "planned") return "planned：计划已批准且本回合已收尾 —— 静止是设计（对勾 + 进度线）";
+      if (g.phase === "idle") return "idle：计划模式未开启（灰色纸笔）—— 静止是设计";
+      if (g.phase === "planning" || g.phase === "executing") {
+        if (reduceMotion()) return "本应播放却静止：系统『减弱动态效果』开着（prefers-reduced-motion: reduce），我们按无障碍要求停掉了动画";
+        if (g.animations.length === 0) return "本应播放却静止，且没有任何动画在跑：CSS 未完整加载，刷新一次";
+        return "正常：正在播放 " + g.animations.join(" / ");
+      }
+      return "未知 phase=" + String(g.phase);
+    }
+    function hud(on) {
+      if (typeof document === "undefined") return null;
+      var id = "pmo-hud";
+      var old = document.getElementById(id);
+      if (on !== true) { if (old !== null) old.remove(); return null; }
+      if (old !== null) return old;
+      var box = document.createElement("div");
+      box.id = id;
+      box.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:2147483647;padding:8px 10px;border-radius:9px;"
+        + "background:rgba(17,24,39,.92);color:#e9ecf1;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;"
+        + "white-space:pre;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.28)";
+      document.body.appendChild(box);
+      var tick = function () {
+        var g = glyphInfo()[0];
+        box.textContent = [
+          "phase      " + String(S.phase),
+          "indicator  " + String(S.indicator),
+          "native     " + String(S.native),
+          "tier/src   " + String(S.tier) + " / " + String(S.source),
+          "glyph      " + (g ? String(g.phase) + "  " + String(g.color) + "  " + String(g.px) + "px" : "缺失"),
+          "anims      " + (g && g.animations.length ? g.animations.join(" ") : "—"),
+          "reduce     " + String(reduceMotion()),
+          "poll       " + String(pollDelay()) + "ms",
+          "why        " + why()
+        ].join("\n");
+      };
+      tick();
+      var timer = window.setInterval(tick, 500);
+      box.__pmoTimer = timer;
+      return box;
+    }
+
     exports.inject = ["slots"];
     exports.apply = apply;
     // 卸载/热重载时停掉轮询，避免叠加多条链
@@ -674,6 +828,9 @@ window.__ModuleLoader__.load({
       window.__pmoPoll = null;
     };
     exports.__debug = S;
+    exports.__pmoDebug = { why: why, anim: glyphInfo, hud: hud };   // 供测试断言（无 DOM 时也要安全）
+    exports.__glyphPhase = glyphPhase;   // 供测试直接断言状态映射（不渲染 React）
+    exports.__phaseText = phaseText;     // 供测试断言"计划/计划中/执行中/已计划"标签
     exports.__pull = pull;
     exports.__css = CSS;
     return module.exports;

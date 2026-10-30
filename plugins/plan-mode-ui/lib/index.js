@@ -67,21 +67,20 @@ function load() {
         if (typeof id !== "string" || id.length === 0 || v === null || typeof v !== "object") continue;
         const tier = pickTier(v.tier), scope = pickScope(v.scope);
         const max = typeof v.max === "boolean" ? v.max : undefined;
-        const pinned = v.pinned === true;
-        if (tier === undefined && scope === undefined && max === undefined && !pinned) continue;
+        // 0.5.1 起没有"钉住"概念：只要这一行有任何取值，它就是用户对这个对话的显式设置。
+        // （旧版 pinned 字段只被读一次，不再写回。）
+        if (tier === undefined && scope === undefined && max === undefined) continue;
         sessions[id] = {
           ...(tier === undefined ? {} : { tier }),
           ...(scope === undefined ? {} : { scope }),
-          ...(max === undefined ? {} : { max }),
-          ...(pinned ? { pinned: true } : {})
+          ...(max === undefined ? {} : { max })
         };
       }
     }
     const dflt = { tier: pickTier(dfltRaw.tier) ?? "light", scope: pickScope(dfltRaw.scope) ?? "always", max: dfltRaw.max === true };
-    // 钉住的行必须整份冻结：早期版本只记用户动过的那几个字段，其余跟着默认走，
-    // 结果就是“勾着仅本会话，别的会话一改全局照样被覆盖”。缺项按当前默认补齐。
+    // 每个会话行都整份冻结：早期版本只记用户动过的那几个字段，其余跟着默认走，
+    // 于是"别的会话一改全局，这个对话也被带着跑"。缺项按当前默认补齐一次。
     for (const over of Object.values(sessions)) {
-      if (over.pinned !== true) continue;
       if (over.tier === undefined) over.tier = dflt.tier;
       if (over.scope === undefined) over.scope = dflt.scope;
       if (over.max === undefined) over.max = dflt.max;
@@ -198,6 +197,8 @@ function touchSession(session) {
 }
 function pruneStale() {
   const now = Date.now();
+  // H2：「已计划」标记只在读取时判 TTL，长期没人看的会话会一直挂着条目
+  for (const [k, at] of plannedAt) { if (now - at > PLANNED_ICON_TTL_MS) plannedAt.delete(k); }
   for (const [key, rec] of phaseRecords) {
     if (now - rec.planningAt <= PLANNING_TTL_MS) continue;
     // 回合仍在进行（例如一次 20 分钟的工具调用，期间没有任何事件）：保留记录，
@@ -289,6 +290,16 @@ function builtinPlanActive(ctx, session) {
       return planModeService.loggedActive(session) === true;
     }
   } catch (error) { planModeService = null; }
+  // D3：planMode 被预设 isolate 掉时（本次部署就是这样），服务拿不到，但"计划是否生效"
+  // 本身是会话投影里的数据 —— loggedActive() 内部也是读它。直接读同一份，结论才一致；
+  // 否则这个守卫恒为 false，full 档会在用户手动 /plan 之后再注入一段 PHASE 1。
+  try {
+    const proj = ctx.sessionProjections;
+    if (proj !== null && proj !== undefined && typeof proj.stateOf === "function") {
+      const st = proj.stateOf(session, "plan");
+      if (st !== null && st !== undefined && typeof st.active === "boolean") return st.active;
+    }
+  } catch (error) { /* 没有该投影 → 按未激活处理 */ }
   return false;
 }
 
@@ -297,7 +308,126 @@ function builtinPlanActive(ctx, session) {
 //        （政策段 / /plan off / exit_plan_mode / 对话框上方的计划评审卡）。
 // full ：桥接 + 我们的执行层 —— 计划同样走原生评审卡，批准（plan/mode -> false）
 //        之后再投递 PHASE 2，执行纪律仍由本插件提供。
+// DSH 0.2.x 的回合顺序是 turn/start → user/message，用户输入落在回合内，
+// 所以"这个回合是不是用户开启的"必须在收到 user/message 时判定（turnOpening）。
+const turnOpening = new Map();         // sessionKey → 本回合还没有助手输出/用户输入
+const decidedTurn = new Map();         // sessionKey → 已决策过的回合号（异步桥接期间的并发保护）
+function decidePlanning(ctx, session, key, evTurn, prompt) {
+  // turn/start 与 user/message 两条路径可能在同一回合先后进来，而桥接是异步的：
+  // 用同步写入的回合号做幂等，避免同一回合进两次计划模式。
+  if (evTurn !== undefined && decidedTurn.get(key) === evTurn) { gateStats.seen += 1; return; }
+  if (evTurn !== undefined) {
+    if (decidedTurn.size > 500) decidedTurn.delete(decidedTurn.keys().next().value);   // H1：有界
+    decidedTurn.set(key, evTurn);
+  }
+  const live = phaseRecords.get(key);
+  if (live !== undefined && live.turn === evTurn) { gateStats.seen += 1; return; }
+  const st = settingsFor(key);
+  if (st.scope === "first" && evTurn !== undefined && evTurn !== 1) { gateStats.scope += 1; return; }
+  if (st.scope === "auto" && evTurn !== undefined && evTurn !== 1) {
+    if (prompt === undefined || !(prompt.chars >= REPLAN_MIN_CHARS || REPLAN_RE.test(prompt.head))) { gateStats.scope += 1; return; }
+  }
+  const alreadyPlanned = st.scope === "first" && plannedSessions.has(key);
+  if (st.tier === "off") {
+    gateStats.off += 1;
+    if (bridgeTier.has(key)) { cancelIntent.add(key); nativeLeave(ctx, agents.get(key), key); }
+    return;
+  }
+  if (alreadyPlanned) return;
+  // D2：原生计划模式已经在跑（用户手动 /plan，或上一回合桥接后还没退出）。
+  // 这时绝不能再注入 PHASE 文本 —— 两套纪律同时进上下文会互相打架。
+  // light 档本来就不注入，这里只是省掉一次多余的 /plan。
+  const nativeAgent = agents.get(key);
+  if (nativeOpen.has(key) || builtinPlanActive(ctx, session)) {
+    gateStats.builtin += 1;
+    if (st.tier === "light" && st.scope === "first") rememberPlanned(key);
+    flushPendingPhase2(key, nativeAgent);
+    return;
+  }
+  // 0.5.0 混合工作：把"计划"交给原生评审卡
+  //   light → 每回合都可桥接（纯桥接，不注入任何文本）
+  //   full  → 只在这一会话还没真正规划过时桥接；之后沿用 0.4.x 的自动续跑
+  const bridgeAgent = agents.get(key);
+  const wantBridge = !isSubagent(session) && bridgeAgent !== undefined
+    && (st.tier === "light" || !plannedSessions.has(key));
+  const bridged = wantBridge ? nativeEnter(ctx, bridgeAgent, key, st.tier) : false;
+  if (!bridged && bridgeAgent === undefined) gateStats.noAgent += 1;
+  if (bridged && st.tier === "light") {
+    gateStats.bridgeOk += 1;
+    if (st.scope === "first") rememberPlanned(key);
+    flushPendingPhase2(key, bridgeAgent);
+    return;
+  }
+  phaseRecords.set(key, {
+    phase: "planning", steeredTurn: null, planningAt: Date.now(), startedAt: Date.now(), turn: evTurn,
+    promptChars: prompt === undefined ? null : prompt.chars,
+    bridged
+  });
+  flushPendingPhase2(key, bridgeAgent);
+}
+
+const gateStats = { turnStart: 0, noKey: 0, subagent: 0, builtin: 0, notUser: 0, scope: 0, seen: 0, off: 0, bridgeOk: 0, noAgent: 0, lastTurn: null, lastType: null };
 const bridgeTier = new Map();          // sessionKey → "light" | "full"（本插件开的）
+// 原生计划模式当前是否开着（来自 plan/mode 事件；用户手动 /plan 也会记在这里）。
+// 与 bridgeTier 合并成 state.native，客户端据此把自己的 composer 入口让给原生胶囊。
+const nativeOpen = new Set();
+// 计划已批准的时间（approval / 自动执行都算）：
+// 有了它，图标在"计划落地但本回合已结束"时仍显示「已计划」，而不是掉回默认色。
+// 新回合开始时清掉（下一轮可能是全新任务），并受 PLANNED_ICON_TTL_MS 约束（30 分钟）。
+// 用户"主动退出"的意图（面板按钮 / 切到关闭）：plan/mode 变 false 时必须把它和
+// "exit_plan_mode 批准"区分开 —— 否则 full 档一退出就被当成批准，直接投递执行阶段。
+const cancelIntent = new Set();
+const plannedAt = new Map();
+const PLANNED_ICON_TTL_MS = 30 * 60 * 1000;
+// 回合是否在跑：activeTurns 由 turn/start 置位、turn/end 清除，另有 ACTIVE_TURN_MAX_MS 上界兜底
+function turnRunning(key) {
+  const at = activeTurns.get(key);
+  return at !== undefined && Date.now() - at <= ACTIVE_TURN_MAX_MS;
+}
+// 四态指示器（唯一权威，客户端不再自己组合 native+phase）：
+//   off       —— 计划模式未开启，也不在执行阶段
+//   armed     —— 已开启但没有回合在跑（图标静止）
+//   planning  —— 已开启且回合进行中（书写动画）
+//   executing —— full 档批准后（原生已关，但正处于执行阶段，优先于 native）
+function indicatorOf(id) {
+  const key = id === null ? lastSession : "id:" + id;
+  if (key === null || key === undefined || key === "") return "off";
+  const rec = phaseRecords.get(key);
+  if (rec !== undefined && rec.phase === "executing") return "executing";
+  if (rec !== undefined && rec.phase === "planning") return "planning";
+  if (nativeOf(id)) return turnRunning(key) ? "planning" : "armed";
+  const approved = plannedAt.get(key);
+  if (approved !== undefined && Date.now() - approved <= PLANNED_ICON_TTL_MS) return "planned";
+  return "off";
+}
+function nativeOf(id) {
+  if (id === null) {
+    if (lastSession === null) return false;
+    return bridgeTier.has(lastSession) || nativeOpen.has(lastSession);
+  }
+  const key = "id:" + id;
+  return bridgeTier.has(key) || nativeOpen.has(key);
+}
+const pendingPhase2 = new Map();       // sessionKey → turn：批准发生在阶段记录被清理之后时暂存
+const phase2Turn = new Map();          // sessionKey → turn：同一回合只投递一次 PHASE 2
+function sendPhase2(agent, key, turn) {
+  if (agent === undefined) return false;
+  if (key !== undefined && turn !== undefined && phase2Turn.get(key) === turn) return false; // 同回合不重复
+  try {
+    agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE2 }], source: { kind: "user" } }));
+    if (key !== undefined && turn !== undefined) phase2Turn.set(key, turn);
+    return true;
+  } catch (error) {
+    console.error("[plan-mode-ui] native-approved steer failed:", error);
+    return false;
+  }
+}
+function flushPendingPhase2(key, agent) {
+  if (key === undefined || !pendingPhase2.has(key)) return;
+  const turn = pendingPhase2.get(key);
+  pendingPhase2.delete(key);
+  sendPhase2(agent, key, turn);
+}
 function planModeHandle(ctx) {
   if (planModeService !== undefined && planModeService !== null
       && typeof planModeService.set === "function") return planModeService;
@@ -307,23 +437,84 @@ function planModeHandle(ctx) {
   } catch (error) { /* 没有原生计划模式 → 回退旧的注入式行为 */ }
   return null;
 }
-function nativeEnter(ctx, agent, key, tier) {
-  const svc = planModeHandle(ctx);
-  if (svc === null || agent === undefined || key === undefined) return false;
+// 第二条通道：预设把 planMode 放在 `isolate` 组里时，顶层插件看不到这个服务，
+// 但 commands.execute(agent, "/plan") 会按 agent 作用域解析到预设注册的那条命令。
+const bridgeStats = { service: 0, command: 0, unavailable: 0 };
+function commandHandle(ctx) {
   try {
-    svc.set(agent, true);
-    bridgeTier.set(key, tier);
-    return true;
+    const svc = typeof ctx.get === "function" ? (ctx.get("commands") ?? null) : null;
+    if (svc !== null && svc !== undefined && typeof svc.execute === "function") return svc;
+  } catch (error) { /* 没有 commands 服务 */ }
+  return null;
+}
+// 事件派发期间会话正在 append（"session append cannot reenter while another append
+// is being published"），所以任何会写会话的动作（commands.execute 内部会 append
+// command/run、command/done）都必须跳出当前派发栈，改成宏任务再执行。
+function defer(fn) { setTimeout(fn, 0); }
+// commands.execute(agent, line, attachments, signal) —— 第 4 个参数是必需的 AbortSignal。
+// 之前只传 3 个：async 函数体内 signal.aborted 立刻抛错，promise 被 .catch 吞掉，
+// 于是"桥接成功"只是假象（命令从未真正执行）。这是桥接不生效的第二个原因。
+function runPlanCommand(ctx, agent, line) {
+  const svc = commandHandle(ctx);
+  if (svc === null || agent === undefined) return null;
+  try {
+    const controller = new AbortController();
+    return Promise.resolve(svc.execute(agent, line, [], controller.signal)).then((settled) => {
+      if (settled === undefined || settled === null) return "unknown";  // 命令名没解析到
+      const kind = settled?.result?.kind;
+      return kind === "success" ? "ok" : (typeof kind === "string" ? kind : "error");
+    }, (error) => {
+      console.error("[plan-mode-ui] /plan bridge failed:", error);
+      return "error";
+    });
   } catch (error) {
-    console.error("[plan-mode-ui] native plan-mode enter failed:", error);
-    return false;
+    console.error("[plan-mode-ui] /plan bridge threw:", error);
+    return Promise.resolve("error");
   }
+}
+function nativeEnter(ctx, agent, key, tier) {
+  if (agent === undefined || key === undefined) return false;
+  const svc = planModeHandle(ctx);
+  if (svc !== null) {
+    try {
+      svc.set(agent, true);
+      bridgeTier.set(key, tier);
+      bridgeStats.service += 1;
+      return true;
+    } catch (error) {
+      console.error("[plan-mode-ui] native plan-mode enter failed:", error);
+    }
+  }
+  if (commandHandle(ctx) === null) { bridgeStats.unavailable += 1; return false; }
+  // 先乐观置位，让本回合立刻按"已进入计划模式"处理；命令稍后执行、结果回来再纠正，
+  // 否则 pre-step 可能早于结算，本回合就白过了。
+  bridgeTier.set(key, tier);
+  bridgeStats.command += 1;
+  defer(() => {
+    const pending = runPlanCommand(ctx, agent, "/plan");
+    if (pending === null) { bridgeStats.unavailable += 1; bridgeTier.delete(key); return; }
+    pending.then((outcome) => {
+      bridgeStats.lastCommand = "/plan:" + outcome;
+      if (outcome === "ok") return;
+      bridgeStats.command = Math.max(0, bridgeStats.command - 1);
+      bridgeStats.commandError = (bridgeStats.commandError || 0) + 1;
+      if (bridgeTier.get(key) === tier) bridgeTier.delete(key);
+      console.error("[plan-mode-ui] /plan bridge not effective:", outcome);
+    });
+  });
+  return true;
 }
 function nativeLeave(ctx, agent, key) {
   const svc = planModeHandle(ctx);
   bridgeTier.delete(key);
-  if (svc === null || agent === undefined) return;
-  try { svc.set(agent, false); } catch (error) { console.error("[plan-mode-ui] native plan-mode leave failed:", error); }
+  if (agent === undefined) return;
+  if (svc !== null) {
+    try { svc.set(agent, false); return; } catch (error) { console.error("[plan-mode-ui] native plan-mode leave failed:", error); }
+  }
+  defer(() => {
+    const pending = runPlanCommand(ctx, agent, "/plan off");
+    if (pending !== null) pending.then((outcome) => { bridgeStats.lastCommand = "/plan off:" + outcome; });
+  });
 }
 
 function isSubagent(session) {
@@ -432,16 +623,11 @@ const PHASE2 = [
 
 
 function save() {
-  // 覆盖数有界：先丢最早的非钉住行；钉住行（“仅本会话”）最后才丢，
-  // 否则会话一多，用户显式钉住的那行会被别的会话悄悄挤掉。
+  // 覆盖数有界：按 LRU 淘汰。写入会话行时先 delete 再赋值（对象键序即最近写入序），
+  // 所以这里丢最前面的（最久没被写过的那几条）即可。
   const ids = Object.keys(state.sessions);
   if (ids.length > SETTINGS_MAX) {
-    const excess = ids.length - SETTINGS_MAX;
-    const nonPinned = ids.filter((id) => state.sessions[id] === undefined || state.sessions[id].pinned !== true);
-    const pinned = ids.filter((id) => state.sessions[id] !== undefined && state.sessions[id].pinned === true);
-    const drop = nonPinned.slice(0, excess);
-    for (const id of pinned.slice(0, Math.max(0, excess - drop.length))) drop.push(id);
-    for (const id of drop) delete state.sessions[id];
+    for (const id of ids.slice(0, ids.length - SETTINGS_MAX)) delete state.sessions[id];
   }
   try {
     mkdirSync(join(dshHome(), "plan-mode-ui"), { recursive: true });
@@ -530,7 +716,7 @@ function sameOrigin(req, method) {
   return true;
 }
 
-async function handleState(req, res) {
+async function handleState(req, res, ctx) {
   try {
     if (req.method !== "GET" && req.method !== "POST") {
       return sendJson(res, 405, { ok: false, message: "method not allowed" });
@@ -565,52 +751,83 @@ async function handleState(req, res) {
       if (patch.tier !== undefined && !TIERS.has(patch.tier)) return sendJson(res, 400, { ok: false, message: "tier must be off|light|full" });
       if (patch.scope !== undefined && !SCOPES.has(patch.scope)) return sendJson(res, 400, { ok: false, message: "scope must be always|auto|first" });
       if (patch.max !== undefined && typeof patch.max !== "boolean") return sendJson(res, 400, { ok: false, message: "max must be boolean" });
-      if (patch.pin !== undefined && typeof patch.pin !== "boolean") return sendJson(res, 400, { ok: false, message: "pin must be boolean" });
+      if (patch.reset !== undefined && typeof patch.reset !== "boolean") return sendJson(res, 400, { ok: false, message: "reset must be boolean" });
+      // pin 字段已在 0.5.1 退役：旧缓存客户端还会带它，这里静默忽略（不再有"取消勾选"的副作用）
       const keys = ["tier", "scope", "max"].filter((k) => patch[k] !== undefined);
-      if (keys.length > 0 || patch.pin !== undefined) withStateLock(() => {
-        state = load();   // 以磁盘现状为底，避免覆盖别的实例刚写进去的会话覆盖
+      // 动作型请求（与设置写入互斥）：目前只有退出原生计划模式一个。
+      // 官方胶囊被本插件隐藏后，退出入口由面板提供，落到这里执行 /plan off。
+      if (patch.action !== undefined) {
+        if (patch.action !== "plan-off") return sendJson(res, 400, { ok: false, message: 'action must be "plan-off"' });
+        if (keys.length > 0 || patch.reset !== undefined) return sendJson(res, 400, { ok: false, message: "action cannot be combined with tier/scope/max/reset" });
+        if (requested === null) return sendJson(res, 400, { ok: false, message: "session required for action=plan-off" });
+        const key = "id:" + requested;
+        const agent = agents.get(key);
+        if (agent === undefined) return sendJson(res, 409, { ok: false, message: "agent not attached (send a message in this session first)" });
+        // 复用 nativeLeave（含 svc.set 快路径、失败纠正、命令计数），并挪出 HTTP 派发栈：
+        // 它会写会话状态，同步调用有重入风险。nativeOpen 在这里清是符合用户显式意图的。
+        nativeOpen.delete(key);
+        cancelIntent.add(key);                  // 明确"这是取消，不是批准"
+        defer(() => nativeLeave(ctx, agent, key));
+        return sendJson(res, 200, { ok: true, native: false, session: requested });
+      }
+      if (patch.reset === true && requested === null) return sendJson(res, 400, { ok: false, message: "session required for reset" });
+      if (patch.reset === true && keys.length > 0) return sendJson(res, 400, { ok: false, message: "reset cannot be combined with tier/scope/max" });
+      if (keys.length > 0 || patch.reset === true) withStateLock(() => {
+        state = load();   // 以磁盘现状为底，避免覆盖别的实例刚写进去的会话行
         if (requested === null) {
+          // 无 ?session= = 写全局默认（设置页专用）。已个性化的会话行一律保留：
+          // 它们是用户对该对话的显式选择，不该被后续的全局改动冲掉。
           const dflt = { ...state.default };
           for (const k of keys) dflt[k] = patch[k];
           state = { ...state, default: dflt };
-          // 不变式：会话覆盖永不与默认等值。默认改到与某覆盖一致时，该覆盖失去意义，删掉，
-          // 否则它会一直“钉”住旧值，之后改全局这个会话不跟随。
-          const keep = {};
-          for (const [id, over] of Object.entries(state.sessions)) {
-            // pinned 行是用户显式勾了"仅本会话"的：默认怎么改都保留它（钉住就是钉住）
-            if (over.pinned === true) { keep[id] = over; continue; }
-            const et = over.tier !== undefined ? over.tier : dflt.tier;
-            const es = over.scope !== undefined ? over.scope : dflt.scope;
-            const em = over.max !== undefined ? over.max === true : dflt.max === true;
-            if (!(et === dflt.tier && es === dflt.scope && em === dflt.max)) keep[id] = over;
-          }
-          state = { ...state, sessions: keep };
-        } else if (patch.pin === false) {
-          // 显式取消“仅本会话”：删掉本会话行，回到跟随全局默认
+        } else if (patch.reset === true) {
+          // 「恢复全局默认」：删掉本会话行，回到跟随全局（幂等）
           if (state.sessions[requested] !== undefined) {
             const next = { ...state.sessions };
             delete next[requested];
             state = { ...state, sessions: next };
           }
-          // 同一次请求里还带了三项的值 → 取消钉住后按全局改动写下去（别静默丢弃）
-          if (keys.length > 0) {
-            const dflt = { ...state.default };
-            for (const k of keys) dflt[k] = patch[k];
-            state = { ...state, default: dflt };
-          }
         } else {
-          // 写入本会话行并钉住：即使生效值与默认完全相同也保留这一行，
-          // 面板据此显示“本会话”。旧实现按“值与默认相等就删行”，
-          // 导致勾着“仅本会话”来回切档位时被误判成“全局”。
-          // 钉住 = 把当时生效的三项整份写进会话行（不只是这次改动的那一项），
-          // 否则没被改到的字段继续跟着全局，勾了“仅本会话”也会被别的会话带跑。
+          // 写本会话行（隐式：面板 = 这个对话自己的设置）。
+          // 三项整份写入，避免没改到的字段继续跟着全局而被别的会话带跑。
           const eff = settingsFor("id:" + requested);
-          const over = { tier: eff.tier, scope: eff.scope, max: eff.max, pinned: true };
+          const over = { tier: eff.tier, scope: eff.scope, max: eff.max };
           for (const k of keys) over[k] = patch[k];
-          state.sessions = { ...state.sessions, [requested]: over };
+          // LRU：先删再插，让这条成为对象里最新的一条（save() 按此淘汰）
+          const next = { ...state.sessions };
+          delete next[requested];
+          next[requested] = over;
+          state = { ...state, sessions: next };
         }
         state = { ...state, updatedAt: new Date().toISOString() };
         save();
+        // 档位切到「关闭」= 全关：立刻退出原生计划模式，而不是等下一个回合才收尾。
+        // （否则面板上会同时出现"关闭"和"退出计划模式"，看起来像两件互相打架的事。）
+        // 判据与 decidePlanning 的 off 分支保持同一份：只关"插件自己开的"。
+        // 用户手动 /plan 开的原生计划不归这个开关管（那是他自己的选择，退出走 action=plan-off）。
+        // nativeOpen 不在这里清：以 plan/mode 事件为准，别让簿记比真实状态更干净。
+        // 与"关闭即退出"对称：切到轻量/全量时立刻进入原生计划模式。
+        // 否则用户切完设置要等到下一句话才生效，界面上毫无反应 —— 看起来像没生效。
+        if (requested !== null) {
+          const onTier = settingsFor("id:" + requested).tier;
+          if (onTier === "light" || onTier === "full") {
+            const onKey = "id:" + requested;
+            const onAgent = agents.get(onKey);
+            if (onAgent !== undefined && !bridgeTier.has(onKey) && !nativeOpen.has(onKey)
+                && !isSubagent(onAgent.session)) {
+              defer(() => nativeEnter(ctx, onAgent, onKey, onTier));
+            }
+          }
+        }
+        if (requested !== null && settingsFor("id:" + requested).tier === "off") {
+          const offKey = "id:" + requested;
+          if (bridgeTier.has(offKey)) {
+            const offAgent = agents.get(offKey);
+            bridgeTier.delete(offKey);              // 同步清簿记，避免下一回合重复发起
+            cancelIntent.add(offKey);               // 切到关闭同样是取消，不是批准
+            defer(() => nativeLeave(ctx, offAgent, offKey));
+          }
+        }
       });
     }
     // 按会话取阶段：客户端带 ?session=<id> 时只返回那一会话的阶段；
@@ -629,10 +846,12 @@ async function handleState(req, res) {
     const sessionIdOut = requested !== null ? requested : (lastSession === null ? null : String(lastSession).replace(/^id:/, ""));
     const eff = settingsFor(requested === null ? null : "id:" + requested);
     sendJson(res, 200, { ok: true, tier: eff.tier, scope: eff.scope, max: eff.max,
+      native: nativeOf(requested),   // 原生计划模式是否开着（兼容字段；胶囊隐藏/退出按钮用它）
+      indicator: indicatorOf(requested),   // 四态：off | armed | planning | executing（动画的唯一依据）
       settings: { source: eff.source, overrides: Object.keys(state.sessions).length, default: state.default },
       updatedAt: state.updatedAt, phase, session: sessionIdOut, phases,
       planning: phase === "planning",
-      debug: { ...sectionStats, records: phaseRecords.size, planned: plannedSessions.size,
+      debug: { ...sectionStats, bridge: { ...bridgeStats, sessions: bridgeTier.size }, gate: { ...gateStats }, records: phaseRecords.size, planned: plannedSessions.size,
         planCheck: requested === null ? lastPlanCheck : (planChecks.get("id:" + requested) ?? null),
         ttl: { planning: PLANNING_TTL_MS, active: ACTIVE_TURN_MAX_MS } } });
   } catch (error) {
@@ -647,7 +866,7 @@ export default {
   apply(ctx) {
     try { console.info("[plan-mode-ui] host ready (two-phase)"); } catch (e) {}
     ctx.effect(() => {
-      const dispose = ctx.webServer.register({ kind: "exact", path: API + "/state", handler: handleState });
+      const dispose = ctx.webServer.register({ kind: "exact", path: API + "/state", handler: (req, res) => handleState(req, res, ctx) });
       return () => { if (typeof dispose === "function") dispose(); };
     }, "plan-mode-ui: state route");
 
@@ -676,49 +895,34 @@ export default {
               const activeAt = activeTurns.get(key);
               // 回合进行中（且有兜底时限）的插话不授权新回合；turn/end 缺失时不至于永久堵死
               const midTurn = activeAt !== undefined && Date.now() - activeAt <= ACTIVE_TURN_MAX_MS;
-              userPrompts.set(key, { at: Date.now(), chars: text.length, head: text.slice(0, 400), used: midTurn });
+              const opening = turnOpening.get(key) === true;
+              userPrompts.set(key, { at: Date.now(), chars: text.length, head: text.slice(0, 400), used: midTurn || opening });
+              if (opening) {
+                // 这正是本回合的开口输入（DSH 0.2.x 先 turn/start 再 user/message）：现在才决定要不要规划
+                turnOpening.set(key, false);
+                decidePlanning(ctx, session, key, evTurn, { at: Date.now(), chars: text.length, head: text.slice(0, 400), used: true });
+              }
             }
           }
         } else if (type === "turn/start") {
-          if (key === undefined) return;                                   // 无会话的事件不建记录
+          gateStats.turnStart += 1; gateStats.lastTurn = evTurn === undefined ? null : evTurn;
+          if (key === undefined) { gateStats.noKey += 1; return; }          // 无会话的事件不建记录
           activeTurns.set(key, Date.now());                                  // 先置位：本回合内的用户输入都算插话
-          if (isSubagent(session)) return;                                   // 子代理会话不做规划拦截
-          if (builtinPlanActive(ctx, session)) return;                        // 内置 /plan 生效时不抢流程
+          turnOpening.set(key, true);                                        // 本回合还没见到用户输入/助手输出
+          plannedAt.delete(key);                                             // 新回合：上一轮的「已计划」不再代表当前状态
+          if (isSubagent(session)) { gateStats.subagent += 1; return; }      // 子代理会话不做规划拦截
+          if (builtinPlanActive(ctx, session)) { gateStats.builtin += 1; return; } // 内置 /plan 生效时不抢流程
           // 来源过滤：第 1 回合视为用户开启；之后的回合必须紧跟一条真实用户输入
+          // 注意：DSH 0.2.x 的顺序是 turn/start → user/message（用户输入落在回合内），
+          // 所以这里通常拿不到 fresh，真正的决策点交给下面的 user/message 分支。
           const prompt = userPrompts.get(key);
-          // 一条输入只授权一个回合：已被消费 / 太久以前的输入不算（插话也不会授权）
           const fresh = prompt !== undefined && prompt.used !== true && Date.now() - prompt.at <= 600000;
           const fromUser = evTurn === undefined || evTurn === 1 || fresh;
-          if (!fromUser) return;
-          // 只在真正被这条输入开启的回合里消费它（系统回合抢先开启时不消耗用户的输入）
+          if (!fromUser) { gateStats.notUser += 1; return; }
           if (prompt !== undefined && fresh) prompt.used = true;
-          const st = settingsFor(key);
-          // scope=first 只认“对话的第 1 回合”：重启后从中途继续的回合（turn>1）不触发规划
-          if (st.scope === "first" && evTurn !== undefined && evTurn !== 1) return;
-          // scope=auto：turn>1 只在任务明显变化时重规划（长指令或改方案类措辞）
-          if (st.scope === "auto" && evTurn !== undefined && evTurn !== 1) {
-            if (prompt === undefined || !(prompt.chars >= REPLAN_MIN_CHARS || REPLAN_RE.test(prompt.head))) return;
-          }
-          const existing = live;
-          if (existing !== undefined && existing.turn === evTurn) return; // 同一回合重复 turn/start 不重置阶段
-          const alreadyPlanned = st.scope === "first" && plannedSessions.has(key);
-          if (st.tier === "off") {
-            // 关档：把我们开过的原生计划模式复位（用户手动 /plan 的不动，因为它不在 bridgeTier 里）
-            if (bridgeTier.has(key)) nativeLeave(ctx, agents.get(key), key);
-          } else if (!alreadyPlanned) {
-            // 0.5.0 混合工作：light/full 先桥接到原生计划模式，计划交给原生评审卡
-            const bridgeAgent = agents.get(key);
-            const bridged = isSubagent(session) || bridgeAgent === undefined
-              ? false
-              : nativeEnter(ctx, bridgeAgent, key, st.tier);
-            if (bridged && st.tier === "light") return;   // 纯桥接：不建阶段记录、不注入任何文本
-            phaseRecords.set(key, {
-              phase: "planning", steeredTurn: null, planningAt: Date.now(), startedAt: Date.now(), turn: evTurn,
-              promptChars: prompt === undefined ? null : prompt.chars,   // 诊断：开启本回合的输入长度
-              bridged
-            });
-          }
+          decidePlanning(ctx, session, key, evTurn, prompt);
         } else if (type === "assistant/message") {
+          if (key !== undefined) turnOpening.set(key, false);   // 本回合已有助手输出，不再是开口
           // 记住最后一段助手文本：模型在提问时不该被硬续到执行
           if (live !== undefined) {
             const parts = event?.message?.content;
@@ -775,19 +979,34 @@ export default {
         } else if (type === "plan/mode") {
           // 原生计划模式的开关（含 exit_plan_mode 批准后自动关）：full 档批准即转入执行阶段
           const active = (event?.data?.active !== undefined ? event.data.active : event?.active) === true;
-          if (!active && key !== undefined && bridgeTier.get(key) === "full") {
+          // 先记住"这次退出前是谁桥接的"，下面 full 分支还要用它判断要不要转执行阶段
+          const bridgedTier = key === undefined ? undefined : bridgeTier.get(key);
+          if (key !== undefined) { if (active) nativeOpen.add(key); else nativeOpen.delete(key); }
+          if (!active && key !== undefined) bridgeTier.delete(key);   // 原生已退出：不再算"桥接中"
+          // 主动退出 ≠ 批准：真正的批准只来自 exit_plan_mode。
+          if (!active && key !== undefined && cancelIntent.delete(key)) {
+            plannedAt.delete(key);
+            phaseRecords.delete(key);     // 当作取消：不留执行阶段记录，也不投递 PHASE 2
+            forgetPlanned(key);
+          } else if (!active && key !== undefined && (bridgedTier === "full" || bridgedTier === "light")) {
             const rec = phaseRecords.get(key);
             const agent = agents.get(key);
-            if (rec !== undefined && rec.phase === "planning" && agent !== undefined) {
+            const turn = rec !== undefined && rec.turn !== undefined ? rec.turn : evTurn;
+            plannedAt.set(key, Date.now());   // 计划落地：图标此后显示「已计划」（执行中则显示执行动画）
+            if (rec !== undefined) {
               rec.phase = "executing";
               rec.resumedByNative = true;
-              rec.steeredTurn = rec.turn !== undefined ? rec.turn : evTurn;
-              try {
-                agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE2 }], source: { kind: "user" } }));
-              } catch (error) {
-                console.error("[plan-mode-ui] native-approved steer failed:", error);
-              }
+              rec.steeredTurn = turn;
+            } else {
+              // light 档纯桥接本来不建记录：这里补一条，否则 indicator 会掉回 off（就是"变回默认图标"的那个 bug）
+              phaseRecords.set(key, {
+                phase: "executing", steeredTurn: turn, planningAt: Date.now(), startedAt: Date.now(),
+                turn, resumedByNative: true, bridged: true
+              });
             }
+            rememberPlanned(key);   // 计划已被批准：本会话后续回合不再重复弹评审卡
+            // 只有 full 档需要投递 PHASE 2（light 纯桥接不注入任何文本）
+            if (bridgedTier === "full" && !sendPhase2(agent, key, turn) && agent === undefined) pendingPhase2.set(key, turn);
           }
         } else if (type === "turn/end") {
           const rec = live;
@@ -813,12 +1032,25 @@ export default {
         if (key !== undefined) {
           if (agents.size > 200) agents.delete(agents.keys().next().value); // 有界
           agents.set(key, agent);
+          // D3：重启/热重载后原生状态平时只能靠 plan/mode 事件补；这里主动校准一次，
+          // 免得会话本来就在计划模式里，界面却按"未开启"渲染。
+          try { if (builtinPlanActive(ctx, agent.session)) nativeOpen.add(key); } catch (error) {}
         }
       });
       // agent 销毁后不再持有引用
       ctx.on("agent/disposed", (payload) => {
         const key = sessionKey(payload?.agent === undefined ? undefined : payload.agent.session);
-        if (key !== undefined) agents.delete(key);
+        if (key !== undefined) {
+          agents.delete(key);
+          bridgeTier.delete(key);      // 0.5.0：桥接簿记随会话回收，避免长跑进程里无界增长
+          nativeOpen.delete(key);
+          plannedAt.delete(key);
+          pendingPhase2.delete(key);
+          phase2Turn.delete(key);
+          decidedTurn.delete(key);     // H1：同样按会话回收，长跑进程里不随会话数线性增长
+          turnOpening.delete(key);
+          cancelIntent.delete(key);
+        }
       });
     }
 
@@ -914,7 +1146,7 @@ export default {
             : "scope=always — regenerate the planning artifacts on each turn that changes the plan.";
         const bridgedNow = sessionKey(context?.agent?.session);
         const bridgedTier = bridgedNow === undefined ? undefined : bridgeTier.get(bridgedNow);
-        if (bridgedTier === "light") return "";   // 纯桥接：原生 plan:policy 已接管，本插件不再插话
+        if (bridgedTier === "light") return maxLine;   // 纯桥接：原生 plan:policy 已接管；Max 行仍保留
         // full 桥接：规划指令归原生，批准后（executing）才恢复我们的执行段
         const phaseBlock = bridgedTier === "full"
           ? (phase === "executing" ? PHASE2 : "")
