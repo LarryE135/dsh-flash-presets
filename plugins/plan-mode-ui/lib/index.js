@@ -292,6 +292,40 @@ function builtinPlanActive(ctx, session) {
   return false;
 }
 
+// ── 原生计划模式桥接（0.5.0 混合工作）──────────────────────────────────────
+// light：纯桥接 —— 不注入任何 PHASE 文本，DSH 自带 plan mode 全权接管
+//        （政策段 / /plan off / exit_plan_mode / 对话框上方的计划评审卡）。
+// full ：桥接 + 我们的执行层 —— 计划同样走原生评审卡，批准（plan/mode -> false）
+//        之后再投递 PHASE 2，执行纪律仍由本插件提供。
+const bridgeTier = new Map();          // sessionKey → "light" | "full"（本插件开的）
+function planModeHandle(ctx) {
+  if (planModeService !== undefined && planModeService !== null
+      && typeof planModeService.set === "function") return planModeService;
+  try {
+    const svc = typeof ctx.get === "function" ? (ctx.get("planMode") ?? null) : null;
+    if (svc !== null && svc !== undefined && typeof svc.set === "function") { planModeService = svc; return svc; }
+  } catch (error) { /* 没有原生计划模式 → 回退旧的注入式行为 */ }
+  return null;
+}
+function nativeEnter(ctx, agent, key, tier) {
+  const svc = planModeHandle(ctx);
+  if (svc === null || agent === undefined || key === undefined) return false;
+  try {
+    svc.set(agent, true);
+    bridgeTier.set(key, tier);
+    return true;
+  } catch (error) {
+    console.error("[plan-mode-ui] native plan-mode enter failed:", error);
+    return false;
+  }
+}
+function nativeLeave(ctx, agent, key) {
+  const svc = planModeHandle(ctx);
+  bridgeTier.delete(key);
+  if (svc === null || agent === undefined) return;
+  try { svc.set(agent, false); } catch (error) { console.error("[plan-mode-ui] native plan-mode leave failed:", error); }
+}
+
 function isSubagent(session) {
   if (session !== undefined && session !== null && typeof session.delegationDepth === "number") return session.delegationDepth > 0;
   const head = sessionHeader(session);
@@ -668,10 +702,20 @@ export default {
           const existing = live;
           if (existing !== undefined && existing.turn === evTurn) return; // 同一回合重复 turn/start 不重置阶段
           const alreadyPlanned = st.scope === "first" && plannedSessions.has(key);
-          if (st.tier !== "off" && !alreadyPlanned) {
+          if (st.tier === "off") {
+            // 关档：把我们开过的原生计划模式复位（用户手动 /plan 的不动，因为它不在 bridgeTier 里）
+            if (bridgeTier.has(key)) nativeLeave(ctx, agents.get(key), key);
+          } else if (!alreadyPlanned) {
+            // 0.5.0 混合工作：light/full 先桥接到原生计划模式，计划交给原生评审卡
+            const bridgeAgent = agents.get(key);
+            const bridged = isSubagent(session) || bridgeAgent === undefined
+              ? false
+              : nativeEnter(ctx, bridgeAgent, key, st.tier);
+            if (bridged && st.tier === "light") return;   // 纯桥接：不建阶段记录、不注入任何文本
             phaseRecords.set(key, {
               phase: "planning", steeredTurn: null, planningAt: Date.now(), startedAt: Date.now(), turn: evTurn,
-              promptChars: prompt === undefined ? null : prompt.chars   // 诊断：开启本回合的输入长度
+              promptChars: prompt === undefined ? null : prompt.chars,   // 诊断：开启本回合的输入长度
+              bridged
             });
           }
         } else if (type === "assistant/message") {
@@ -703,7 +747,8 @@ export default {
             if (live.phase === "planning" && WRITE_TOOL_RE.test(String(event?.name ?? ""))) {
               live.wroteDuringPlan = true;
               // 立刻纠正：等到回合收尾往往已经晚了（实测有 32 分钟才收尾的回合）
-              if (live.nudged !== true) {
+              if (key !== undefined && bridgeTier.has(key)) { /* 桥接中：原生政策负责"先计划后动手" */ }
+              else if (live.nudged !== true) {
                 const planned = hasPlanFile(session, live.startedAt);
                 if (planned === true) live.planSeen = true;
                 if (planned === false) {
@@ -726,6 +771,23 @@ export default {
           if (key !== undefined) {
             const n = (pendingTools.get(key) ?? 0) - 1;
             if (n > 0) pendingTools.set(key, n); else pendingTools.delete(key);
+          }
+        } else if (type === "plan/mode") {
+          // 原生计划模式的开关（含 exit_plan_mode 批准后自动关）：full 档批准即转入执行阶段
+          const active = (event?.data?.active !== undefined ? event.data.active : event?.active) === true;
+          if (!active && key !== undefined && bridgeTier.get(key) === "full") {
+            const rec = phaseRecords.get(key);
+            const agent = agents.get(key);
+            if (rec !== undefined && rec.phase === "planning" && agent !== undefined) {
+              rec.phase = "executing";
+              rec.resumedByNative = true;
+              rec.steeredTurn = rec.turn !== undefined ? rec.turn : evTurn;
+              try {
+                agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE2 }], source: { kind: "user" } }));
+              } catch (error) {
+                console.error("[plan-mode-ui] native-approved steer failed:", error);
+              }
+            }
           }
         } else if (type === "turn/end") {
           const rec = live;
@@ -769,6 +831,7 @@ export default {
         if (rec === undefined || rec.phase !== "planning" || agent === undefined) return;
         if (payload?.signal?.aborted === true) return;          // 用户取消：不续跑
         if (builtinPlanActive(ctx, agent.session)) return;      // 内置 /plan 生效时交给它
+        if (key !== undefined && bridgeTier.has(key)) return;   // 0.5.0 桥接中：计划与批准由原生负责
         // 关档只影响“要不要开始规划”，不影响已经开始规划的回合：
         // 让它按原样跑完（否则别的会话一关档就会把这里的任务掐停在规划阶段）。
         touchSession(agent.session);
@@ -849,7 +912,13 @@ export default {
           : st.scope === "auto"
             ? "scope=auto — plan on the first turn; on later turns only when the request visibly changes the task (a long instruction or explicit re-plan wording)."
             : "scope=always — regenerate the planning artifacts on each turn that changes the plan.";
-        const phaseBlock = phase === "planning" ? PHASE1 : phase === "executing" ? PHASE2 : "";
+        const bridgedNow = sessionKey(context?.agent?.session);
+        const bridgedTier = bridgedNow === undefined ? undefined : bridgeTier.get(bridgedNow);
+        if (bridgedTier === "light") return "";   // 纯桥接：原生 plan:policy 已接管，本插件不再插话
+        // full 桥接：规划指令归原生，批准后（executing）才恢复我们的执行段
+        const phaseBlock = bridgedTier === "full"
+          ? (phase === "executing" ? PHASE2 : "")
+          : phase === "planning" ? PHASE1 : phase === "executing" ? PHASE2 : "";
         // 收尾句按阶段给：规划阶段不能出现“然后实现”，否则与 PHASE 1 自相矛盾
         const tail = phase === "planning"
           ? "In this step produce only the plan and its artifacts; implementation starts in the next step."
