@@ -84,7 +84,9 @@ const EXPECT = {
   'flash-lean-ptc-v3.patch.yml': { preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
-const EXPECT_IDS = Object.values(EXPECT).map(e => e.preset);
+// bundle 默认只发 v3（EXPECT 里其余是源文件级的对照版本，不进合成产物）
+const BUNDLE_IDS = ['flash-lean-ptc-v3'];
+const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
 const check = (cond, msg) => {
@@ -205,8 +207,11 @@ if (args.length) {
         const ids = (cdoc || []).flatMap(e => (e && e.insert) || [])
           .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
           .map(r => (r.config || {}).id);
+        // 0.2.5 起 bundle 默认只发 v3；同时反向断言别把 v1/v2 又混进来
         check(EXPECT_IDS.every(id => ids.includes(id)),
               '合成产物含 ' + EXPECT_IDS.join('/') + '（实际: ' + (ids.join(', ') || '无') + '）');
+        check(ids.length === EXPECT_IDS.length,
+              '合成产物只含 ' + EXPECT_IDS.join('/') + '，不含对照版本（实际: ' + (ids.join(', ') || '无') + '）');
       }
     }
   }

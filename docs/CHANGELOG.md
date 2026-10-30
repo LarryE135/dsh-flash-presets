@@ -2,6 +2,10 @@
 
 ## 0.2.5 — 2026-10-30
 
+本轮同时是本包在 npm 的首次发布；默认只装一个预设（v3）。
+
+- **bundle 只发 v3**：`scripts/compose-bundle-patch.mjs` 默认只合成 `presets/flash-lean-ptc-v3.patch.yml`，加 `--all` 才合成三份。`cordis.patch.yml` 由 36.6 KB 降到 12.3 KB，安装后预设列表只多一项。
+
 起因：用户报告"装完预设后不能选工作区"。排查后确认预设补丁不碰工作区/目录选择器/终端插件（全仓库 grep 0 命中），但过程中暴露出两个真实缺陷，加上一个缺失的诊断入口，一并补上。
 
 **安装器**
@@ -39,6 +43,10 @@
 - CRLF profile → 安装层校验 exit 0（原会 3 项误报）
 - 移除 js-yaml → exit 2 且打印「跳过，不等于通过」
 
+- **安装器**：`install.sh` 的 `PRESETS` 默认只有 `flash-lean-ptc-v3`，新增 `--all-presets`；`install.ps1` 对应 `-AllPresets`。legacy 目录式安装固定走 v1（旧式目录本就只提供 v1）。
+- **校验链**：`verify-yaml` 反向断言合成产物不得混入 v1/v2；`check-ps1` 的名单断言改为"presets/ 的子集且含最新"，不再要求与源文件列表全等。
+- **文档**：README 中英、版本与兼容性表、本文件同步为"默认只装 v3"。
+- **npm**：本包首次发布到 npm（此前 npm 上最新只有 0.2.4）。plan mode 插件仍不在 npm 发布范围内。
 
 ## 0.2.4 — 2026-10-24
 

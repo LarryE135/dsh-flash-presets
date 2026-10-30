@@ -19,13 +19,17 @@
 param(
   [string]   $DshHome,
   [string]   $Profile = 'web',
-  [string[]] $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'),
+  [string[]] $Presets = @('flash-lean-ptc-v3'),
   [switch]   $Help,
   [switch]   $Legacy,
-  [switch]   $Uninstall
+  [switch]   $Uninstall,
+  [switch]   $AllPresets
 )
 
 $ErrorActionPreference = 'Stop'
+
+# 0.2.5 起默认只装 v3；-AllPresets 装 v1/v2/v3 三份（A/B 对照用）
+if ($AllPresets) { $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3') }
 
 if ($Help) {
   $self = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
@@ -79,7 +83,7 @@ function Invoke-Merge([string[]]$ExtraArgs) {
 
 # ── 旧版：目录式 ──────────────────────────────────────────────────────────────
 function Install-Legacy {
-  foreach ($p in $Presets) {
+  foreach ($p in @('flash-lean-ptc-v1')) {
     $src = Join-Path $here "presets\legacy-0.1.5\$p"
     if (-not (Test-Path $src)) { Write-Host "跳过 ${p}：本版未提供旧式目录（legacy 仅保留 v1）"; continue }
     $dst = Join-Path $legacyDir $p
@@ -97,7 +101,7 @@ function Install-Legacy {
 }
 
 function Uninstall-Legacy {
-  foreach ($p in $Presets) {
+  foreach ($p in @('flash-lean-ptc-v1')) {
     $dst = Join-Path $legacyDir $p
     if (Test-Path $dst) {
       Move-Item $dst "$dst.removed-$stamp"

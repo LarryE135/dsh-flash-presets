@@ -16,13 +16,17 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
-const SOURCES = ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml', 'presets/flash-lean-ptc-v3.patch.yml'];
+// 0.2.5 起默认只发布 v3（lean-v3，现行主版本）：装一次只多一个预设，不用在列表里挑。
+// 需要对照 v1/v2（做 A/B 时）用 --all 显式合成三份。
+const ALL_SOURCES = ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml', 'presets/flash-lean-ptc-v3.patch.yml'];
+const SOURCES = process.argv.includes('--all') ? ALL_SOURCES : ['presets/flash-lean-ptc-v3.patch.yml'];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件按顺序叠加三个预设：v1 基线、v2 上一代、v3 现行主版本（lean-v3）。',
-  '# 由 presets/flash-lean-ptc-v{1,2,3}.patch.yml 合成；改预设请改源文件后重新合成：',
-  '#   node scripts/compose-bundle-patch.mjs',
+  '# 本文件默认只叠加 v3（lean-v3，现行主版本）：安装后预设列表里只多这一项。',
+  '# v1/v2 是对照版本，源文件仍在 presets/，需要时用 --all 显式合成（做 A/B 才用得上）。',
+  '#   node scripts/compose-bundle-patch.mjs          # v3（默认）',
+  '#   node scripts/compose-bundle-patch.mjs --all    # v1 + v2 + v3',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',
 ].join('\n');
@@ -36,7 +40,8 @@ function compose() {
   const out = HEADER + parts.join('\n\n') + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
-  for (const id of ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3']) {
+  for (const rel of SOURCES) {
+    const id = rel.replace(/^presets\//, '').replace(/\.patch\.yml$/, '');
     if (!out.includes(id)) throw new Error('合成结果里缺少预设 id: ' + id);
   }
   return out;

@@ -20,8 +20,11 @@ const presetFiles = fs.readdirSync(path.join(repo, 'presets'))
   .filter(f => f.endsWith('.patch.yml')).map(f => f.replace('.patch.yml', '')).sort();
 const listMatch = (ps1 || '').match(/\$Presets\s*=\s*@\(([^)]*)\)/);
 const listed = listMatch ? listMatch[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).sort() : [];
-check(JSON.stringify(listed) === JSON.stringify(presetFiles),
-      'install.ps1 预设名单与 presets/ 一致（' + (listed.join(', ') || '未解析到') + '）');
+// 0.2.5 起安装器默认只装最新预设（对照版本仍在 presets/），这里检查子集 + 含最新
+const knownFiles = presetFiles.slice().sort();
+const newestOfAll = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();
+check(listed.length > 0 && listed.every(id => knownFiles.includes(id)) && listed.includes(newestOfAll),
+      'install.ps1 预设名单是 presets/ 的子集且含最新（' + (listed.join(', ') || '未解析到') + '）');
 
 // 自检提示里的 id 必须是最新那个预设
 const newest = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();

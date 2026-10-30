@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.5（已发 GitHub Release；npm 上最新仍为 0.2.4 —— 本包与 plan mode 插件都未上 npm），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
+> 当前版本：v0.2.5（GitHub Release 与 npm 同为 0.2.5；plan mode 插件仍未上 npm），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -24,11 +24,11 @@
 
 | 预设 | id | order | 规则条数 | 压缩 | 用途 |
 |---|---|---|---|---|---|
-| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | 上下文余量优先，任务偏长 |
-| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | 与 v1 同代，更省，保守选择 |
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | 默认，当前适用版本 |
+| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | 上下文余量优先，任务偏长（对照版本，默认不装） |
+| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | 与 v1 同代，更省，保守选择（对照版本，默认不装） |
+| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**，当前适用版本 |
 
-三者可同时安装，在预设列表里逐项选择，但考虑到模型和框架更新，一般使用最新版本（v3）即可，具体适配情况可见release说明。
+**默认只装 v3**：npm 包与安装器都不再插入 v1/v2 的行，装完预设列表里只多一项。需要 A/B 对照时显式装三份 —— `bash scripts/install.sh --all-presets` 或 `pwsh scripts/install.ps1 -AllPresets`（v1/v2 源文件仍随包发布）。具体适配情况见 release 说明。
 
 v3 相对 v2 的改动集中在验证阶段：验收门通过即交付，不再追加随机测试与压测轮。改动针对的实测现象是失败模式从「答案错误」迁移到「超时」与「单个任务耗时过长」。
 
@@ -42,6 +42,8 @@ dsh plugin --profile web add dsh-flash-presets
 ```
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
+
+> 安装后预设列表里只出现 **v3**（`flash-lean-ptc-v3`）；v1/v2 是对照版本，默认不插入，见上文「预设」。
 
 <img width="413" height="283" alt="屏幕截图 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -220,6 +222,11 @@ marketplace/                      插件市场提交材料（不随包发布）
 ## 版本历史
 
 ### v0.2.5（2026-10-30）
+
+- **默认只装 v3**：bundle 合成默认只取 `presets/flash-lean-ptc-v3.patch.yml`，安装后预设列表只多一项；v1/v2 转为对照版本（`--all` / `--all-presets` / `-AllPresets` 显式安装）
+- 安装器：`install.sh` 默认 `PRESETS=(flash-lean-ptc-v3)`；`install.ps1` 同形参与 `-AllPresets`；legacy 目录式固定走 v1
+- 校验链：`verify-yaml` 反向断言合成产物不得混入 v1/v2；`check-ps1` 名单断言改为"子集且含最新"
+- **npm 首发**：本包首次发布到 npm；plan mode 插件仍不在 npm 发布范围
 
 - 安装器认领历史残留：托管块之外的老式裸行（旧安装方式 / 手工粘贴）会被整条摘掉并并入托管块，重复安装不再产生第二份同名预设。只摘"整条都由本仓库预设行组成"的条目，别人的行一个不碰。
 - 写盘前解析 `!!js`：profile 补丁里不再出现非标准 YAML 标签（`tool-bash`/`tool-pwsh` 的 `disabled` 落成 true/false），js-yaml、yamllint、GitHub 预览、第三方插件工具都能直接读这个文件。

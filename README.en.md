@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.5, published as a GitHub Release. The latest npm release is still 0.2.4: neither this package nor the plan-mode plugin is on npm. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.5, the same version on both the GitHub release and npm. The plan-mode plugin is still not published to npm. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -27,11 +27,11 @@ The presets control three things: the budget and round limit (counted by rounds,
 
 | Preset | id | order | Rules | Compaction | Intended use |
 |---|---|---:|---:|---|---|
-| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | More context headroom for longer tasks |
-| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | A more conservative, lower-cost preset from the same generation |
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | Default and currently supported preset |
+| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | More context headroom for longer tasks (reference version, not installed by default) |
+| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | A more conservative, lower-cost preset from the same generation (reference version, not installed by default) |
+| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**; currently supported preset |
 
-All three can be installed at the same time and selected from the preset list. Because model and framework behavior changes over time, v3 is generally the recommended choice; see the release notes for compatibility details.
+**Only v3 is installed by default**: neither the npm package nor the installers insert v1/v2 rows any more, so the preset list grows by exactly one entry. For A/B comparisons install all three explicitly with `bash scripts/install.sh --all-presets` or `pwsh scripts/install.ps1 -AllPresets` (the v1/v2 sources still ship with the package). Because model and framework behavior changes over time, v3 is generally the recommended choice; see the release notes for compatibility details.
 
 Compared with v2, v3 mainly changes the verification phase: once the acceptance gate passes, it delivers instead of adding random tests or load-test rounds. This responds to an observed shift in failure modes from wrong answers toward timeouts and single-task overrun.
 
@@ -45,6 +45,8 @@ dsh plugin --profile web add dsh-flash-presets
 ```
 
 In the GUI, open **Plugins → Add plugin** and enter `dsh-flash-presets` to get the same result.
+
+> After installation the preset list shows **v3** (`flash-lean-ptc-v3`) only; v1/v2 are reference versions and are not inserted by default.
 
 <img width="413" height="283" alt="Screenshot 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -218,6 +220,11 @@ marketplace/                      Plugin marketplace submission material
 ## Version history
 
 ### v0.2.5 (2026-10-30)
+
+- **Only v3 is installed by default**: the bundle now composes `presets/flash-lean-ptc-v3.patch.yml` alone, so the preset list grows by exactly one entry; v1/v2 become reference versions installed explicitly with `--all` / `--all-presets` / `-AllPresets`
+- Installers: `install.sh` defaults to `PRESETS=(flash-lean-ptc-v3)`; `install.ps1` mirrors it and gains `-AllPresets`; legacy directory installs always use v1
+- Verification: `verify-yaml` now asserts the composed bundle contains v3 and no reference versions; `check-ps1` checks the installer list is a subset of `presets/` that includes the newest
+- **First npm release**: this package is now published to npm; the plan-mode plugin is still outside the npm release scope
 
 - Installer claims historical leftovers: bare `- id: preset-flash-lean-ptc-vN` rows outside the managed block are removed and folded back in, so reinstalling never duplicates a preset.
 - Platform tags are resolved before writing, so no non-standard `!!js` tag lands in the profile; unknown expressions fail loudly instead of being guessed.

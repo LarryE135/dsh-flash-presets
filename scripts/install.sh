@@ -23,7 +23,8 @@ PROFILE="web"
 MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3)
+# 0.2.5 起默认只装 v3（现行主版本）；v1/v2 是对照版本，用 --all-presets 显式安装
+PRESETS=(flash-lean-ptc-v3)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -31,6 +32,7 @@ while [ $# -gt 0 ]; do
                  PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
+    --all-presets) PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3); shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help)   sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "未知参数: $1（用 --help 看用法）" >&2; exit 2 ;;
@@ -99,7 +101,8 @@ install_modern() {
 }
 
 install_legacy() {
-  for p in "${PRESETS[@]}"; do
+  # legacy 只提供 v1 旧式目录：与 --all-presets 无关，固定走 v1
+  for p in flash-lean-ptc-v1; do
     src="$HERE/presets/legacy-0.1.5/$p"
     if [ ! -d "$src" ]; then
       echo "跳过 ${p}：本版未提供旧式目录（legacy 仅保留 v1）"
@@ -125,7 +128,8 @@ uninstall_modern() {
 }
 
 uninstall_legacy() {
-  for p in "${PRESETS[@]}"; do
+  # legacy 只提供 v1 旧式目录：与 --all-presets 无关，固定走 v1
+  for p in flash-lean-ptc-v1; do
     if [ -e "$LEGACY_DIR/$p" ]; then
       mv "$LEGACY_DIR/$p" "$LEGACY_DIR/$p.removed-$STAMP"
       echo "已移走 $LEGACY_DIR/$p → .removed-$STAMP"
