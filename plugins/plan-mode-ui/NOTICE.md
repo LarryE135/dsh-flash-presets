@@ -7,7 +7,7 @@
 | 路径 | 排除方式 |
 |---|---|
 | npm 包（`npm pack`） | `package.json` 的 `files` 是白名单，未列 `plugins/` |
-| GitHub Release（`git archive HEAD` → `dist/dsh-flash-presets-<tag>.zip`） | `.gitattributes` 里 `plugins/plan-mode-ui export-ignore` |
+| GitHub Release（`git archive HEAD` → `dist/dsh-flash-presets-<tag>.zip`） | `.gitattributes` 里 `plugins/ export-ignore`（整个 plugins/ 都不进 Release 包） |
 
 原因：插件尚未稳定，作者在稳定前不发布。
 
