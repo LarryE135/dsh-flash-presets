@@ -159,6 +159,32 @@ checks:
 而本端点不返回任何 CORS 头），所以 `curl -X POST` 之类没带头的请求会拿到 403。GET 只读，无此要求。
 写文件走临时锁（`state.json.lock`）+ 写前以磁盘为准重载，多个实例（桌面端 + CLI）同时改不会互相覆盖。
 
+## 无头 / CI 场景（`DSH_PLAN_MODE_UI_HEADLESS=off`）
+
+无头会话（`dsh headless`、CI 跑批）没有"计划审批"的 UI 通道，`exit_plan_mode` 会直接报：
+
+```
+Error: no user-questions answerer accepted the request
+```
+
+于是 light/full 会**卡在规划阶段**拿不到执行结果（实测：off 档能把文件写出来，light/full 写不出来）。
+
+设一个环境变量即可让插件在这些进程里表现得像 off（不桥接、不注入、不碰原生计划模式），Web 端不受影响（该变量只在设了的进程里生效）：
+
+```bash
+DSH_PLAN_MODE_UI_HEADLESS=off dsh headless "把 1+1 写进 /tmp/x.txt"
+```
+
+实测同一任务：
+
+| 档位 | 不设开关 | 设 `DSH_PLAN_MODE_UI_HEADLESS=off` |
+|---|---|---|
+| off | 写出文件 ✅ | 写出文件 ✅ |
+| light | 卡在审批 ❌ | 写出文件 ✅ |
+| full | 卡在审批 ❌ | 写出文件 ✅ |
+
+`GET /api/plan-mode/state` 的响应里带 `headless: true` 与 `debug.headless`，便于确认降级是否生效。
+
 ## 已知限制
 
 1. 会话行按会话 id 存，会话被删后条目会残留，靠 **50 条上限 + LRU 淘汰**（最久未写的那条先丢）。

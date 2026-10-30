@@ -148,3 +148,19 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
   if (d.debug.records !== 0) throw new Error("A7 取消后仍留着执行阶段记录：" + d.debug.records);
   console.log("PASS A7 full 档主动退出 = 取消（不记已计划、不建执行记录，indicator=" + d.indicator + "）");
 }
+
+// A8：无头降级开关 —— 没有审批通道时不桥接，任务照常完成
+{
+  process.env.DSH_PLAN_MODE_UI_HEADLESS = "off";
+  try {
+    const c = await boot({ tier: "light" });
+    c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
+    c.fire("session/event", c.session, userMsg(1));
+    await tick();
+    if (c.seen.includes("/plan")) throw new Error("A8 无头环境下仍桥接了，seen=" + JSON.stringify(c.seen));
+    const d = await c.state();
+    if (d.debug.headless !== true) throw new Error("A8 状态里没有 headless 标记");
+    if (d.indicator !== "off") throw new Error("A8 无头环境 indicator 应为 off，实际 " + d.indicator);
+    console.log("PASS A8 无头开关 =off → 不桥接、无注入、indicator=off");
+  } finally { delete process.env.DSH_PLAN_MODE_UI_HEADLESS; }
+}

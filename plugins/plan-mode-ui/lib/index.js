@@ -50,6 +50,18 @@ function dshHome() {
 }
 const storePath = () => join(dshHome(), "plan-mode-ui", "state.json");
 
+// ── 无头降级开关 ────────────────────────────────────────────────────
+// 无头会话（dsh headless / CI）没有"计划审批"的 UI 通道，exit_plan_mode 会报
+//   no user-questions answerer accepted the request
+// 于是 light/full 会卡在规划阶段、永远拿不到执行结果。设 DSH_PLAN_MODE_UI_HEADLESS=off
+// 即让插件在这些进程里表现得像 off（不桥接、不注入），工作照常完成。
+// 未设置 = 保持原行为（Web 端不受影响）。
+const HEADLESS_ENV = "DSH_PLAN_MODE_UI_HEADLESS";
+function headlessForced() {
+  const v = String(process.env[HEADLESS_ENV] ?? "").trim().toLowerCase();
+  return v === "off" || v === "0" || v === "false" || v === "no";
+}
+
 const SETTINGS_MAX = 50;                  // 每会话覆盖条数上限
 const pickTier = (v) => (TIERS.has(v) ? v : undefined);
 const pickScope = (v) => (SCOPES.has(v) ? v : undefined);
@@ -323,6 +335,12 @@ function decidePlanning(ctx, session, key, evTurn, prompt) {
   const live = phaseRecords.get(key);
   if (live !== undefined && live.turn === evTurn) { gateStats.seen += 1; return; }
   const st = settingsFor(key);
+  if (headlessForced()) {
+    // 无头环境：主动退出可能残留的原生计划模式，然后当作 off 处理
+    gateStats.off += 1;
+    if (bridgeTier.has(key)) { cancelIntent.add(key); nativeLeave(ctx, agents.get(key), key); }
+    return;
+  }
   if (st.scope === "first" && evTurn !== undefined && evTurn !== 1) { gateStats.scope += 1; return; }
   if (st.scope === "auto" && evTurn !== undefined && evTurn !== 1) {
     if (prompt === undefined || !(prompt.chars >= REPLAN_MIN_CHARS || REPLAN_RE.test(prompt.head))) { gateStats.scope += 1; return; }
@@ -473,6 +491,7 @@ function runPlanCommand(ctx, agent, line) {
   }
 }
 function nativeEnter(ctx, agent, key, tier) {
+  if (headlessForced()) return false;      // 无头没有审批通道：进去就出不来
   if (agent === undefined || key === undefined) return false;
   const svc = planModeHandle(ctx);
   if (svc !== null) {
@@ -810,7 +829,7 @@ async function handleState(req, res, ctx) {
         // 否则用户切完设置要等到下一句话才生效，界面上毫无反应 —— 看起来像没生效。
         if (requested !== null) {
           const onTier = settingsFor("id:" + requested).tier;
-          if (onTier === "light" || onTier === "full") {
+          if ((onTier === "light" || onTier === "full") && !headlessForced()) {
             const onKey = "id:" + requested;
             const onAgent = agents.get(onKey);
             if (onAgent !== undefined && !bridgeTier.has(onKey) && !nativeOpen.has(onKey)
@@ -851,7 +870,8 @@ async function handleState(req, res, ctx) {
       settings: { source: eff.source, overrides: Object.keys(state.sessions).length, default: state.default },
       updatedAt: state.updatedAt, phase, session: sessionIdOut, phases,
       planning: phase === "planning",
-      debug: { ...sectionStats, bridge: { ...bridgeStats, sessions: bridgeTier.size }, gate: { ...gateStats }, records: phaseRecords.size, planned: plannedSessions.size,
+      headless: headlessForced(),
+      debug: { ...sectionStats, headless: headlessForced(), bridge: { ...bridgeStats, sessions: bridgeTier.size }, gate: { ...gateStats }, records: phaseRecords.size, planned: plannedSessions.size,
         planCheck: requested === null ? lastPlanCheck : (planChecks.get("id:" + requested) ?? null),
         ttl: { planning: PLANNING_TTL_MS, active: ACTIVE_TURN_MAX_MS } } });
   } catch (error) {
