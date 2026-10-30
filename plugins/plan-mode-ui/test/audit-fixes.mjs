@@ -18,13 +18,14 @@ async function boot(opts) {
   let route = null;
   const seen = [];
   const commands = { execute: (agent, line) => { seen.push(line); return Promise.resolve({ commandId: "c", result: { kind: "success" } }); } };
+  let sectionSpec = null;
   const { default: plugin } = await import("../lib/index.js?audit" + (++seq) + "-" + Date.now());
   const ctx = {
     get: (n) => (n === "commands" ? commands : undefined),
     on: (n, fn) => handlers.set(n, fn),
     inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
     webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
-    systemPrompt: { section: () => {}, getSectionOrder: () => 500 },
+    systemPrompt: { section: (spec) => { sectionSpec = spec; return () => {}; }, getSectionOrder: () => 500 },
     logger: { warn() {}, info() {} }
   };
   if (o.projections) ctx.sessionProjections = o.projections;
@@ -46,7 +47,7 @@ async function boot(opts) {
   });
   return {
     fire: (n, ...a) => handlers.get(n)?.(...a), session, seen, register,
-    state: () => call("GET"), post: (b) => call("POST", b),
+    state: () => call("GET"), post: (b) => call("POST", b), section: () => sectionSpec,
     dispose: () => handlers.get("agent/disposed")?.({ agent: { session } })
   };
 }
@@ -189,6 +190,26 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
   const d = await c.state();
   if (d.debug.gate.builtin < 1) throw new Error("A10 没有走『沿用』分支");
   console.log("PASS A10 投影说已开 → 不再重复 /plan（沿用）");
+}
+
+// A12（本次线上故障的第二半）：原生计划模式在跑时，本插件的系统提示段必须整段让位
+{
+  const c = await boot({ tier: "light", projections: { stateOf: (s, n) => (n === "plan" ? { active: true } : undefined) } });
+  const spec = c.section();
+  if (spec === null || typeof spec.text !== "function") throw new Error("A12 没抓到系统提示段");
+  const text = spec.text({ agent: { session: c.session } });
+  if (text.includes("ACCEPTANCE")) throw new Error("A12 light 档在原生计划模式下仍注入了验收段（会和只读约束打架）");
+  if (text.includes("P0-EXEC")) throw new Error("A12 仍注入了 P0-EXEC 产物指令");
+  console.log("PASS A12 light 档 + 原生计划模式在跑 → 系统提示段让位（不注入验收/产物指令）");
+}
+
+// A13：full 档、原生已退出（批准后）→ 必须恢复注入验收与执行纪律
+{
+  const c = await boot({ tier: "full", projections: { stateOf: (s, n) => (n === "plan" ? { active: false } : undefined) } });
+  const spec = c.section();
+  const text = spec.text({ agent: { session: c.session } });
+  if (!text.includes("ACCEPTANCE")) throw new Error("A13 full 档原生已退出却没注入验收段");
+  console.log("PASS A13 full 档 + 原生已退出 → 恢复注入验收段与执行纪律");
 }
 
 // A11（本次线上故障的回归）：读不到投影 + 簿记说"开着" —— 仍必须每轮重发 /plan

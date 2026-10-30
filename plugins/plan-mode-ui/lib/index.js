@@ -1199,7 +1199,16 @@ export default {
             : "scope=always — regenerate the planning artifacts on each turn that changes the plan.";
         const bridgedNow = sessionKey(context?.agent?.session);
         const bridgedTier = bridgedNow === undefined ? undefined : bridgeTier.get(bridgedNow);
-        if (bridgedTier === "light") return maxLine;   // 纯桥接：原生 plan:policy 已接管；Max 行仍保留
+        // 让位判据不能只看本地簿记（重启后它是空的）：以会话投影的真实状态为准。
+        // 否则 light 档会掉进下面的通用分支，注入 P0-EXEC/CONVENTIONS/“然后实现”那一整套，
+        // 与原生 plan:policy 的"只读、只出计划"直接冲突 —— 模型会挑那个让它干活的。
+        const projNow = context?.agent?.session === undefined ? { available: false, active: false } : planProjection(ctx, context.agent.session);
+        const nativeGoverning = projNow.available
+          ? projNow.active
+          : (bridgedTier === "light" || bridgedTier === "full"
+             || (bridgedNow !== undefined && nativeOpen.has(bridgedNow)));
+        if (st.tier === "light") return maxLine;       // 纯桥接档：永不注入计划/验收文本
+        if (nativeGoverning) return maxLine;           // 原生计划模式在跑：整段让位，只留 Max 行
         // full 桥接：规划指令归原生，批准后（executing）才恢复我们的执行段
         const phaseBlock = bridgedTier === "full"
           ? (phase === "executing" ? PHASE2 : "")
