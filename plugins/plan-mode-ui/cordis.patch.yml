@@ -1,0 +1,5 @@
+# dsh-plan-mode-ui —— 组合包补丁层
+# 装进 profile 后由这一行把插件挂上（id 用于 cordis 里的实例名，name 是包名）。
+- insert:
+    - id: plan-mode-ui
+      name: 'dsh-plan-mode-ui'

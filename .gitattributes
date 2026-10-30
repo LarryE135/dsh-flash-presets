@@ -13,3 +13,5 @@
 *.bat   text eol=crlf
 *.png   binary
 *.zip   binary
+# plan-mode-ui 只在仓库里做版本管理，不随 git archive 进 Release 包（见其 NOTICE.md）
+plugins/plan-mode-ui export-ignore

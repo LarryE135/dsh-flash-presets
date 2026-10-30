@@ -1,0 +1,233 @@
+# dsh-plan-mode-ui
+
+给 DeepSeek Harness（Web GUI）用的**两阶段计划模式**：一个 composer 图标 + 向上展开的面板，把「先计划、再执行」做进同一个回合里——不需要你手动发第二条消息。
+
+```
+你发一条消息 ──▶ 宿主拦下回合 ──▶ PHASE 1 只读取证 + 写计划产物
+                                        │
+                    计划写完、回合即将结束 ◀┘
+                                        │
+                    ★ 自动投递 PHASE 2，同一回合继续执行
+                                        │
+                          跑验收项、回报实测值、收尾
+```
+
+## 安装（桌面端）
+
+需要一个已经能跑的 DSH web profile。两种方式选一种：
+
+```bash
+# A. 从打好的 tarball 装（推荐，跨机器拷贝方便）
+dsh plugin --profile web add ./dsh-plan-mode-ui-0.1.1.tgz
+
+# B. 直接从目录装（开发时才用，走 link）
+dsh plugin --profile web add /absolute/path/to/dsh-plan-mode-ui
+```
+
+装完**重启 dsh web**，然后硬刷新页面（Ctrl/Cmd+Shift+R）。
+
+> 包自带 `cordis.patch.yml`（`dsh.bundle`），安装时会把
+> `{ id: plan-mode-ui, name: dsh-plan-mode-ui }` 这一行插进 profile 的插件层，
+> 不需要手工编辑 profile 的 `cordis.patch.yml`。
+
+## 怎么确认真的生效（30 秒）
+
+1. **图标**：输入框左下角工具栏里多出一个「阶段」图标。点开是面板，标题下方应显示 `计划模式 · 全局`（或 `· 本会话`）。
+2. **端点**：
+
+   ```bash
+   curl -s http://127.0.0.1:3081/api/plan-mode/state | head -c 300
+   # {"ok":true,"tier":"light","scope":"auto","max":false,
+   #  "settings":{"source":"default","overrides":0,"default":{...}},
+   #  "phase":"idle","planning":false,"phases":[],"debug":{...}}
+   ```
+
+3. **提示词**：随便发一条消息，模型收到的系统提示里会出现一行
+   `ACCEPTANCE (plan-mode tier=…, scope=…, phase=planning|executing|idle)`，
+   紧接着是 `PHASE 1 — PLAN ONLY …`。计划阶段结束后的下一步，同一行变成 `phase=executing`。
+
+## 面板
+
+| 控件 | 取值 | 作用 |
+|---|---|---|
+| 档位 | 关闭 / 轻量 / 全量 | 关闭=不注入任何协议；轻量=两阶段但要求精简；全量=两阶段 + 完整验收纪律 |
+| Max | 开 / 关 | 额外注入「不用担心预算，你的 Token 是无限的」，抑制模型在预算受限时提前收手；与档位解耦（关档 + Max 也生效） |
+| 作用域 | 每次 / 自动 / 仅首轮 | 每次=每回合都先计划；自动=首轮必计划，之后只在长指令或含「改/重做/重构/重新…」等措辞时重规划；仅首轮=只有第 1 回合 |
+| 仅本会话 | 勾 / 不勾 | 勾上只改当前对话（写会话覆盖）；不勾改全局默认，所有会话的下一个回合生效 |
+
+## 验收产物
+
+`tier=light/full` 的协议要求把验收清单落成 `P0-EXEC.yml`，键名**定死**（脚本可解析）：
+
+```yaml
+version: 1
+summary: { total: 12, passed: 12, failed: 0 }
+checks:
+  - id: C1
+    assert: "one line: what this check proves"
+    run: "exact shell command"
+    expect: "observable result: stdout text or exit code"
+    measured: "the value you actually observed"
+    result: pass
+```
+
+执行后每一行都要回填 `measured` 与 `result`（不只是失败项），并让 `summary` 与之一致。
+计划文件本体固定在 `.plan-mode/plan.md`（只认这个目录下的产物）。
+
+## 设置存在哪
+
+| 文件 | 内容 |
+|---|---|
+| `$DSH_HOME/plan-mode-ui/state.json` | 全局默认 `{tier, scope, max}` + 各会话覆盖 `sessions{<id>:{...}}`（上限 50 条；与默认等值时自动删除） |
+| `$DSH_HOME/plan-mode-ui/sessions.json` | 已经规划过的会话（`scope=first` 用），上限 1000 |
+
+两个文件都是 tmp + rename 原子写。
+
+## HTTP 契约
+
+- `GET  /api/plan-mode/state?session=<id>` → `{ok, tier, scope, max, settings{source,overrides,default}, updatedAt, phase, session, phases[], planning, debug{}}`
+- `POST /api/plan-mode/state?session=<id>` body `{tier?, scope?, max?}` → 同上（带 `?session` 写会话覆盖，不带写全局默认）
+
+只接受同源 + `application/json`；非法值 400，非 JSON 415，超大 413（按字节计上限 8192），跨站 403。
+
+写操作（POST）还必须带自定义头 `x-plan-mode-client: 1`——浏览器跨站页面发不出这个头（会先触发预检，
+而本端点不返回任何 CORS 头），所以 `curl -X POST` 之类没带头的请求会拿到 403。GET 只读，无此要求。
+写文件走临时锁（`state.json.lock`）+ 写前以磁盘为准重载，多个实例（桌面端 + CLI）同时改不会互相覆盖。
+
+## 已知限制
+
+1. `仅本会话` 勾选本身不持久化（每个会话首次拿到状态时会自动对齐到真实来源）。
+2. 覆盖按会话 id 存，会话被删后条目会残留，靠 50 条上限自然淘汰。
+3. `bash` 里写文件不算「写工具」，拦门识别不到。
+4. 依赖 `user/message` 先于 `turn/start` 的事件顺序。
+5. `turn/end` 缺失时，`activeTurns` 靠 6 小时兜底失效。
+6. 关档只影响「要不要开始规划」，**不会中断已经开始规划的回合**（要中断按停止）。
+7. **安全边界**：能直连 `127.0.0.1:<port>` 的本机进程可以读这个端点（只读信息：档位/阶段，不含任何密钥）。
+   本插件不把它当安全边界——本机进程本来就能直接改 `$DSH_HOME/plan-mode-ui/state.json`。端点层面挡的是
+   浏览器跨站 CSRF 与顺手 `curl`。
+8. **安装位置**：请用 `dsh plugin --profile web add <tarball>` 装。**不要**用 `file:` 指向桌面/临时目录的
+   tgz —— pnpm 会把依赖记成 `file:C:/Users/.../Desktop/xxx.tgz`，那个文件一旦移动/删除，profile 就装不回来。
+   要留在本机就先把 tgz 拷到 `$DSH_HOME/plugins/` 再 `add`。
+
+## 卸载
+
+```bash
+dsh plugin --profile web remove dsh-plan-mode-ui
+```
+
+重启即可；`$DSH_HOME/plan-mode-ui/` 下的两个状态文件可以留着（重装后继续用）或直接删。
+
+## 兼容性
+
+- DSH `>= 0.2.1-rc`，web profile（`dsh.client.platform = web`）。
+- 宿主半端只用 `node:fs` / `node:zlib` / `@deepseek-ai/dsh-llm`；客户端半端只 require `react`。
+- 与内置 `/plan` 共存：内置 plan 生效时本插件让路，不抢流程。
+- 桌面端 profile 若在 `compatibility.json` 里给 `dsh-git-bash-shell` 之类留了版本豁免，与本插件无关；
+  升级 DSH 后检查那份豁免是否仍对应真实安装版本。
+- `tier=light/full` 的协议**要求**模型落盘验收产物（`P0-EXEC.yml` / `.plan-mode/plan.md`），这是有意副作用：
+  档位不只是"提示词风格"，它会改变工作区里的文件。不想留文件就把档位调成 `off`。
+
+## 与 agent 预设有何关系（lean v3 / PTC）
+
+本插件在任何预设下都能工作，但有两件事会真实改变它的行为，值得单独说清楚。
+
+**1. 两套「计划模式」可以同时存在。** 预设里常带着官方的 `@deepseek-ai/dsh-plan-mode` 组件（`exit_plan_mode` 那一套，需要人点批准）。只要它在本回合生效，本插件就主动让路，不抢流程、不重复投递 PHASE 2。所以同一个界面上可能有两套计划模式在，判断谁在管看面板顶部那行状态。
+
+**2. PTC 会换掉「动手」的工具名。** 预设 `flash-lean-ptc-v3` 里 `agent-tool-presentation` 用 `mode: ptc`，模型改文件的动作是**在 `run_code` 里调 `write`/`edit`**，而不是直接调 `write`。所以「规划期有没有偷偷动手」不能看工具名——v0.4.1 起改成：**计划文件（`.plan-mode/plan.md`）落地之后，统计后续工具调用次数**（阈值 2）。这个判据是从真实会话回放里定的：樱花树会话计划写在第 5 步、体素建筑写在第 9 步；换成新判据后，旧逻辑那个「第 62 步才投递 PHASE 2」的迟到彻底不再出现。
+
+**3. lean v3 的 13 条硬规则里，有三条和本插件直接对话：**
+
+| 规则 | 原文要点 | 对本插件的含义 |
+|---|---|---|
+| 1 | 目标 ≤20 轮，超预期 3 倍就重新规划 | PHASE 2 不能说「继续深挖」，否则和轮数预算打架；它写的是「收尾」 |
+| 4 | 交付前一次性过闸，过闸即停，不追加随机/压测轮 | 执行阶段只做一次集中验收，不要连跑多轮"再确认一下" |
+| 7 | ≥3 个独立调用折进一个 `run_code` | 这就是 PTC 的来源，也是上面第 2 条判据必须绕开工具名的原因 |
+
+完整规则原文和组件清单在 `~/.dsh/local-presets/flash-lean-ptc-v3.patch.yml`（13 条人设规则 + 工具/压缩/委派配置）。**换预设不需要改插件**，但如果新预设改了呈现模式（比如从 PTC 切回原生工具），第 2 条判据要重新验一遍。
+
+## v0.4.3：审计补的两个漏（同属「仅本会话」会失灵）
+
+**1. 会话覆盖有上限（50 行），清理时按插入顺序丢最早的——钉住的行也会被丢。**
+会话一多，用户显式钉住的设置会凭空消失，表现就是「我明明勾了仅本会话，它却不认」。
+现在清理时优先丢非钉住行，钉住行最后才丢。
+
+**2. 同一个请求里既取消钉住又带值，值会被静默丢弃。**
+改成：删掉会话行后，把这次带的三项当作全局改动写下去。
+
+回归用例 H10、H11；目前 64 项全绿。
+
+## v0.4.2：修「仅本会话」被全局覆盖
+
+现象：在 A 会话勾上「仅本会话」，去别的会话改全局，A 的值还是被改掉了——面板上勾选还亮着，但没起作用。
+
+根因：钉住只记「你在这里改过的那几项」。只勾了复选框、没同时调值的话，会话行里只有 `pinned: true`，
+其余字段照样跟着全局默认走，所以后来的全局改动会漏进来。
+
+现在钉住 = **整份冻结**：
+
+- 写入钉住行时，会把当时生效的 tier / scope / max 三项一起写进去（不只是这次改的那项）；
+- 加载旧状态时，早期版本留下的半截钉住行按当时的默认补齐，一次性迁移；
+- 取消勾选仍然删行、回到跟随全局。
+
+顺带把 `GET /api/plan-mode/state` 的 `phases[]` 补上 `callsAfterPlan` / `resumedByWork`，排查「这次为什么没续跑」不用再翻日志。
+
+回归用例 H1–H9（含「只勾复选框也会冻结」「旧格式行迁移」「值等于全局也仍然钉住」），目前 64 项全绿（v0.4.2 时是 62）。
+
+## v0.4.1：两个实测出来的时序问题
+
+拿两个真实会话（一棵程序化樱花树、一座体素古建群）回放日志后改的两处：
+
+**1. 计划交付后模型没停步时，不再「事后催办」**
+
+原来的 PHASE 2 只挂在回合收尾的钩子上。樱花树那轮模型写完计划就停了，注入即时（第 5 步）；
+但体素那轮模型写完计划一路连做到第 62 步才停，于是「开始执行」的指令在 38 分钟后才送到，
+结果是同一份交付被汇报了两遍。
+
+现在会在规划阶段探测计划文件（不依赖工具名，`run_code` 里写文件也算），
+只要计划已落地、之后又调用了 ≥2 次工具，就认定它已经在执行：收尾时静默把阶段切到 `executing`，不再注入。
+只调用 1 次工具就停的情况仍然照旧续跑。
+
+**2. 「扩大到十倍」这类量级指令会触发重规划**
+
+`scope=auto` 原本只认「≥30 字」或「改/重做/重构…」这类措辞。用户那句
+「提高精度和规模，至少扩大到当前的10倍以上」只有 21 字、也不含那些词，于是一个十倍规模的活直接开干，没写计划。
+
+现在阈值降到 `20` 字，词表补了量级与强度类词：扩大 / 扩到 / 放大 / 翻倍 / 倍 / 规模 / 精度 / 全量 / 整体 / 彻底 / 性能 / 升级 / 细化 / 增强。
+
+两条都有回归用例（`test/features.mjs` 的 C5–C7、E6–E7），目前 53 项全绿。
+
+回放那两个真实会话的日志（按原 stop 点驱动收尾钩子），新旧逻辑的差别是：
+
+| 会话 | 旧逻辑 | 0.4.1 |
+|---|---|---|
+| 樱花树（计划在第 5 步） | 第 5 步注入 PHASE 2 | 第 5 步注入（行为不变） |
+| 体素建筑（计划在第 9 步，第 62 步才停） | 第 62 步注入，迟到约 38 分钟 | **不注入**，阶段直接转 `executing` |
+
+## v0.4.0：移除「执行前确认」（人工审批）
+
+`gate`（执行前确认 / 人工审批）整套删掉了，发布版不再有这一项：规划阶段结束就直接进执行阶段，
+不再拦写操作、不再弹「执行 / 改计划 / 停止」的确认卡。规划协议、阶段推进、验收产物要求保持不变。
+
+删掉的东西：host 侧 `tools/pre-execute` 与 `tools/post-execute` 两个钩子、`gateActive`、
+`approvals` / `gateStrikes`、写动作启发式（`BASH_WRITEISH_RE` / `CODE_WRITEISH_RE`）、
+`GATE_DENY` / `PHASE_NEED_APPROVAL`、`clientSeenAt` 活性时间戳；状态 API 里的 `gate` / `gateActive` 字段；
+设置页的「执行前确认」开关。
+
+兼容性：旧 `state.json` 里残留的 `gate` 字段会被**静默忽略**（不报错、不迁移，下次保存即消失），无需手工清理；
+客户端若仍拿到带 `gate` 的响应也只是无视它。
+
+副作用（如实说明）：会话里不再有「先批准再动手」的停顿，模型写完计划会立刻开始改文件。
+要人工把关，请用 DSH 自带的权限模式/审批，而不是本插件的门。
+
+**设置页分区**：设置左侧导航新增「计划模式」一栏，可调强度、生效范围、Max 模式与「仅本会话」，与浮层面板共用同一份状态。
+
+**修复**：勾选「仅本会话」后来回切换档位，面板标题会掉回「全局」。根因是旧实现用
+"生效值是否等于全局默认"来判断来源，值一旦回落到默认就删掉本会话行。现在改为显式
+`pinned` 语义——勾上就记住这一行（即使值与默认相同），取消勾选才删。
+
+## English summary
+
+Two-phase plan mode for the DSH web GUI. The host half splits each turn into a planning phase and an execution phase, injects a planning protocol through `ctx.systemPrompt`, and — when the model stops at the end of planning — steers a `PHASE 2` message into the same turn so execution continues without a second user message. The browser half is a composer icon plus an upward panel (tier, scope, Max mode, per-session override). State lives in `$DSH_HOME/plan-mode-ui/`.
+There is **no manual approval step** (the `gate` feature was removed in v0.4.0): planning flows straight into execution.
+
+It coexists with the built-in `@deepseek-ai/dsh-plan-mode` component (it yields when that one is active) and with PTC-style presets such as `flash-lean-ptc-v3`, where file edits happen inside `run_code` — which is why the "did it already start working?" check keys on the plan file landing plus the number of tool calls after it, not on tool names. See 「与 agent 预设有何关系」 above.
