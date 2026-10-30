@@ -113,7 +113,9 @@ const bridged = async (c) => {
   if (src.includes(".pmo-root[data-native='true']{display:none}")) throw new Error("T6 让位规则没删掉");
   if (!src.includes("[data-slot='conversation.input.plan']{display:none!important}")) throw new Error("T6 缺少隐藏官方胶囊的 CSS");
   if (!src.includes('"data-phase": glyphPhase(s)')) throw new Error("T6 data-phase 没走 glyphPhase");
-  if (!src.includes("function exitNative()")) throw new Error("T6 缺少退出动作");
+  // 退出不走独立按钮：档位拖到「关闭」即为退出（服务端 POST tier=off 会立即 /plan off）
+  if (src.includes("退出计划模式") || src.includes("取消本次计划")) throw new Error("T6 面板仍残留退出按钮（应与「关闭」档合一）");
+  if (src.includes("action: \"plan-off\"")) throw new Error("T6 客户端仍会发 plan-off（应由档位=关闭代劳）");
   console.log("PASS T6 客户端隐藏官方胶囊并用 glyphPhase 驱动动画");
 }
 

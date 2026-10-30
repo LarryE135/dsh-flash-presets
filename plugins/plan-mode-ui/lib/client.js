@@ -141,7 +141,6 @@ window.__ModuleLoader__.load({
       ".pmo-row+.pmo-row{margin-top:6px}",
       ".pmo-row:last-child{margin-bottom:0}",
       // 面板底部的操作按钮与右侧分段控件右边缘对齐
-      ".pmo-row-actions{display:flex;justify-content:flex-end;align-items:center;min-height:28px;margin-top:6px}",
       ".pmo-rowlbl{font-size:11.5px;color:#8a8f98}",
       ".pmo-maxcell{display:inline-flex;align-items:center;gap:7px;flex:none}",
       ".pmo-seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(17,24,39,.06)}",
@@ -302,28 +301,8 @@ window.__ModuleLoader__.load({
       }, delay);
     }
 
-    // 官方胶囊被隐藏后，退出原生计划模式的入口由我们提供：等价于发送 /plan off
-    function exitNative() {
-      var sid = currentSessionId();
-      if (!sid) { S.error = "拿不到会话 id"; notify(); return; }
-      var prev = S.native === true;
-      S.native = false;          // 乐观：先让动画回到 idle
-      S.error = "";
-      notify();
-      fetch(API + "?session=" + encodeURIComponent(sid), {
-        method: "POST", credentials: "same-origin",
-        headers: { "content-type": "application/json", "x-plan-mode-client": "1" },
-        body: JSON.stringify({ action: "plan-off" })
-      }).then(function (res) {
-        if (!res || res.ok !== true) {
-          S.native = prev;
-          S.error = "退出计划模式失败（HTTP " + (res && res.status ? res.status : "?") + "）";
-        }
-      }).catch(function (err) {
-        S.native = prev;
-        S.error = "网络错误：" + (err && err.message ? err.message : "未知");
-      }).then(function () { notify(); pull(); });
-    }
+    // 退出原生计划模式没有单独按钮：把档位拖到「关闭」就是退出（服务端切档时会立即发 /plan off，
+    // 且判定为"取消"而非"批准"）。HTTP 侧仍保留 action=plan-off，供脚本使用。
 
     // 0.5.1 起没有"仅本会话"开关：写哪一层由调用点决定。
     //   target="session" → 输入框旁的面板，写当前对话自己的设置
@@ -628,17 +607,7 @@ window.__ModuleLoader__.load({
         ),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" },
           "设置未生效：" + (s.commitError || s.error)) : null,
-        // 底部只在原生计划模式确实开着、且档位不是关闭时出现一个右对齐的操作：
-        // 档位=关闭时代替它的是"立即退出原生模式"，所以这里不会同时出现两件互相打架的事。
-        (s.native === true && s.tier !== "off") ? React.createElement("div", { className: "pmo-row-actions" },
-          React.createElement("button", {
-            type: "button", className: "pmo-segbtn",
-            title: s.tier === "full"
-              ? "取消本次计划：退出原生计划模式，且不投递执行阶段（退出 ≠ 批准；只有计划评审卡里的批准才算）"
-              : "退出 DSH 原生的计划模式（等价 /plan off）；官方胶囊已由本插件隐藏。与档位不是同一件事：档位=关闭时会自动完成",
-            onClick: exitNative
-          }, s.tier === "full" ? "取消本次计划" : "退出计划模式")
-        ) : null
+
       );
     }
 
@@ -698,8 +667,6 @@ window.__ModuleLoader__.load({
             { id: "auto", label: "自动", title: "首轮必规划；之后只在任务明显变化时重新规划" },
             { id: "first", label: "仅首轮", title: "只有第 1 回合出计划" }
           ], s.scope, function (id) { commit({ scope: id }, "global"); })),
-        s.native === true ? setRow("原生计划模式", "进行中；官方「计划」胶囊已由本插件隐藏，动画由本插件显示。",
-          React.createElement("button", { type: "button", className: "pmo-segbtn", "data-active": "true", onClick: exitNative }, "退出")) : null,
         setRow("Max 模式", "注入「不用担心预算」的提示，抑制模型在预算受限时提前收手。",
           switchControl("Max 模式", s.max === true, function (next) { commit({ max: next }, "global"); })),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" }, "设置未生效：" + (s.commitError || s.error)) : null
