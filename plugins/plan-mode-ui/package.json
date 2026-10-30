@@ -1,6 +1,6 @@
 {
   "name": "dsh-plan-mode-ui",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Two-phase plan mode for DeepSeek Harness: a composer icon opens a panel (tier off/light/full, scope, Max mode); the host half intercepts the turn with a planning protocol, then resumes execution in the same turn and reports the measured acceptance numbers.",
   "keywords": [
     "dsh",
