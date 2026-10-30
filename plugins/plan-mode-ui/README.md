@@ -143,15 +143,21 @@ checks:
 
 | 文件 | 内容 |
 |---|---|
-| `$DSH_HOME/plan-mode-ui/state.json` | 全局默认 `{tier, scope, max}` + 各会话覆盖 `sessions{<id>:{...}}`（上限 50 条；与默认等值时自动删除） |
+| `$DSH_HOME/plan-mode-ui/state.json` | 全局默认 `{tier, scope, max, autoApprove}` + 各会话覆盖 `sessions{<id>:{tier, scope, max, autoApprove?}}`（上限 50 条） |
 | `$DSH_HOME/plan-mode-ui/sessions.json` | 已经规划过的会话（`scope=first` 用），上限 1000 |
 
 两个文件都是 tmp + rename 原子写。
 
+**会话行里只有 `tier`/`scope`/`max` 会被冻结**（面板一动就把这三项整份写进该会话行，避免被别的对话改全局带着跑）。
+`autoApprove` 是**权限开关而不是调参**，因此不会被连带冻结：行里没有该字段时一律落回全局默认，
+所以设置页一改，所有"没单独设置过自动批准"的对话立刻跟随（包括历史上的老会话行）。
+只有对该会话**显式**写过 `autoApprove` 时，它才拥有自己的值。
+
 ## HTTP 契约
 
-- `GET  /api/plan-mode/state?session=<id>` → `{ok, tier, scope, max, settings{source,overrides,default}, updatedAt, phase, session, phases[], planning, debug{}}`
-- `POST /api/plan-mode/state?session=<id>` body `{tier?, scope?, max?}` → 同上（带 `?session` 写会话覆盖，不带写全局默认）
+- `GET  /api/plan-mode/state?session=<id>` → `{ok, tier, scope, max, autoApprove, settings{source,overrides,default}, updatedAt, phase, session, phases[], planning, indicator, native, headless, debug{plan, auto{approved,skipped,failed}, …}}`
+- `POST /api/plan-mode/state?session=<id>` body `{tier?, scope?, max?, autoApprove?}` → 同上（带 `?session` 写会话覆盖，不带写全局默认；`{reset:true}` 删掉该会话行回到跟随全局）
+- `POST /api/plan-mode/state?session=<id>` body `{action:"plan-off"}` → 主动退出计划模式（等同取消，不记「已计划」）
 
 只接受同源 + `application/json`；非法值 400，非 JSON 415，超大 413（按字节计上限 8192），跨站 403。
 
@@ -279,7 +285,7 @@ PHASE 2 的投递判据也从簿记改成档位。
 
 **测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复）、
 I14–I16（无簿记时批准→executing→planned、空闲期保持、新回合让位）与 `test/auto-approve.mjs` 8 项
-（自动批准正例 + 关/档位关/普通提问/多问题/已取消/子代理/读写 reset），全套 **113 项**。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
+（自动批准正例 + 关/档位关/普通提问/多问题/已取消/子代理/读写 reset + prepend 抢位 + 会话行继承与显式优先 + 调档不冻结），全套 **117 项**。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
 `pm-gate.sh`、`pm-selfcheck.sh`、`pmlog*.mjs`）。
 
 ## v0.5.1（未发布）：一次全量逻辑审计的修复

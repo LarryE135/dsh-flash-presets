@@ -1,5 +1,5 @@
 // 自动批准：设置页开关 → 命中「计划评审」时直接回批准，其它一律退回人工
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
@@ -13,23 +13,24 @@ async function boot(tier, opts = {}) {
   writeFileSync(join(home, "plan-mode-ui", "state.json"), JSON.stringify({
     version: 1,
     default: { tier, scope: "always", max: false, autoApprove: opts.autoApprove === true },
-    sessions: {}
+    sessions: opts.sessions === undefined ? {} : opts.sessions
   }));
   process.env.DSH_HOME = home;
   const handlers = new Map();
+  const handlerOpts = new Map();
   let route = null;
   const commands = { execute: () => Promise.resolve({ commandId: "c", result: { kind: "success" } }) };
   const { default: plugin } = await import("../lib/index.js?auto" + (++seq) + "-" + Date.now());
   const ctx = {
     get: (n) => (n === "commands" ? commands : undefined),
-    on: (n, fn) => { handlers.set(n, fn); return () => {}; },
+    on: (n, fn, options) => { handlers.set(n, fn); handlerOpts.set(n, options); return () => {}; },
     inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
     webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
     systemPrompt: { section: () => () => {}, getSectionOrder: () => 500 },
     logger: { warn() {}, info() {} }
   };
   plugin.apply(ctx);
-  const session = { id: "auto-" + seq, delegationDepth: 0 };
+  const session = { id: opts.sessionId === undefined ? "auto-" + seq : opts.sessionId, delegationDepth: 0 };
   handlers.get("agent/created")?.({ agent: { session, steer() {}, inject() {} } });
   const listener = () => handlers.get("user-questions/request");
   const ask = (request) => {
@@ -55,7 +56,7 @@ async function boot(tier, opts = {}) {
     req.emit("data", Buffer.from(JSON.stringify(body || {})));
     req.emit("end");
   });
-  return { session, ask, state, post };
+  return { session, home, ask, state, post, opts: (n) => handlerOpts.get(n) };
 }
 
 const review = (session, extra = {}) => ({
@@ -135,6 +136,55 @@ const review = (session, extra = {}) => ({
   await c.post({ reset: true });
   if ((await c.state()).autoApprove !== false) throw new Error("A7 reset 后应回落到默认 false");
   console.log("PASS A7 autoApprove 可写、可 reset 回落");
+}
+
+// A9：注册必须带 prepend —— 否则会被 Web 答题器挡住（自动批准静默失效）
+{
+  const c = await boot("light", { autoApprove: true });
+  const o = c.opts("user-questions/request");
+  if (o === null || o === undefined || o.prepend !== true) {
+    throw new Error("A9 user-questions/request 监听器没有 prepend，会被 Web 答题器抢先接单：" + JSON.stringify(o));
+  }
+  console.log("PASS A9 监听器以 prepend 注册（顺序与加载顺序无关）");
+}
+
+// A10：会话行没有 autoApprove 时跟随全局默认（F2 回归）
+{
+  // 升级前的历史行就长这样：只有 tier/scope/max，没有 autoApprove
+  const c = await boot("light", {
+    autoApprove: true, sessionId: "s-a10",
+    sessions: { "s-a10": { tier: "light", scope: "always", max: false } }
+  });
+  const d = await c.state();
+  if (d.autoApprove !== true) throw new Error("A10 历史会话行（无 autoApprove）没有跟随全局默认，实际 " + d.autoApprove);
+  const out = c.ask(review(c.session));
+  if (out === NEXT) throw new Error("A10 历史会话行没有继承全局 → 自动批准不生效");
+  console.log("PASS A10 会话行无 autoApprove → 跟随全局默认并生效");
+}
+
+// A11：会话行显式 autoApprove:false → 覆盖全局（显式优先）
+{
+  const c = await boot("light", {
+    autoApprove: true, sessionId: "s-a11",
+    sessions: { "s-a11": { tier: "light", scope: "always", max: false, autoApprove: false } }
+  });
+  const d = await c.state();
+  if (d.autoApprove !== false) throw new Error("A11 显式的 false 被全局覆盖了，实际 " + d.autoApprove);
+  if (c.ask(review(c.session)) !== NEXT) throw new Error("A11 显式关闭的会话仍被自动批准");
+  console.log("PASS A11 会话显式 autoApprove:false → 不被全局打开覆盖");
+}
+
+// A12：面板调档写入会话行时，不得连带冻结 autoApprove
+{
+  const c = await boot("light", { autoApprove: true, sessionId: "s-a12", sessions: {} });
+  await c.post({ tier: "full" });
+  const raw = JSON.parse(readFileSync(join(c.home, "plan-mode-ui", "state.json"), "utf8"));
+  const row = raw.sessions[c.session.id];
+  if (row === undefined) throw new Error("A12 会话行没有写入");
+  if (row.autoApprove !== undefined) throw new Error("A12 调档把 autoApprove 连带冻结进了会话行：" + JSON.stringify(row));
+  const d = await c.state();
+  if (d.autoApprove !== true) throw new Error("A12 调档后该会话不再跟随全局，实际 " + d.autoApprove);
+  console.log("PASS A12 面板调档不冻结 autoApprove（仍跟随全局）");
 }
 
 // A8：子代理会话 → 不答（与 planning 拦截一致，只针对主对话）

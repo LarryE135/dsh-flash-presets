@@ -98,7 +98,9 @@ function load() {
       if (over.tier === undefined) over.tier = dflt.tier;
       if (over.scope === undefined) over.scope = dflt.scope;
       if (over.max === undefined) over.max = dflt.max;
-      if (over.autoApprove === undefined) over.autoApprove = dflt.autoApprove;
+      // 注意：autoApprove 故意**不补齐**。它是"权限开关"而不是"这个对话的调参"，
+      // 补齐会在升级首次加载时把当时全局值烤进所有既有会话行，之后改设置页就再也影响不到它们。
+      // 行里没有该字段时，settingsFor() 会落回全局默认 —— 这正是我们要的"跟随全局"。
     }
     return {
       default: dflt,
@@ -861,7 +863,8 @@ async function handleState(req, res, ctx) {
           // 写本会话行（隐式：面板 = 这个对话自己的设置）。
           // 三项整份写入，避免没改到的字段继续跟着全局而被别的会话带跑。
           const eff = settingsFor("id:" + requested);
-          const over = { tier: eff.tier, scope: eff.scope, max: eff.max, autoApprove: eff.autoApprove };
+          // 只冻结 tier/scope/max；autoApprove 仅在本次显式设置时才写入行（见下方 keys 循环）
+          const over = { tier: eff.tier, scope: eff.scope, max: eff.max };
           for (const k of keys) over[k] = patch[k];
           // LRU：先删再插，让这条成为对象里最新的一条（save() 按此淘汰）
           const next = { ...state.sessions };
@@ -1208,6 +1211,9 @@ export default {
     // 命中时直接返回批准答案即可短路后续答题器（含 Web 评审卡）。
     // 约束：只认 intent.kind === "plan-review" 且请求里恰好一个问题；任何不匹配、异常、
     // 已取消、子代理会话都 next() 退回人工 —— 宁可弹卡，不可误批。
+    // prepend 是必需的，不是优化：瀑布按注册顺序依次调用，Web 答题器（dsh-api-remotes）
+    // 一旦接到请求就会转发到浏览器并挂起等人点确认 —— 排在它后面等于永远轮不到我们，
+    // 自动批准会 100% 静默失效。prepend 让我们与加载顺序无关地排在第一位。
     ctx.effect(() => ctx.on("user-questions/request", (request, next) => {
       try {
         const q = planReviewOf(request);
@@ -1225,7 +1231,7 @@ export default {
         autoStats.failed += 1;
         return next();
       }
-    }));
+    }, { prepend: true }));
     ctx.effect(() => ctx.systemPrompt.section({
       name: "plan-mode:protocol",
       // 排在 DSH 自带 PLAN_POLICY(500) 之后：内置 plan mode 的文本先讲，本插件作为其上的验收强化
