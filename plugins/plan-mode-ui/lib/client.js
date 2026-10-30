@@ -153,9 +153,6 @@ window.__ModuleLoader__.load({
       ".pmo-switch[data-on='true'] .pmo-knob{transform:translateX(18px)}",
       ".pmo-switch:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(64,116,228,.35)}",
       "@media (prefers-color-scheme:dark){.pmo-switch{background:#3a3f48}.pmo-switch[data-on='true']{background:#4f80ea}}",
-      ".pmo-check{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#98a0ab;cursor:pointer;margin-top:8px}",
-      ".pmo-check input{width:13px;height:13px;accent-color:#4074e4;cursor:pointer;margin:0}",
-      ".pmo-check:hover{color:#4b5563}",
       "@media (prefers-reduced-motion:reduce){.pmo-panel,.pmo-glyph *,.pmo-fillbar{animation:none !important;transition:none !important}}",
       // 静止帧也能分三态：idle=两行+搁笔 | planning=第一行写完、第二行半写、笔停在第二行 | executing=对勾+一行、没笔
       "@media (prefers-reduced-motion:reduce){.pmo-glyph[data-phase='planning'] .pmo-pen{transform:translate(37.5%,56.25%)}.pmo-glyph[data-phase='planning'] .pmo-l2{transform:scaleX(.5)}}",
@@ -172,7 +169,6 @@ window.__ModuleLoader__.load({
       ".pmo-set-lbl{font-size:13px;font-weight:500}",
       ".pmo-set-hint{font-size:11.5px;line-height:1.45;color:#98a0ab}",
       ".pmo-set-ctl{flex:none;display:flex;align-items:center;gap:10px}",
-      ".pmo-set .pmo-check{margin-top:0}",
       "@media (prefers-color-scheme:dark){.pmo-set-row{border-top-color:rgba(255,255,255,.08)}.pmo-set-desc,.pmo-set-hint{color:#8b94a1}}"
     ].join("\n");
 
