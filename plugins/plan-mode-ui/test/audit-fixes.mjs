@@ -80,9 +80,9 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
   console.log("PASS A2 桥接中的会话切「关闭」→ 立即 /plan off 且簿记清零");
 }
 
-// A3（D2）：原生已在跑时，full 档不得再注入 PHASE 1（也不该白发一次 /plan）
+// A3（D2）：投影明确说"原生已在跑"时，full 档不得再注入 PHASE 1（也不该白发一次 /plan）
 {
-  const c = await boot({ tier: "full" });
+  const c = await boot({ tier: "full", projections: { stateOf: (s, n) => (n === "plan" ? { active: true } : undefined) } });
   c.fire("session/event", c.session, { type: "plan/mode", data: { active: true } });
   c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
   c.fire("session/event", c.session, userMsg(2));
@@ -189,4 +189,16 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
   const d = await c.state();
   if (d.debug.gate.builtin < 1) throw new Error("A10 没有走『沿用』分支");
   console.log("PASS A10 投影说已开 → 不再重复 /plan（沿用）");
+}
+
+// A11（本次线上故障的回归）：读不到投影 + 簿记说"开着" —— 仍必须每轮重发 /plan
+{
+  const c = await boot({ tier: "light" });   // 不传 projections：模拟 planMode 被 isolate
+  c.fire("session/event", c.session, { type: "plan/mode", data: { active: true } });  // 制造"簿记说开着"
+  if ((await c.state()).native !== true) throw new Error("A11 前置：簿记没建起来");
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
+  c.fire("session/event", c.session, userMsg(1));
+  await tick();
+  if (!c.seen.includes("/plan")) throw new Error("A11 读不到投影时被陈旧簿记挡住了，没有重发 /plan（线上故障复现）");
+  console.log("PASS A11 读不到投影时不抑制，每轮重发 /plan（计划模式重新断言）");
 }

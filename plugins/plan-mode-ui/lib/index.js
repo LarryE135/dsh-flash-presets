@@ -296,7 +296,10 @@ let planModeService;
 // 会话投影里的真实计划状态（planMode 被 isolate 时这是唯一可靠来源）
 function planProjection(ctx, session) {
   try {
-    const proj = ctx.sessionProjections;
+    // 服务可能挂在 ctx 属性上，也可能只能通过 ctx.get 拿到（取决于 isolate）
+    let proj = null;
+    try { if (typeof ctx.get === "function") proj = ctx.get("sessionProjections") ?? null; } catch (error) { proj = null; }
+    if (proj === null || proj === undefined) proj = ctx.sessionProjections;
     if (proj !== null && proj !== undefined && typeof proj.stateOf === "function") {
       const st = proj.stateOf(session, "plan");
       if (st !== null && st !== undefined && typeof st.active === "boolean") return { available: true, active: st.active };
@@ -370,7 +373,10 @@ function decidePlanning(ctx, session, key, evTurn, prompt) {
   const nativeAgent = agents.get(key);
   // 以会话投影为准（真实状态），投影不可用时才退回本地簿记。
   const proj = planProjection(ctx, session);
-  const nativeActive = proj.available ? proj.active : (nativeOpen.has(key) || builtinPlanActive(ctx, session));
+  // 读不到投影（本 profile 里 planMode 被 isolate 时就是这样）→ 当作"未知"，
+  // 不做任何抑制，直接每轮重发一次 /plan（幂等），让计划模式成为"每轮重新断言"，
+  // 而不是"依赖上次记住的状态" —— 后者正是"一直开着却不出计划"的根因。
+  const nativeActive = proj.available ? proj.active : false;
   // 自愈：簿记与真实状态不一致时，以真相覆盖簿记 —— 否则会出现
   // "插件以为在计划模式里、其实 DSH 早就关了"，于是每轮都不再进入、也不再出计划。
   if (proj.available && nativeActive !== nativeOpen.has(key)) {
