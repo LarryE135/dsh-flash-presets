@@ -19,6 +19,8 @@ const EXPECT = {
   'flash-lean-ptc-v2': { order: 22, rules: 12, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
 };
+// 0.2.5 起 bundle 默认只装 v3；v1/v2 是对照版本，装了才校验（--all-presets / -AllPresets）
+const SHIPPED = new Set(['flash-lean-ptc-v3']);
 
 const arg = process.argv[2];
 let dump = '';
@@ -54,7 +56,7 @@ console.log('dump 来源: ' + (arg || 'dsh --dump-config') + '（' + dump.length
 for (const [name, exp] of Object.entries(EXPECT)) {
   const slice = sliceOf(name);
   console.log('\n[' + name + ']');
-  check(slice !== '', '进入合成结果');
+  check(slice !== '' || !SHIPPED.has(name), SHIPPED.has(name) ? '进入合成结果' : '未安装（对照版本，默认不装）');
   if (!slice) continue;
   check(new RegExp('^\\s*order: ' + exp.order + '$', 'm').test(slice), 'order = ' + exp.order);
   check(slice.includes('thresholdRatio: ' + exp.thr), '压缩阈值 ' + exp.thr);
@@ -64,7 +66,8 @@ for (const [name, exp] of Object.entries(EXPECT)) {
   check(rules.length === exp.rules, '规则条数 ' + rules.length + '（期望 ' + exp.rules + '）');
   check(/mode: ptc/.test(slice), 'PTC 展示层');
 }
-check((dump.match(/id: preset-flash-lean-ptc-v/g) || []).length === 3, '三个预设各出现一次');
+const installed = (dump.match(/id: preset-flash-lean-ptc-v/g) || []).length;
+check(installed >= 1 && installed <= 3, '预设行数 ' + installed + '（默认 1；--all-presets 时最多 3）');
 
 console.log('');
 if (failed === 0) { console.log('运行时合成断言通过'); process.exit(0); }
