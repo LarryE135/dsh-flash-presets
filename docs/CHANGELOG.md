@@ -1,6 +1,6 @@
 # 变更日志
 
-## 0.2.6 — 2026-10-29
+## 0.2.5 — 2026-10-30
 
 起因：用户报告"装完预设后不能选工作区"。排查后确认预设补丁不碰工作区/目录选择器/终端插件（全仓库 grep 0 命中），但过程中暴露出两个真实缺陷，加上一个缺失的诊断入口，一并补上。
 
@@ -22,8 +22,6 @@
 - 真实 profile（`zz-duptest`）：`dsh --profile zz-duptest --dump-config` 正常，linux 下 `tool-pwsh` 落成 `disabled: true`。
 - `bash scripts/selftest.sh`：30 项通过。
 
-## 0.2.5 — 2026-10-24
-
 响应 issue #4（Gold-Ballon）。四条缺陷已复核，全部属实，已逐条修复。
 
 **校验器**
@@ -40,6 +38,7 @@
 - 破坏 v3 缩进 → `verify-yaml` exit 1（js-yaml 报 bad indentation）
 - CRLF profile → 安装层校验 exit 0（原会 3 项误报）
 - 移除 js-yaml → exit 2 且打印「跳过，不等于通过」
+
 
 ## 0.2.4 — 2026-10-24
 

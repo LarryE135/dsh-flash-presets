@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.6 on the `main` branch, **not yet published**. The latest npm release is 0.2.4, published together with plan mode. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.5, published as a GitHub Release. The latest npm release is still 0.2.4: neither this package nor the plan-mode plugin is on npm. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -217,14 +217,11 @@ marketplace/                      Plugin marketplace submission material
 
 ## Version history
 
-### v0.2.6 (2026-10-29)
+### v0.2.5 (2026-10-30)
 
 - Installer claims historical leftovers: bare `- id: preset-flash-lean-ptc-vN` rows outside the managed block are removed and folded back in, so reinstalling never duplicates a preset.
 - Platform tags are resolved before writing, so no non-standard `!!js` tag lands in the profile; unknown expressions fail loudly instead of being guessed.
 - New `scripts/doctor.mjs`: one command checks the DSH version, managed-block count, stray rows, `!!js`, and standard YAML parsing; `--fix` repairs in place (with backup).
-
-### v0.2.5 (2026-10-24)
-
 - Hardened the verifier (issue #4): v3 now participates in YAML assertions; the generated `cordis.patch.yml` is verified too; installer branches cover v1/v2/v3; missing `js-yaml` exits with code 2 instead of failing open; CRLF profiles no longer produce false installation-layer failures.
 - Aligned documentation: v2/v3 compaction comments now match the actual 0.25 / 20000 values; the version table includes 0.2.2–0.2.5; `marketplace/plugin.json` matches the package version.
 - Changed `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` to the `- insert:` form. Flat `- id:` entries are silently ignored inside the preset package.

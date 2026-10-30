@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.6（分支 main，**未发布**；npm 上最新为 0.2.4，随 plan mode 一同发布），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
+> 当前版本：v0.2.5（已发 GitHub Release；npm 上最新仍为 0.2.4 —— 本包与 plan mode 插件都未上 npm），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -219,14 +219,11 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 版本历史
 
-### v0.2.6（2026-10-29）
+### v0.2.5（2026-10-30）
 
 - 安装器认领历史残留：托管块之外的老式裸行（旧安装方式 / 手工粘贴）会被整条摘掉并并入托管块，重复安装不再产生第二份同名预设。只摘"整条都由本仓库预设行组成"的条目，别人的行一个不碰。
 - 写盘前解析 `!!js`：profile 补丁里不再出现非标准 YAML 标签（`tool-bash`/`tool-pwsh` 的 `disabled` 落成 true/false），js-yaml、yamllint、GitHub 预览、第三方插件工具都能直接读这个文件。
 - 新增 `scripts/doctor.mjs`：一条命令体检 DSH 版本、托管块数量、块外残留、`!!js`、标准 YAML 解析；`--fix` 就地修，`--dump` 顺手跑 `dsh --dump-config` 确认预设真被认。
-
-### v0.2.5（2026-10-24）
-
 - 校验器防线修复（issue #4）：v3 纳入 YAML 解析断言、合成产物 `cordis.patch.yml` 也参与校验、安装器分支覆盖 v1/v2/v3；js-yaml 缺失改为退出码 2（不再 fail-open）；CRLF profile 不再误报安装层失败。
 - 文档对齐：v2/v3 压缩参数注释改为实际值（0.25 / 20000）；版本表补 0.2.2–0.2.5；`marketplace/plugin.json` 与包版本同步。
 - `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` 改为 `- insert:` 形态（扁平 `- id:` 行在预设包里会被静默忽略，此前该候选不生效）。
