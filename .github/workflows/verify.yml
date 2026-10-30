@@ -167,18 +167,24 @@ jobs:
           echo "--- profile 清单 ---"
           cat "$HOME/.dsh/profiles/ci/package.json" 2>/dev/null || { echo "profile 未创建，目录树："; find "$HOME/.dsh" -maxdepth 3 2>/dev/null | head -20; }
 
-      - name: 断言三个预设行进入组合配置
+      - name: 断言只装 v3（v1/v2 不进组合配置）
         run: |
           # 注意：dump-config 是旗标（--dump-config），当子命令跑会挂起且 stdout 为空
           dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt" 2> "$RUNNER_TEMP/dump.err" || echo "dump 退出码非 0"
           echo "dump 大小: $(wc -c < "$RUNNER_TEMP/dump.txt") B；stderr 尾部："
           tail -5 "$RUNNER_TEMP/dump.err" || true
           echo "dump 前 5 行："; head -5 "$RUNNER_TEMP/dump.txt" || true
-          for id in flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3; do
+          # 0.2.5 起 bundle 默认只装 v3；v1/v2 是对照版本，源文件仍在 presets/，但不进组合配置
+          for id in flash-lean-ptc-v3; do
             n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
             grep -m2 -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
+          done
+          for id in flash-lean-ptc-v1 flash-lean-ptc-v2; do
+            n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
+            echo "$id: $n（期望 0）"
+            [ "$n" -eq 0 ] || { echo "::error::$id 不应进入组合配置（默认只装 v3，用 --all-presets 才装）"; exit 1; }
           done
 
       # 只断言"id 出现过"还不够：order / 阈值 / 规则条数 / PTC 才是预设真正的行为参数
