@@ -236,6 +236,36 @@ dsh plugin --profile web remove dsh-plan-mode-ui
 
 完整规则原文和组件清单在 `~/.dsh/local-presets/flash-lean-ptc-v3.patch.yml`（13 条人设规则 + 工具/压缩/委派配置）。**换预设不需要改插件**，但如果新预设改了呈现模式（比如从 PTC 切回原生工具），第 2 条判据要重新验一遍。
 
+## v0.5.2（未发布）：计划状态以会话投影为准
+
+**症状**：一直开着计划模式，却每轮都不出计划、也不弹审批。
+
+三个缺陷不在同一层，叠在一起才让它看起来"完全没生效"：
+
+**1. 状态读的是簿记，不是真相。** 判断"原生是否在跑"以前只看本地簿记（`nativeOpen` /
+`bridgeTier`）。只要漏采样一次 `plan/mode` 事件，簿记就永久陈旧，D2 的守卫于是每轮都判定
+"已在计划模式里"→ 直接 `return`，既不重发 `/plan` 也不注入。现在优先读会话投影
+`stateOf(session,"plan").active`；并补上 `ctx.get("sessionProjections")` 探测（预设
+`isolate` 时 `ctx.sessionProjections` 属性可能拿不到）；两者不一致时按真相自愈
+（`gate.reconcile` 计数）。
+
+**2. 读不到真相时不该抑制。** 投影确实不可用（`debug.plan.available=false`）时当作"未知"，
+每轮重发一次幂等的 `/plan`——把计划模式从"记住的状态"改成"每轮重新断言"。这是唯一在信息
+不足时仍然正确的选择。
+
+**3. 系统提示段的让位判据同样错。** 原来只看 `bridgeTier`，重启后它是空的 → light/full
+档都把 `ACCEPTANCE` + `P0-EXEC.yml` + "然后实现并跑验收"注入进去，与原生 `plan:policy`
+的"只读、只出计划、用 exit_plan_mode 提交"**直接对冲**，模型自然挑那份让它干活。现在让位
+判据同样以投影为准，light 档无条件不注入（纯桥接语义本来就不该有验收文本）。
+
+**自检口径（重要）**：本轮的 `system/message` 里 `grep ACCEPTANCE` 应当**查不到**；查得到
+说明冲突回归了。计划模式的真值是 `debug.plan.active`，不是面板图标。`gate.reconcile > 0`
+表示发生过一次自愈。
+
+**测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复），
+全套 102 项。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
+`pm-gate.sh`、`pm-selfcheck.sh`、`pmlog*.mjs`）。
+
 ## v0.5.1（未发布）：一次全量逻辑审计的修复
 
 **1. 「关闭」与「退出原生计划模式」判据不一致（D1）。** 下一回合开头的路径只关插件自己开的桥接，而切档时的写路径把用户手动 `/plan` 开的也一起关掉。现在两条路径统一为「只关插件自己开的」；用户手动开的原生计划归 `action=plan-off` 管，也不再越权清 `nativeOpen` 簿记。
