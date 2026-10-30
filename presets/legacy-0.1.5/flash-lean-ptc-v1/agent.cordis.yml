@@ -24,13 +24,12 @@
 # ── identity ────────────────────────────────────────────────────────────────
 
 # The preset's own persona, shadowing the deployment default for this agent.
-# `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
+# `{{model}}` resolves from the agent's own route; the workspace comes from the runtime context
+# （DSH 的提示词插值是严格模式，只注册了 provider / model；写工作目录占位符会让整轮对话抛错）。
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
     suffix: |-
-      Your working directory is {{cwd}}.
-
       FLASH OPERATING RULES (hard constraints; they override habit and tool default wording):
       1. Tool choice. `run_code` is the only tool you can call directly; inside the program,
          call everything as `await tools.<name>(...)` (`tools["exotic-name"]` when needed).

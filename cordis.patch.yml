@@ -16,8 +16,6 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               suffix: |-
-                Your working directory is {{cwd}}.
-
                 FLASH OPERATING RULES (hard constraints; they override habit and tool default wording):
                 1. Tool choice. `run_code` is the only tool you can call directly; inside the program,
                    call everything as `await tools.<name>(...)` (`tools["exotic-name"]` when needed).
@@ -225,8 +223,6 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               suffix: |-
-                Your working directory is {{cwd}}.
-
                 FLASH OPERATING RULES (hard constraints; they override habit and tool default wording):
 
                 BUDGET FIRST

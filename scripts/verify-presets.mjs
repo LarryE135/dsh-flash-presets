@@ -72,6 +72,22 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
     check(new RegExp('^- insert:$', 'm').test(text), name + '.patch.yml 含行首 - insert: 条目');
   }
 
+  // issue #5：DSH 的 system-prompt 插值是严格模式，{{var}} 必须是已注册变量，
+  // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
+  // （工作目录走 runtime context，不走占位符）。
+  const PROMPT_VARS = new Set(['provider', 'model']);
+  for (const f of ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml',
+                   'presets/flash-lean-ptc-v3.patch.yml', 'cordis.patch.yml',
+                   'presets/legacy-0.1.5/flash-lean-ptc-v1/agent.cordis.yml',
+                   'presets/legacy-0.1.5/flash-lean-ptc-v1/preset.yml']) {
+    const text = read(path.join(repo, f));
+    if (text === null) continue;
+    const used = [...text.matchAll(/\{\{([a-z_][a-z0-9_]*)\}\}/g)].map(m => m[1]);
+    const bad = [...new Set(used)].filter(v => !PROMPT_VARS.has(v));
+    check(bad.length === 0, f + ' 未使用未注册的提示词变量'
+          + (bad.length ? '（发现 ' + bad.map(v => '{{' + v + '}}').join(' ') + '）' : ''));
+  }
+
   for (const s of ['install.sh', 'install.ps1', 'publish.sh', 'publish.ps1', 'merge-presets.mjs',
                    'verify-presets.mjs', 'verify-yaml.mjs']) {
     check(fs.existsSync(path.join(here, s)), 'scripts/' + s + ' 存在');

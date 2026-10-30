@@ -12,6 +12,10 @@
 - `scripts/doctor.mjs`：体检 DSH 版本、托管块数量、块外残留、`!!js` 行号、标准 YAML 解析（报错带行号）；`--fix` 就地解析标签并备份，`--dump` 额外跑 `dsh --dump-config` 确认预设被合成进去。
 - `lib/platform-tags.mjs`：平台标签解析的唯一实现，安装器与医生共用。
 
+**修复（issue #5）**
+- v1 / v2 的 persona suffix 以 `Your working directory is {{cwd}}.` 开头，而 DSH 的提示词插值是严格模式，只注册了 `provider` 与 `model`；选中这两个预设后**任意一轮对话都会抛 `unknown prompt variable "{{cwd}}"` 并中止**，等于 v1/v2 完全不可用。工作目录本来就由 runtime context 注入，占位符是 Claude Code 沿用的写法，已两处删除（v1、v2 源文件；`cordis.patch.yml` 重新合成）。
+- `verify-presets.mjs`：新增"未注册提示词变量"断言——扫描三个预设源文件与合成产物里的 `{{var}}`，只允许 `provider`/`model`，出现别的直接判失败。此前这类错误只会在用户选中预设时才炸。
+
 **验证**
 - 合成"用户行 + 老式残留"的补丁：安装后 v3 只出现 1 次、`!!js` 为 0、js-yaml 直接解析通过、用户自己的行保持原样。
 - 连跑两次安装：字节级幂等。

@@ -11,8 +11,6 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               suffix: |-
-                Your working directory is {{cwd}}.
-
                 FLASH OPERATING RULES (hard constraints; they override habit and tool default wording):
 
                 BUDGET FIRST
