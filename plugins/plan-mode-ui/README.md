@@ -258,12 +258,19 @@ dsh plugin --profile web remove dsh-plan-mode-ui
 的"只读、只出计划、用 exit_plan_mode 提交"**直接对冲**，模型自然挑那份让它干活。现在让位
 判据同样以投影为准，light 档无条件不注入（纯桥接语义本来就不该有验收文本）。
 
+**4. 指示器第二段的相位判定犯了同一类错。** 批准分支的门闸写的是 `bridgedTier === "full" ||
+"light"`——只要没桥接过（投影说已开时我们确实不桥接），档位是 light/full 也判不成"批准"，
+于是 `plannedAt` 不写、`executing` 记录不建，`indicatorOf` 一路落到 `return "off"`，客户端拿到
+`data-phase='off'` 用默认前景色 `#111827`（近黑）——这就是"讲划完成后标志变回黑色"的来源。
+现在门闸改看会话档位 + `cancelIntent`，并且 `planned` 在 `indicatorOf` 里提到 `armed` 之前，
+PHASE 2 的投递判据也从簿记改成档位。
+
 **自检口径（重要）**：本轮的 `system/message` 里 `grep ACCEPTANCE` 应当**查不到**；查得到
 说明冲突回归了。计划模式的真值是 `debug.plan.active`，不是面板图标。`gate.reconcile > 0`
 表示发生过一次自愈。
 
-**测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复），
-全套 102 项。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
+**测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复）
+与 I14–I16（无簿记时批准→executing→planned、空闲期保持、新回合让位），全套 105 项。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
 `pm-gate.sh`、`pm-selfcheck.sh`、`pmlog*.mjs`）。
 
 ## v0.5.1（未发布）：一次全量逻辑审计的修复

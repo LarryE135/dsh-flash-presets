@@ -441,9 +441,12 @@ function indicatorOf(id) {
   const rec = phaseRecords.get(key);
   if (rec !== undefined && rec.phase === "executing") return "executing";
   if (rec !== undefined && rec.phase === "planning") return "planning";
-  if (nativeOf(id)) return turnRunning(key) ? "planning" : "armed";
+  // 第二段（计划已完成）：批准后到下一次「新回合」跑起来之前，都保持在完成态。
+  // 判据是时间窗口而不是"有没有被 delete 掉"——曾经靠桥接簿记 + 回合开始清除，
+  // 结果在"投影说已开、我们从没桥接"的会话里永远拿不到 planned，直接掉回 off（黑色默认图标）。
   const approved = plannedAt.get(key);
   if (approved !== undefined && Date.now() - approved <= PLANNED_ICON_TTL_MS) return "planned";
+  if (nativeOf(id)) return turnRunning(key) ? "planning" : "armed";
   return "off";
 }
 function nativeOf(id) {
@@ -962,7 +965,7 @@ export default {
           if (key === undefined) { gateStats.noKey += 1; return; }          // 无会话的事件不建记录
           activeTurns.set(key, Date.now());                                  // 先置位：本回合内的用户输入都算插话
           turnOpening.set(key, true);                                        // 本回合还没见到用户输入/助手输出
-          plannedAt.delete(key);                                             // 新回合：上一轮的「已计划」不再代表当前状态
+          plannedAt.delete(key);                                             // 新回合：上一轮的「已计划」不再代表当前状态（相位标记由批准重新建立）
           if (isSubagent(session)) { gateStats.subagent += 1; return; }      // 子代理会话不做规划拦截
           if (builtinPlanActive(ctx, session)) { gateStats.builtin += 1; return; } // 内置 /plan 生效时不抢流程
           // 来源过滤：第 1 回合视为用户开启；之后的回合必须紧跟一条真实用户输入
@@ -1041,7 +1044,12 @@ export default {
             plannedAt.delete(key);
             phaseRecords.delete(key);     // 当作取消：不留执行阶段记录，也不投递 PHASE 2
             forgetPlanned(key);
-          } else if (!active && key !== undefined && (bridgedTier === "full" || bridgedTier === "light")) {
+          } else if (!active && key !== undefined && (function () {
+            // 门闸看"本会话档位 + 是不是我们主动退出的"，不看有没有桥接过：
+            // 投影说已开启时我们根本不桥接，bridgeTier 是空的，用它当门闸会让批准永远不被记账。
+            const tierNow = settingsFor(key).tier;
+            return bridgedTier !== undefined || tierNow === "light" || tierNow === "full";
+          })()) {
             const rec = phaseRecords.get(key);
             const agent = agents.get(key);
             const turn = rec !== undefined && rec.turn !== undefined ? rec.turn : evTurn;
@@ -1058,8 +1066,10 @@ export default {
               });
             }
             rememberPlanned(key);   // 计划已被批准：本会话后续回合不再重复弹评审卡
-            // 只有 full 档需要投递 PHASE 2（light 纯桥接不注入任何文本）
-            if (bridgedTier === "full" && !sendPhase2(agent, key, turn) && agent === undefined) pendingPhase2.set(key, turn);
+            // 只有 full 档需要投递 PHASE 2（light 纯桥接不注入任何文本）。
+            // 档位同样以会话设置为准：没有桥接簿记时 bridgedTier 是空的，不能据此跳过投递。
+            const governingTier = bridgedTier !== undefined ? bridgedTier : settingsFor(key).tier;
+            if (governingTier === "full" && !sendPhase2(agent, key, turn) && agent === undefined) pendingPhase2.set(key, turn);
           }
         } else if (type === "turn/end") {
           const rec = live;

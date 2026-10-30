@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 const HERE = dirname(fileURLToPath(import.meta.url));
 let seq = 0;
 
-async function boot(tier) {
+async function boot(tier, opts = {}) {
   const home = mkdtempSync(join(tmpdir(), "pmui-ind-"));
   mkdirSync(join(home, "plan-mode-ui"), { recursive: true });
   writeFileSync(join(home, "plan-mode-ui", "state.json"), JSON.stringify({ version: 1, default: { tier, scope: "always", max: false }, sessions: {} }));
@@ -19,7 +19,7 @@ async function boot(tier) {
   const commands = { execute: (agent, line, attachments, signal) => { seen.push(line); return Promise.resolve({ commandId: "c", result: { kind: "success" } }); } };
   const { default: plugin } = await import("../lib/index.js?ind" + (++seq) + "-" + Date.now());
   const ctx = {
-    get: (n) => (n === "commands" ? commands : undefined),
+    get: (n) => (n === "commands" ? commands : (n === "sessionProjections" ? opts.projections : undefined)),
     on: (n, fn) => handlers.set(n, fn),
     inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
     webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
@@ -173,6 +173,55 @@ const userMsg = (turn) => ({ type: "user/message", data: { turn, content: [{ typ
   if (rules.some((l) => l.includes("animation"))) throw new Error("I9 planned 不应有动画（与 executing 区分）");
   if (!controls(css)) throw new Error("I9 planned 缺少对勾显示规则");
   console.log("PASS I9 planned 静止（对勾+进度线，无动画）");
+}
+
+// I14：线上故障复现 —— 投影说已开（我们从没桥接过，bridgeTier 为空）+ 用户批准 → 必须是完成态
+{
+  let planOn = true;
+  const c = await boot("light", { projections: { stateOf: (s, n) => (n === "plan" ? { active: planOn } : undefined) } });
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
+  c.fire("session/event", c.session, userMsg(2));
+  planOn = false;
+  c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
+  const during = await c.state();
+  if (during.indicator === "off") throw new Error("I14 批准后掉回 off（就是黑色默认图标那个 bug）");
+  if (during.indicator !== "executing") throw new Error("I14 批准后回合内应为 executing，实际 " + during.indicator);
+  c.fire("session/event", c.session, { type: "turn/end", data: { turn: 2 } });
+  const after = await c.state();
+  if (after.indicator !== "planned") throw new Error("I14 回合结束应保持 planned，实际 " + after.indicator);
+  console.log("PASS I14 无桥接簿记 + 批准 → executing → planned（不再掉回 off）");
+}
+
+// I15：批准之后空闲期不会因为 native 重进计划模式而被打回 armed
+{
+  let planOn = true;
+  const c = await boot("light", { projections: { stateOf: (s, n) => (n === "plan" ? { active: planOn } : undefined) } });
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
+  c.fire("session/event", c.session, userMsg(2));
+  planOn = false;
+  c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
+  c.fire("session/event", c.session, { type: "turn/end", data: { turn: 2 } });
+  planOn = true;   // 下一轮我们会重新断言 /plan，但那是"下一次"的事
+  const d = await c.state();
+  if (d.indicator !== "planned") throw new Error("I15 空闲期应保持 planned，实际 " + d.indicator);
+  console.log("PASS I15 批准后空闲期保持 planned（不被 native 打回 armed）");
+}
+
+// I16：批准后的新回合 → 回到 planning（笔动画），完成态自动让位
+{
+  let planOn = true;
+  const c = await boot("light", { projections: { stateOf: (s, n) => (n === "plan" ? { active: planOn } : undefined) } });
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
+  c.fire("session/event", c.session, userMsg(2));
+  planOn = false;
+  c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
+  c.fire("session/event", c.session, { type: "turn/end", data: { turn: 2 } });
+  planOn = true;
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 3 } });
+  c.fire("session/event", c.session, userMsg(3));
+  const d = await c.state();
+  if (d.indicator === "planned") throw new Error("I16 新回合仍停在 planned，第一段动画没了");
+  console.log("PASS I16 批准后新回合回到 " + d.indicator + "（完成态自动让位）");
 }
 
 function controls(src) { return src.includes(".pmo-glyph[data-phase='planned'] .pmo-ck{opacity:1}"); }
