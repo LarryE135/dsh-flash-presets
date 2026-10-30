@@ -92,6 +92,20 @@ for (const doc of DOCS) {
   }
 }
 
+// ---- 2b. marketplace 清单版本断言 -------------------------------------------
+// marketplace/plugin.json 的 version 靠人工同步，改漏不会被上面的文档扫描拦到（issue #16 第 8 项）。
+const marketPath = path.join(ROOT, 'marketplace', 'plugin.json');
+if (fs.existsSync(marketPath)) {
+  try {
+    const market = JSON.parse(fs.readFileSync(marketPath, 'utf8'));
+    if (market.version !== VERSION) {
+      problems.push('marketplace/plugin.json: version=' + market.version + '，与 package.json 的 ' + VERSION + ' 不一致');
+    }
+  } catch (error) {
+    problems.push('marketplace/plugin.json: 无法解析（' + error.message + '）');
+  }
+}
+
 // ---- 3. 白名单折叠 ----------------------------------------------------------
 const allowPath = path.join(ROOT, 'scripts', 'lint-allowlist.json');
 const allow = fs.existsSync(allowPath) ? JSON.parse(fs.readFileSync(allowPath, 'utf8')).entries ?? [] : [];

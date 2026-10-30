@@ -4,7 +4,7 @@
       config:
         id: flash-lean-ptc-v3
         name: "Flash 精简·PTC v3（v4.1-flash）"
-        description: "精简模式的 PTC 版 · v3（lean-v3，2026-10-20 定稿）：v3b 基线 + 反过度自测——验收门一旦通过就交付，不再追加随机/压测轮。针对实测「失败模式从答错迁移到 TLE/拖时长」。轮数预算、按需折叠、路由感知同 v3b。"
+        description: "精简模式的 PTC 版 · v3（lean-v3，2026-10-20 定稿）：在 v2 的轮数预算 / 按需折叠 / 路由感知之上加反过度自测——验收门一旦通过就交付，不再追加随机/压测轮。针对实测「失败模式从答错迁移到 TLE/拖时长」。轮数预算、按需折叠、路由感知同 v3b。"
         order: 27
         plugins:
           - id: persona
@@ -20,7 +20,7 @@
                 2. Deliberate briefly. Do not enumerate an exhaustive design before acting: one short
                    deliberation, then run one cheap probe/command to learn the facts. Acting beats more planning.
                 3. Input/answer-type tasks (submit a file or an answer): produce the SMALLEST artifact that
-                   satisfies the stated constraints first; refine only while you are under the step budget.
+                   satisfies the stated constraints first; refine only while you are under the turn budget.
                 4. Gate before delivery, not after. If the task states hidden tests, a judge, or hard limits
                    (time/memory/output), run ONE consolidated acceptance pass over every stated criterion at once (all
                    samples, edge cases, largest legal scale) and quote the measured numbers; measure hard limits with

@@ -55,7 +55,7 @@ Package page: <https://www.npmjs.com/package/dsh-flash-presets>. `dsh plugin add
 Version strategy: without a version, the manager writes a caret range such as `^0.2.2`, so a later pnpm operation may move it to the newest 0.2.x release. Because presets directly affect agent behavior, pin the version when reproducibility matters:
 
 ```console
-dsh plugin --profile web add dsh-flash-presets@0.2.4   # Pin a published release
+dsh plugin --profile web add dsh-flash-presets@0.2.5   # Pin a published release
 ```
 
 ### Direct installation from GitHub
@@ -154,7 +154,7 @@ This is not a defect, but you should know it: if a task depends on the current d
 
 ## Compatibility
 
-This repository has been regression-tested against DSH 0.2.1-rc.2 using a simulated installation: a temporary `DSH_HOME`, installation, `--dump-config` checks for v1/v2/v3, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers. DSH 0.1.7 through 0.2.0 use the same plugin-row mechanism, so the installer logic is unchanged. Before 0.1.7, only v1 has the directory-style fallback under `presets/legacy-0.1.5/`; v2 and v3 are unsupported there. The web profile uses live reload; desktop, headless, and acp require a restart because the provider patch layer is read at startup.
+This repository has been regression-tested against DSH 0.2.1-rc.5 (rc.2 was also tested) using a simulated installation: a temporary `DSH_HOME`, installation, `--dump-config` checks for v1/v2/v3, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers. DSH 0.1.7 through 0.2.0 use the same plugin-row mechanism, so the installer logic is unchanged. Before 0.1.7, only v1 has the directory-style fallback under `presets/legacy-0.1.5/`; v2 and v3 are unsupported there. The web profile uses live reload; desktop, headless, and acp require a restart because the provider patch layer is read at startup.
 
 The installer runs in Windows PowerShell, Ubuntu, and macOS CI (see the matrix in `.github/workflows/verify.yml`). macOS hardware has not been tested. The scripts are written for bash 3.2 compatibility; variables followed by non-ASCII text use `${var}`. The `!!js` tag in the patch is interpreted by the DSH loader and is rejected by generic YAML parsers.
 
@@ -256,7 +256,7 @@ marketplace/                      Plugin marketplace submission material
 - Made v3 (`lean-v3`) the main preset: order 27, 13 rules, compaction 0.25 / 20k.
 - Extended installers, composers, and verifiers to support all three presets.
 - Reworked `verify-presets.mjs` to verify each preset slice independently.
-- Completed simulated-install regression testing against DSH 0.2.1-rc.2.
+- Completed simulated-install regression testing against DSH 0.2.1-rc.5 (rc.2 was also tested).
 
 ### v0.2.0 (2026-09-30)
 
@@ -266,7 +266,7 @@ marketplace/                      Plugin marketplace submission material
 ### v0.1.0 (2026-09-23 to 2026-09-24)
 
 - First release: v1 with compaction 0.3 / 50k, 14 constraints, and the PTC presentation layer.
-- Earlier v1.0.0, v1.0.1, and v1.1.0 tags belong to the same generation and are folded into this version; the tags remain available.
+- Earlier v1.0.0, v1.0.1, and v1.1.0 tags belong to the same generation and are folded into this version. Those tags were removed when the 0.2.5 tags were rewritten; the remote now only carries `v0.1.0`, `v0.2.0`-`v0.2.5`, and the plugin tag `plan-mode-ui-v0.5.2`.
 
 ## Documentation
 

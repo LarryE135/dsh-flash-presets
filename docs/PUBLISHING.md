@@ -70,6 +70,12 @@ npm publish
 
 成功标志：`+ dsh-flash-presets@X.Y.Z`。
 
+**发完立刻同步已发布版本号**（否则 lint 的"允许引用版本"白名单还停在上一版，文档锁旧版不会被拦）：
+
+```bash
+node scripts/sync-published-version.mjs   # 把 package.json 的 publishedVersion 写成当前 version
+```
+
 ### 坑 1：网页授权流程我这边走不完
 
 不带 bypass token 时 npm 会打印 `https://www.npmjs.com/auth/cli/...` 让人在浏览器批准，**它需要一个交互式终端**；在非交互 shell 里 npm 直接以 `EOTP` 退出。所以自动化发布必须用 bypass token 或带 `--otp`。
