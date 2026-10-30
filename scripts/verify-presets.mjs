@@ -164,11 +164,16 @@ for (const line of attrText.split(/\r?\n/)) {
 const matches = (pattern, name) => (pattern === '*' ? true : pattern.startsWith('*.') ? name.endsWith(pattern.slice(1)) : name === pattern);
 const lfViolations = [];
 const crlfViolations = [];
+// 只扫"该进仓库的文本文件"：构建产物（dist/）、缓存与二进制归档不参与行尾判断，
+// 否则一个本地打包出来的 .zip 就会让 eol=lf 断言误报（2026-10-30 审计发现）。
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.cache']);
+const SKIP_EXT = /.(zip|gz|tgz|png|jpe?g|gif|webp|ico|woff2?|ttf|pdf|mp4)$/i;
 const walkRepo = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    if (SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) { walkRepo(full); continue; }
+    if (SKIP_EXT.test(entry.name)) continue;
     const rel = path.relative(repo, full);
     const buf = fs.readFileSync(full);
     if (lfPatterns.some((p) => matches(p, entry.name)) && buf.includes(13)) lfViolations.push(rel);

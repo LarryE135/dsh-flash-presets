@@ -265,6 +265,10 @@ marketplace/                      Plugin marketplace submission material
 
 [Measured evidence](docs/实测证据.md), [version and compatibility](docs/版本与兼容性.md), [the 0.2.0 historical README](docs/README-0.2.0.md), and the [changelog](docs/CHANGELOG.md).
 
+Implementation notes: [technical reference](docs/技术文档-精简预设实现.md) and [the four token-saving mechanisms](docs/技术文档-省token四机制.md).
+
+Audit records: [full audit](docs/审计-0.2.5-全量.md), [re-check](docs/审计-0.2.5-复检.md), and [earlier audit](docs/审计-0.2.5.md).
+
 ## License
 
 [MIT](LICENSE).
