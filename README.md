@@ -1,6 +1,6 @@
 <p align="center"><strong>dsh-flash-presets</strong></p>
 
-<p align="center"><strong>中文</strong> | <a href="#english-summary">English</a></p>
+<p align="center"><strong>中文</strong> | <a href="README.en.md">English</a></p>
 
 <p align="center">
   <a href="https://github.com/LarryE135/dsh-flash-presets/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/LarryE135/dsh-flash-presets?style=flat-square&color=eab308"></a>
