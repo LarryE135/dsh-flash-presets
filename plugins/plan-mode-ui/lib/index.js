@@ -68,7 +68,7 @@ const pickScope = (v) => (SCOPES.has(v) ? v : undefined);
 // 设置分两层：default（全局默认）+ sessions（按会话覆盖）。
 // 旧格式 { tier, scope } 自动迁移成 default，会话覆盖为空。
 function load() {
-  const fallback = { default: { tier: "light", scope: "always", max: false }, sessions: {}, updatedAt: null };
+  const fallback = { default: { tier: "light", scope: "always", max: false, autoApprove: false }, sessions: {}, updatedAt: null };
   try {
     const raw = JSON.parse(readFileSync(storePath(), "utf8"));
     if (raw === null || typeof raw !== "object") return fallback;
@@ -79,23 +79,26 @@ function load() {
         if (typeof id !== "string" || id.length === 0 || v === null || typeof v !== "object") continue;
         const tier = pickTier(v.tier), scope = pickScope(v.scope);
         const max = typeof v.max === "boolean" ? v.max : undefined;
+        const autoApprove = typeof v.autoApprove === "boolean" ? v.autoApprove : undefined;
         // 0.5.1 起没有"钉住"概念：只要这一行有任何取值，它就是用户对这个对话的显式设置。
         // （旧版 pinned 字段只被读一次，不再写回。）
-        if (tier === undefined && scope === undefined && max === undefined) continue;
+        if (tier === undefined && scope === undefined && max === undefined && autoApprove === undefined) continue;
         sessions[id] = {
           ...(tier === undefined ? {} : { tier }),
           ...(scope === undefined ? {} : { scope }),
-          ...(max === undefined ? {} : { max })
+          ...(max === undefined ? {} : { max }),
+          ...(autoApprove === undefined ? {} : { autoApprove })
         };
       }
     }
-    const dflt = { tier: pickTier(dfltRaw.tier) ?? "light", scope: pickScope(dfltRaw.scope) ?? "always", max: dfltRaw.max === true };
+    const dflt = { tier: pickTier(dfltRaw.tier) ?? "light", scope: pickScope(dfltRaw.scope) ?? "always", max: dfltRaw.max === true, autoApprove: dfltRaw.autoApprove === true };
     // 每个会话行都整份冻结：早期版本只记用户动过的那几个字段，其余跟着默认走，
     // 于是"别的会话一改全局，这个对话也被带着跑"。缺项按当前默认补齐一次。
     for (const over of Object.values(sessions)) {
       if (over.tier === undefined) over.tier = dflt.tier;
       if (over.scope === undefined) over.scope = dflt.scope;
       if (over.max === undefined) over.max = dflt.max;
+      if (over.autoApprove === undefined) over.autoApprove = dflt.autoApprove;
     }
     return {
       default: dflt,
@@ -117,6 +120,7 @@ function settingsFor(key) {
     tier: over !== undefined && over.tier !== undefined ? over.tier : state.default.tier,
     scope: over !== undefined && over.scope !== undefined ? over.scope : state.default.scope,
     max: over !== undefined && over.max !== undefined ? over.max === true : state.default.max === true,
+    autoApprove: over !== undefined && over.autoApprove !== undefined ? over.autoApprove === true : state.default.autoApprove === true,
     // 只要有"本会话行"就是 session 来源：行的存在即"钉住本会话"，
     // 不能再用"值与默认是否相同"来推断（否则勾了仅本会话、值恰好等于默认时会被误判为全局）。
     source: over !== undefined ? "session" : "default"
@@ -413,6 +417,21 @@ function decidePlanning(ctx, session, key, evTurn, prompt) {
 }
 
 const gateStats = { turnStart: 0, noKey: 0, subagent: 0, builtin: 0, notUser: 0, scope: 0, seen: 0, off: 0, bridgeOk: 0, noAgent: 0, lastTurn: null, lastType: null };
+// 自动批准（设置页开关）：命中「计划评审」时直接回批准，短路后续答题器。
+// 计数只用于状态自检（debug.auto），不影响行为。
+const autoStats = { approved: 0, skipped: 0, failed: 0 };
+// 只接受"恰好一个问题且是计划评审"的请求：替用户答别的问题是不该发生的事。
+function planReviewOf(request) {
+  const qs = request === null || request === undefined ? undefined : request.questions;
+  if (!Array.isArray(qs) || qs.length !== 1) return undefined;
+  const q = qs[0];
+  if (q === null || typeof q !== "object") return undefined;
+  if (q.id !== "plan-review") return undefined;
+  const intent = q.intent;
+  if (intent === null || typeof intent !== "object" || intent.kind !== "plan-review") return undefined;
+  if (typeof intent.approve !== "string" || intent.approve.length === 0) return undefined;   // 标签取自问题本身
+  return q;
+}
 const bridgeTier = new Map();          // sessionKey → "light" | "full"（本插件开的）
 // 原生计划模式当前是否开着（来自 plan/mode 事件；用户手动 /plan 也会记在这里）。
 // 与 bridgeTier 合并成 state.native，客户端据此把自己的 composer 入口让给原生胶囊。
@@ -801,14 +820,15 @@ async function handleState(req, res, ctx) {
       if (patch.tier !== undefined && !TIERS.has(patch.tier)) return sendJson(res, 400, { ok: false, message: "tier must be off|light|full" });
       if (patch.scope !== undefined && !SCOPES.has(patch.scope)) return sendJson(res, 400, { ok: false, message: "scope must be always|auto|first" });
       if (patch.max !== undefined && typeof patch.max !== "boolean") return sendJson(res, 400, { ok: false, message: "max must be boolean" });
+      if (patch.autoApprove !== undefined && typeof patch.autoApprove !== "boolean") return sendJson(res, 400, { ok: false, message: "autoApprove must be boolean" });
       if (patch.reset !== undefined && typeof patch.reset !== "boolean") return sendJson(res, 400, { ok: false, message: "reset must be boolean" });
       // pin 字段已在 0.5.1 退役：旧缓存客户端还会带它，这里静默忽略（不再有"取消勾选"的副作用）
-      const keys = ["tier", "scope", "max"].filter((k) => patch[k] !== undefined);
+      const keys = ["tier", "scope", "max", "autoApprove"].filter((k) => patch[k] !== undefined);
       // 动作型请求（与设置写入互斥）：目前只有退出原生计划模式一个。
       // 官方胶囊被本插件隐藏后，退出入口由面板提供，落到这里执行 /plan off。
       if (patch.action !== undefined) {
         if (patch.action !== "plan-off") return sendJson(res, 400, { ok: false, message: 'action must be "plan-off"' });
-        if (keys.length > 0 || patch.reset !== undefined) return sendJson(res, 400, { ok: false, message: "action cannot be combined with tier/scope/max/reset" });
+        if (keys.length > 0 || patch.reset !== undefined) return sendJson(res, 400, { ok: false, message: "action cannot be combined with tier/scope/max/autoApprove/reset" });
         if (requested === null) return sendJson(res, 400, { ok: false, message: "session required for action=plan-off" });
         const key = "id:" + requested;
         const agent = agents.get(key);
@@ -821,7 +841,7 @@ async function handleState(req, res, ctx) {
         return sendJson(res, 200, { ok: true, native: false, session: requested });
       }
       if (patch.reset === true && requested === null) return sendJson(res, 400, { ok: false, message: "session required for reset" });
-      if (patch.reset === true && keys.length > 0) return sendJson(res, 400, { ok: false, message: "reset cannot be combined with tier/scope/max" });
+      if (patch.reset === true && keys.length > 0) return sendJson(res, 400, { ok: false, message: "reset cannot be combined with tier/scope/max/autoApprove" });
       if (keys.length > 0 || patch.reset === true) withStateLock(() => {
         state = load();   // 以磁盘现状为底，避免覆盖别的实例刚写进去的会话行
         if (requested === null) {
@@ -841,7 +861,7 @@ async function handleState(req, res, ctx) {
           // 写本会话行（隐式：面板 = 这个对话自己的设置）。
           // 三项整份写入，避免没改到的字段继续跟着全局而被别的会话带跑。
           const eff = settingsFor("id:" + requested);
-          const over = { tier: eff.tier, scope: eff.scope, max: eff.max };
+          const over = { tier: eff.tier, scope: eff.scope, max: eff.max, autoApprove: eff.autoApprove };
           for (const k of keys) over[k] = patch[k];
           // LRU：先删再插，让这条成为对象里最新的一条（save() 按此淘汰）
           const next = { ...state.sessions };
@@ -895,14 +915,14 @@ async function handleState(req, res, ctx) {
     // session 统一用裸 id（与 phases[].id 同构）；lastSession 内部带 "id:" 前缀，出口处剥掉
     const sessionIdOut = requested !== null ? requested : (lastSession === null ? null : String(lastSession).replace(/^id:/, ""));
     const eff = settingsFor(requested === null ? null : "id:" + requested);
-    sendJson(res, 200, { ok: true, tier: eff.tier, scope: eff.scope, max: eff.max,
+    sendJson(res, 200, { ok: true, tier: eff.tier, scope: eff.scope, max: eff.max, autoApprove: eff.autoApprove,
       native: nativeOf(requested),   // 原生计划模式是否开着（兼容字段；胶囊隐藏/退出按钮用它）
       indicator: indicatorOf(requested),   // 四态：off | armed | planning | executing（动画的唯一依据）
       settings: { source: eff.source, overrides: Object.keys(state.sessions).length, default: state.default },
       updatedAt: state.updatedAt, phase, session: sessionIdOut, phases,
       planning: phase === "planning",
       headless: headlessForced(),
-      debug: { ...sectionStats, headless: headlessForced(),
+      debug: { ...sectionStats, headless: headlessForced(), auto: { ...autoStats },
         plan: (function () {
           const ag = requested === null ? undefined : agents.get("id:" + requested);
           if (ag === undefined || ag === null) return { available: false, active: null };
@@ -1183,6 +1203,29 @@ export default {
     }
 
 
+    // ── 自动批准（设置页「计划模式」分区的开关）──────────────────────────────
+    // 实现方式：注册 user-questions 瀑布监听器。exit_plan_mode 的评审就是走这条瀑布征询的，
+    // 命中时直接返回批准答案即可短路后续答题器（含 Web 评审卡）。
+    // 约束：只认 intent.kind === "plan-review" 且请求里恰好一个问题；任何不匹配、异常、
+    // 已取消、子代理会话都 next() 退回人工 —— 宁可弹卡，不可误批。
+    ctx.effect(() => ctx.on("user-questions/request", (request, next) => {
+      try {
+        const q = planReviewOf(request);
+        if (q === undefined) return next();
+        if (request.signal !== undefined && request.signal !== null && request.signal.aborted === true) return next();
+        const sess = request.agent === undefined || request.agent === null ? undefined : request.agent.session;
+        if (sess === undefined || sess === null || isSubagent(sess)) return next();
+        const key = sessionKey(sess);
+        if (key === undefined) return next();
+        const st = settingsFor(key);
+        if (st.autoApprove !== true || st.tier === "off") { autoStats.skipped += 1; return next(); }
+        autoStats.approved += 1;
+        return { answers: [{ id: q.id, selected: [q.intent.approve] }] };
+      } catch (error) {
+        autoStats.failed += 1;
+        return next();
+      }
+    }));
     ctx.effect(() => ctx.systemPrompt.section({
       name: "plan-mode:protocol",
       // 排在 DSH 自带 PLAN_POLICY(500) 之后：内置 plan mode 的文本先讲，本插件作为其上的验收强化

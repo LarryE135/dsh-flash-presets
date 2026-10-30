@@ -265,12 +265,21 @@ dsh plugin --profile web remove dsh-plan-mode-ui
 现在门闸改看会话档位 + `cancelIntent`，并且 `planned` 在 `indicatorOf` 里提到 `armed` 之前，
 PHASE 2 的投递判据也从簿记改成档位。
 
+**5. 新增「自动批准」开关（设置页 · 计划模式）。** 开启后 `exit_plan_mode` 的评审自动通过、
+直接进入执行，不再等人工点「批准」。实现是注册 `user-questions/request` **瀑布监听器**：
+`exit_plan_mode` 的评审正是走这条瀑布征询的，命中即返回 `{answers:[{id:"plan-review",selected:[approve]}]}`
+短路后续答题器（含 Web 评审卡）。约束是刻意的：只认 `intent.kind === "plan-review"`、请求里必须
+**恰好一个问题**、批准标签取自问题本身的 `intent.approve`（不硬编码 `"Approve"`）、子代理会话不答、
+已取消请求不答、任何异常都 `next()` 退回人工（**fail-open：宁可弹卡，不可误批**）。档位为「关闭」时
+开关置灰且不触发。默认关闭；状态里用 `autoApprove` 与 `debug.auto = {approved,skipped,failed}` 自检。
+
 **自检口径（重要）**：本轮的 `system/message` 里 `grep ACCEPTANCE` 应当**查不到**；查得到
 说明冲突回归了。计划模式的真值是 `debug.plan.active`，不是面板图标。`gate.reconcile > 0`
 表示发生过一次自愈。
 
-**测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复）
-与 I14–I16（无簿记时批准→executing→planned、空闲期保持、新回合让位），全套 105 项。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
+**测试**：新增 A9–A13（簿记陈旧时自愈、投影已开不重发、读不到投影仍重发、段让位、段恢复）、
+I14–I16（无簿记时批准→executing→planned、空闲期保持、新回合让位）与 `test/auto-approve.mjs` 8 项
+（自动批准正例 + 关/档位关/普通提问/多问题/已取消/子代理/读写 reset），全套 **113 项**。**调试脚本**统一收在 `~/.dsh/scripts/plan-mode-ui/`（`pm-wb.yml`、`pm-e2e.sh`、
 `pm-gate.sh`、`pm-selfcheck.sh`、`pmlog*.mjs`）。
 
 ## v0.5.1（未发布）：一次全量逻辑审计的修复

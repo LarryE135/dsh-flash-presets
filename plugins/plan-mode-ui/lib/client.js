@@ -47,10 +47,10 @@ window.__ModuleLoader__.load({
       { id: "full", label: "全量", line: "同样走原生评审，批准后接管 PHASE 2 与 P0 验收" }
     ];
 
-    var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
+    var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, autoApprove: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
       // 每个会话一份设置：切走再切回来还是自己的值；by 只存面板关心的几项
       by: {}, error: "" };
-    function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, source: S.source }; }
+    function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, autoApprove: S.autoApprove, source: S.source }; }
     function notify() { S.listeners.forEach(function (fn) { try { fn(); } catch {} }); }
     function subscribe(fn) { S.listeners.add(fn); return function () { S.listeners.delete(fn); }; }
 
@@ -151,6 +151,8 @@ window.__ModuleLoader__.load({
       ".pmo-switch .pmo-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.25);transition:transform 160ms cubic-bezier(.34,1.2,.5,1)}",
       ".pmo-switch[data-on='true'] .pmo-knob{transform:translateX(18px)}",
       ".pmo-switch:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(64,116,228,.35)}",
+      // 置灰：档位为「关闭」时自动批准不会触发，开关明确不可点（不是"点了没反应"）
+      ".pmo-switch[data-disabled='true']{opacity:.4;cursor:not-allowed}",
       "@media (prefers-color-scheme:dark){.pmo-switch{background:#3a3f48}.pmo-switch[data-on='true']{background:#4f80ea}}",
       "@media (prefers-reduced-motion:reduce){.pmo-panel,.pmo-glyph *,.pmo-fillbar{animation:none !important;transition:none !important}}",
       // 静止帧也能分三态：idle=两行+搁笔 | planning=第一行写完、第二行半写、笔停在第二行 | executing=对勾+一行、没笔
@@ -241,13 +243,14 @@ window.__ModuleLoader__.load({
           var tier = pending ? S.tier : d.tier;
           var scope = pending ? S.scope : d.scope;
           var max = pending ? S.max : (d.max === true);
+          var autoOn = pending ? S.autoApprove : (d.autoApprove === true);
           var nextPhase = typeof d.phase === "string" ? d.phase : (d.planning ? "planning" : "idle");
           // 原生计划模式是否开着：开着就把自己的入口让给原生胶囊（见 CSS .pmo-root[data-native='true']）
           var nativeOpen = d.native === true;
           var nextIndicator = typeof d.indicator === "string" && d.indicator.length > 0 ? d.indicator : null;
           var changed = tier !== S.tier || scope !== S.scope || max !== S.max || nextPhase !== S.phase
-            || nativeOpen !== S.native || nextIndicator !== S.indicator;
-          S.tier = tier; S.scope = scope; S.max = max; S.phase = nextPhase; S.native = nativeOpen;
+            || autoOn !== S.autoApprove || nativeOpen !== S.native || nextIndicator !== S.indicator;
+          S.tier = tier; S.scope = scope; S.max = max; S.autoApprove = autoOn; S.phase = nextPhase; S.native = nativeOpen;
           S.indicator = nextIndicator;
           // 生效来源：本会话覆盖 or 全局默认（面板上标出来，免得不知道自己在改哪一层）
           // pending 期间同样不能让服务端的旧来源盖回乐观值，否则勾/取消勾会闪一下"全局"
@@ -291,7 +294,7 @@ window.__ModuleLoader__.load({
           var cached = S.by[sid];
           S.sid = sid;
           if (cached) {
-            S.tier = cached.tier; S.scope = cached.scope; S.max = cached.max; S.source = cached.source;
+            S.tier = cached.tier; S.scope = cached.scope; S.max = cached.max; S.autoApprove = cached.autoApprove === true; S.source = cached.source;
           }
           notify();
           pull().then(schedulePoll, schedulePoll);
@@ -638,12 +641,16 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function switchControl(label, on, onToggle) {
+    function switchControl(label, on, onToggle, disabled) {
+      var off = disabled === true;
       return React.createElement("button", {
         type: "button", role: "switch", className: "pmo-switch",
         "aria-checked": on ? "true" : "false", "data-on": on ? "true" : "false",
         "aria-label": label,
-        onClick: function () { onToggle(!on); }
+        "data-disabled": off ? "true" : "false",
+        disabled: off,
+        // 置灰时也要给出理由（设置页文字里有说明），点击不生效但不会静默改变状态
+        onClick: function () { if (off) return; onToggle(!on); }
       }, React.createElement("span", { className: "pmo-knob" }));
     }
 
@@ -669,6 +676,9 @@ window.__ModuleLoader__.load({
           ], s.scope, function (id) { commit({ scope: id }, "global"); })),
         setRow("Max 模式", "注入「不用担心预算」的提示，抑制模型在预算受限时提前收手。",
           switchControl("Max 模式", s.max === true, function (next) { commit({ max: next }, "global"); })),
+        setRow("自动批准", "开启后计划评审自动通过、直接进入执行，不再等你点「批准」；只影响计划评审卡，不影响其它提问。"
+          + (s.tier === "off" ? " 当前档位为「关闭」，自动批准不会触发。" : ""),
+          switchControl("自动批准", s.autoApprove === true, function (next) { commit({ autoApprove: next }, "global"); }, s.tier === "off")),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" }, "设置未生效：" + (s.commitError || s.error)) : null
       );
     }
@@ -680,7 +690,7 @@ window.__ModuleLoader__.load({
           window.__pmo = {
             why: why, anim: glyphInfo, hud: hud,
             state: function () {
-              return { tier: S.tier, scope: S.scope, max: S.max, source: S.source, native: S.native,
+              return { tier: S.tier, scope: S.scope, max: S.max, autoApprove: S.autoApprove, source: S.source, native: S.native,
                 indicator: S.indicator, phase: S.phase, sid: S.sid, open: S.open,
                 poll: pollDelay(), reduced: reduceMotion() };
             },
