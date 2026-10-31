@@ -93,6 +93,26 @@ v3 的 persona 后缀含 13 条编号规则，分五类：
 4. 工具与输出（规则 5–9）：读文件用 read/glob/grep 而不是 shell 浏览；批量调用；按需折叠；控制上下文；增量改写。
 5. 交付与范围（规则 10–13）：按用户语言回答、遵守范围；不把密钥写进会话；两次失败换路子；按路由与模型调整策略。
 
+## 办公基准测试（benchmarks/office）
+
+仓库里带两个虚构的日常办公数据处理套件，用于横向比较模型在"杂乱材料 → 特定格式交付物"上的表现：
+
+- **办公基准测试 v1**（`benchmarks/office/base-v1/`，包内 v5.0.0）：`O01`–`O08` 共 8 题
+- **办公追加测试 v1**（`benchmarks/office/addendum-v1/`，包内 v5.5.0）：`P01`–`P05` 共 5 题
+
+```bash
+npm run bench:office       # 结构 + 完整性 + 题面表头一致性
+npm run checklist:bench    # 发布前人工复核（自动收集证据，人只确认三项）
+```
+
+题目数据是合成数据（不含真实个人信息），三层 sha256 把输入钉死；**不要改 `inputs/`**，
+改题面必须回写对应的 `prompt_sha256`。口径细节见 [benchmarks/office/README.md](benchmarks/office/README.md)。
+
+**评分规则公开、真值私有**：规则在 `benchmarks/office/grading/`（v5 六维加权 / v5.5 单元格精确匹配，两者不可混用）；
+真值与评分器在独立**私有**仓库。公开仓库由 `npm run guard:bench` 保证"一个字节都不泄漏"
+（哈希黑名单 + 命名黑名单 + `inputs/` 之外禁止出现表格文件），已接入 `npm run verify` 与 `prepublishOnly`。
+基准数据不随 npm 包分发（不在 `files` 白名单里）。
+
 ## 实测
 
 以下为 DSH headless 与 PTC 模式的批量运行结果，时间 2026 年 10 月，每组样本量 2 到 3。
@@ -104,6 +124,24 @@ v3 的 persona 后缀含 13 条编号规则，分五类：
 P15114 与受控复现的完整数字见 [实测证据](docs/实测证据.md)。
 
 跨场景能成立的说法只有一条：分数差距主要来自判定标准是否写死，与模型能力关系不大。
+
+### 办公基准：Token 消耗
+
+两个套件各跑一轮、每组取平均；**OPS 指项目 `dsh-ops`**，Token **含缓存读取**，单位百万。
+
+| 配置 | 办公基准 v1 | 相对标准模式 | 办公追加 v1 | 相对标准模式 |
+|---|---:|---:|---:|---:|
+| 标准模式 | 5.380 M（n=5） | — | 2.827 M（n=5） | — |
+| OPS + 标准模式 | 4.693 M（n=5） | −12.8% | 2.141 M（n=5） | −24.3% |
+| PTC 模式 | 3.553 M（n=5） | −34.0% | 1.560 M（n=5） | −44.8% |
+| OPS + PTC | 3.499 M（n=4） | −35.0% | 1.404 M（n=5） | −50.3% |
+| lean-v3 | 1.437 M（n=5） | −73.3% | 0.461 M（n=5） | −83.7% |
+
+![办公基准与追加基准的平均 Token 消耗（含缓存读取）](docs/images/bench-office-token.png)
+
+三条口径：`OPS + PTC` 在基准 v1 只有 4 次有效运行（图上标 n=4），其余均为 5 次；两个套件任务不同、
+**不合并排名**，只分别对比；这里只有 Token，质量分不在本表，评分规则与真值口径见
+[benchmarks/office/grading/](benchmarks/office/grading/)。
 
 ## 已知偏差（相对官方 `preset-ptc`）
 
@@ -162,25 +200,6 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 4. 桌面版或 Windows 端用户，建议先安装并启用 MSI 版 PowerShell 7 或 Git Bash——实测这一项本身就能带来不少提升；不知道怎么装可以问大肥鱼。
 
 5. 本包只安装预设行，不携带工具：profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
-
-## 办公基准测试（benchmarks/office）
-
-仓库里带两个虚构的日常办公数据处理套件，用于横向比较模型在"杂乱材料 → 特定格式交付物"上的表现：
-
-- **办公基准测试 v1**（`benchmarks/office/base-v1/`，包内 v5.0.0）：`O01`–`O08` 共 8 题
-- **办公追加测试 v1**（`benchmarks/office/addendum-v1/`，包内 v5.5.0）：`P01`–`P05` 共 5 题
-
-```bash
-npm run bench:office     # 结构 + 完整性 + 题面表头一致性校验
-```
-
-题目数据是合成数据（不含真实个人信息），三层 sha256 把输入钉死；**不要改 `inputs/`**，
-改题面必须回写对应的 `prompt_sha256`。口径细节见 [benchmarks/office/README.md](benchmarks/office/README.md)。
-
-**评分规则公开、真值私有**：规则在 `benchmarks/office/grading/`（v5 六维加权 / v5.5 单元格精确匹配，两者不可混用）；
-真值与评分器在独立**私有**仓库。公开仓库由 `npm run guard:bench` 保证"一个字节都不泄漏"
-（哈希黑名单 + 命名黑名单 + `inputs/` 之外禁止出现表格文件），已接入 `npm run verify` 与 `prepublishOnly`。
-基准数据不随 npm 包分发（不在 `files` 白名单里）。
 
 ## 仓库结构
 

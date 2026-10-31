@@ -126,6 +126,25 @@ The v3 persona suffix contains 13 numbered rules in five groups:
 4. **Tools and output (rules 5–9):** use read/glob/grep instead of shell browsing for files; batch independent calls; fold context as needed; control context size; edit incrementally.
 5. **Delivery and scope (rules 10–13):** answer in the user's language, stay within scope, never put secrets into the session, change approach after two failures, and adapt strategy to the route and model.
 
+## Office benchmark suites (benchmarks/office)
+
+Two fictional office-data suites for comparing models on "messy materials → strictly formatted deliverables":
+
+- **Office benchmark v1** (`benchmarks/office/base-v1/`, internal v5.0.0): tasks `O01`–`O08` (8 tasks)
+- **Office addendum v1** (`benchmarks/office/addendum-v1/`, internal v5.5.0): tasks `P01`–`P05` (5 tasks)
+
+```bash
+npm run bench:office       # structure + integrity + prompt/manifest header consistency
+npm run checklist:bench    # pre-release human review (collects evidence, you confirm three items)
+```
+
+Task data is synthetic (contains no real personal information); a three-layer sha256 chain pins every input -- **do not modify `inputs/`**.
+Editing a prompt means rewriting the matching `prompt_sha256`. Details: [benchmarks/office/README.md](benchmarks/office/README.md).
+
+**Scoring rules are public; ground truth is private**: the rules live in `benchmarks/office/grading/` (v5 six-dimension weighted score
+vs v5.5 exact cell matching -- the two must not be mixed); ground truth and graders live in a separate **private** repository.
+`npm run guard:bench` keeps this repository clean (hash denylist + name denylist + no tabular files outside `inputs/`) and is wired
+into `npm run verify` and `prepublishOnly`. Benchmark data is not shipped in the npm package.
 ## Measured results
 
 The following results came from batch runs in DSH headless and PTC modes during October 2026, with two to three samples per group.
@@ -137,6 +156,24 @@ On P2099 (submission-answer task with continuous scoring), the standard preset p
 See [measured evidence](docs/实测证据.md) for the complete P15114 and controlled-reproduction numbers.
 
 The only cross-scenario conclusion supported by these measurements is that much of the score difference came from whether the acceptance criteria were made explicit; it should not be interpreted as a general increase in model capability.
+
+### Office benchmarks: token consumption
+
+One full round per suite, averaged per group; **OPS refers to the `dsh-ops` project**; tokens **include cache reads**, in millions.
+
+| Setup | Office benchmark v1 | vs standard | Office addendum v1 | vs standard |
+|---|---:|---:|---:|---:|
+| Standard mode | 5.380 M (n=5) | — | 2.827 M (n=5) | — |
+| OPS + standard | 4.693 M (n=5) | −12.8% | 2.141 M (n=5) | −24.3% |
+| PTC mode | 3.553 M (n=5) | −34.0% | 1.560 M (n=5) | −44.8% |
+| OPS + PTC | 3.499 M (n=4) | −35.0% | 1.404 M (n=5) | −50.3% |
+| lean-v3 | 1.437 M (n=5) | −73.3% | 0.461 M (n=5) | −83.7% |
+
+![Average token consumption on the office benchmark and addendum suites (including cache reads)](docs/images/bench-office-token.png)
+
+Three caveats: `OPS + PTC` has only 4 valid runs on the v1 benchmark (the chart labels it n=4), all others have 5;
+the two suites contain different tasks and are **not pooled** into a single ranking; this table covers tokens only —
+for quality scoring rules and ground-truth policy see [benchmarks/office/grading/](benchmarks/office/grading/).
 
 ## Known deviations (vs the official `preset-ptc`)
 
