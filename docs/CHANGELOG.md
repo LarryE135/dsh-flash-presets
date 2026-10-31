@@ -11,6 +11,11 @@
   审计记录、实验记录、`PUBLISHING.md` 不再对外可见。
 - **README 链接对 npm 友好**：`benchmarks/`、`docs/images/`、以及不再随包发布的文档改用绝对链接，
   避免 npm 页面上出现死链；基准节补回「题目与评分规则只在仓库提供，npm 包不含 `benchmarks/`」这句口径。
+- **npm 页面刷新一次到位**：npm 上的 README 是发布快照，0.2.5 之后仓库改了 5 个提交（基准节、数据修正、
+  删英文摘要、链接改绝对）都没反映。本版发布即同步；发版后按 `docs/PUBLISHING.md` 第 8 节 c) 核对
+  「含基准节 / 含 `bench:office`」两项为 True。
+- 插件 `dsh-plan-mode-ui` 0.5.2 与本版**一起发**：zip 作为 Release 附件，npm 页面随后刷新；
+  `docs/规格-规划插件-v1.md` 维持不进 npm 包（内部文档），使用者从仓库查规格。
 
 ## 0.2.5 — 2026-10-30
 

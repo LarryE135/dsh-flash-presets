@@ -148,6 +148,21 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 
 删掉后 `npm whoami` 失效是正常的。
 
+## 7.5 0.2.6 起：插件与本包一起发
+
+发布顺序固定为「先 npm，再 Release」，因为 Release 正文要引用已存在的包版本：
+
+```bash
+# 1) 主包
+npm publish --otp <code>
+# 2) 主版本 Release（正文写「插件 dsh-plan-mode-ui vA.B.C 见附件」）
+gh release create vX.Y.Z dist/dsh-flash-presets-X.Y.Z.tgz --title "vX.Y.Z" --notes-file /tmp/notes.md
+# 3) 插件 zip 作为同一 Release 的附件（不单独建 Release、不打 plan-mode-ui-* tag）
+gh release upload vX.Y.Z ~/.dsh/artifacts/dsh-plan-mode-ui-vA.B.C.zip
+# 4) 核对：Releases / tags 里都不该出现 plan-mode-ui-*
+npm run verify:release
+```
+
 ## 8. 发布后验证（建议每次都做）
 
 ```bash
