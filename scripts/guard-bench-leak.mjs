@@ -113,6 +113,19 @@ for (const file of files) {
       continue;
     }
   }
+  // 真值 JSON 伪装成别的名字（t.json / notes.md…）：按**结构**判，不按文件名判。
+  if (st.size < 8 * 1024 * 1024 && /\.(json|txt|md|csv)$/i.test(rel)) {
+    const text = readFileSync(file).toString("utf8").replace(/^\uFEFF/, "").trim();
+    if (text.startsWith("{")) {
+      try {
+        const obj = JSON.parse(text);
+        if (obj && typeof obj === "object" && obj.tables && obj.task_id && Array.isArray(obj.input_files)) {
+          problems.push("真值 JSON 被伪装成：" + rel + "（结构含 tables/task_id/input_files）");
+          continue;
+        }
+      } catch { /* 不是 JSON，忽略 */ }
+    }
+  }
   for (const re of NAME_PATTERNS) {
     if (re.test(rel)) { problems.push("可疑私有资产：" + rel + "（命中命名黑名单 " + String(re) + "）"); break; }
   }
