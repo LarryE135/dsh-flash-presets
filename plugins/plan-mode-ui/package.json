@@ -37,7 +37,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.15"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"

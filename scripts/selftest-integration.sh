@@ -19,7 +19,7 @@ rc=$?
 
 patch="$TMP/profiles/web/cordis.patch.yml"
 blocks=$(grep -c "dsh-flash-presets: managed block (0.1.7" "$patch" || true)
-[ "$blocks" -eq 1 ] && ok "托管块恰好 1 个" || bad "托管块数量 = $blocks（期望 1）"
+[ "$blocks" -eq 1 ] && ok "托管块恰好 1 个" || bad "托管块数量 = ${blocks}（期望 1）"
 grep -q "id: preset-flash-lean-ptc-v3" "$patch" && ok "v3 预设行已写入" || bad "v3 预设行缺失"
 
 if command -v dsh >/dev/null 2>&1; then
@@ -51,5 +51,5 @@ else
   grep -q "未安装（纯可选）" <<<"$dout" && ok "无 dsh 时插件只报可选提示" || bad "无 dsh 时插件提示不对"
 fi
 
-echo "通过 $pass，失败 $fail"
+echo "通过 ${pass}，失败 ${fail}"
 [ "$fail" -eq 0 ] || exit 1

@@ -24,7 +24,7 @@
   "scripts": {
     "build": "node scripts/compose-bundle-patch.mjs",
     "check": "node scripts/compose-bundle-patch.mjs --check",
-    "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check",
+    "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && node scripts/check-bash32-cjk.mjs && node scripts/check-ps1.mjs",
     "verify:versions": "node scripts/verify-versions.mjs",
     "verify:bench-table": "node scripts/render-bench-table.mjs --check",
     "render:bench-table": "node scripts/render-bench-table.mjs --write",
