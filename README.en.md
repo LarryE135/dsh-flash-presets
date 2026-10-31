@@ -175,6 +175,11 @@ Three caveats: `OPS + PTC` has only 4 valid runs on the v1 benchmark (the chart 
 the two suites contain different tasks and are **not pooled** into a single ranking; this table covers tokens only —
 for quality scoring rules and ground-truth policy see [benchmarks/office/grading/](benchmarks/office/grading/).
 
+Two disclosures:
+
+- **Authored and graded by the same model, executed and graded in isolation**: both task authoring and grading used `GPT-6.1-Sol`; execution (the model answering) and scoring (comparing against ground truth) happen in isolated stages -- the answering environment can read neither the ground truth nor the grader.
+- **Correctness is not shown separately**: no significant difference in correctness was observed (every run was fully correct), so this table compares token consumption only and does not turn "all correct" into another ranking.
+
 ## Known deviations (vs the official `preset-ptc`)
 
 All three lean presets are trimmed-down versions of the official PTC preset. What we leave out:
