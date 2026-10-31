@@ -79,14 +79,6 @@ dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 
 Set `DSH_HOME` or `DSH_PROFILE` to point these checks at a simulated installation.
 
-## Configuration
-
-- `compaction-basic`: v1 uses `thresholdRatio 0.3` and `retainTokens 50000`; v2 and v3 use `0.25` and `20000`. `compactionRetries` is 2 for v1 and 1 for v2/v3.
-- `compaction-tool-result-pruner`: `thresholdChars 8192`, `headChars 4096`, and `tailChars 1024`.
-- `tool-presentation`: `mode: ptc` with the single `run_code` entry point.
-- `tool-workflow`: disabled. Newer DSH releases disable it by default; this package pins it explicitly so an upstream default change cannot silently re-enable it.
-- Platform branch: the patch uses `!!js process.platform === 'win32'` to switch between bash and PowerShell. This tag is interpreted by the DSH loader; third-party YAML parsers report it as an unknown tag.
-
 ## Behavioral constraints
 
 The v3 persona suffix contains 13 numbered rules in five groups:
@@ -116,19 +108,8 @@ Editing a prompt means rewriting the matching `prompt_sha256`. Details: [benchma
 vs v5.5 exact cell matching -- the two must not be mixed); ground truth and graders live in a separate **private** repository.
 `npm run guard:bench` keeps this repository clean (hash denylist + name denylist + no tabular files outside `inputs/`) and is wired
 into `npm run verify` and `prepublishOnly`. Benchmark data is not shipped in the npm package.
+
 ## Measured results
-
-The following results came from batch runs in DSH headless and PTC modes during October 2026, with two to three samples per group.
-
-On P15654 (19 official samples, four-second limit), v3 scored full marks once and failed twice on the original prompt because the runs reached 4.00 s and 4.01 s. When the prompt required a reproducible `verify.log` and a fully passing result, all three runs scored full marks. Total billed usage was 17.5M, below the original prompt's 26.8M; two runs corrected 16/19 and 15/19 in their second round. The standard preset scored full marks in both runs in the Luogu measurement.
-
-On P2099 (submission-answer task with continuous scoring), the standard preset produced ratios of 0.99, 1.09, 1.04, and 1.05. With legality-only judging, v3 produced 1.05 to 1.15, below the standard preset; after changing the criterion to “legal and no more than 1.05” and feeding failed items back into the run, the ratios were 1.05, 1.03, and 0.98, with two corrected in the second round.
-
-See [measured evidence](docs/实测证据.md) for the complete P15114 and controlled-reproduction numbers.
-
-The only cross-scenario conclusion supported by these measurements is that much of the score difference came from whether the acceptance criteria were made explicit; it should not be interpreted as a general increase in model capability.
-
-### Office benchmarks: token consumption
 
 One full round per suite, averaged per group; **OPS refers to the `dsh-ops` project**; tokens **include cache reads**, in millions.
 
@@ -149,7 +130,7 @@ for quality scoring rules and ground-truth policy see [benchmarks/office/grading
 Two disclosures:
 
 - **Authored and graded by the same model, executed and graded in isolation**: both task authoring and grading used `GPT-6.1-Sol`; execution (the model answering) and scoring (comparing against ground truth) happen in isolated stages -- the answering environment can read neither the ground truth nor the grader.
-- **Correctness is not shown separately**: no significant difference in correctness was observed (every run was fully correct), so this table compares token consumption only and does not turn "all correct" into another ranking.
+- **Correctness is not shown separately**: no significant difference in correctness was observed (every run was fully correct), so this table compares token consumption only and adds no separate accuracy presentation.
 
 ## Known deviations (vs the official `preset-ptc`)
 
