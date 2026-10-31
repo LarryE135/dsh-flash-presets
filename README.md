@@ -115,7 +115,7 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 | OPS + 标准模式 | 4.693 M（n=5） | −12.8% | 2.141 M（n=5） | −24.3% |
 | PTC 模式 | 3.553 M（n=5） | −34.0% | 1.560 M（n=5） | −44.8% |
 | OPS + PTC | 3.499 M（n=4） | −35.0% | 1.404 M（n=5） | −50.3% |
-| lean-v3 | 1.437 M（n=5） | −73.3% | 0.461 M（n=5） | −83.7% |
+| lean-v3 | 1.437 M（n=5） | −73.3% | 0.481 M（n=5） | −83.0% |
 
 ![办公基准与追加基准的平均 Token 消耗（含缓存读取）](docs/images/bench-office-token.png)
 
@@ -291,6 +291,6 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 Flash-tier agent presets for DSH, shipped as a patch-only bundle (`dsh.bundle`) that inserts `@deepseek-ai/dsh-agent-preset` rows into a profile. Three presets: `v1` (compaction 0.3/50k, 14 rules), `v2` (0.25/20k, 12 rules), `v3` (current, 0.25/20k, 13 rules, stops once the acceptance gate passes). No runtime code, no `main`, no `prepare`. Verified against DSH 0.2.1-rc.2 with a simulated install: temp `DSH_HOME`, install, `--dump-config` shows all three, idempotent re-install, clean uninstall. Not verified on macOS hardware, and no same-scale comparison for native (non-PTC) mode.
 
-Measured on two office-data suites (one round each; tokens include cache reads; every run fully correct): lean-v3 used 1.437M / 0.461M against standard mode's 5.380M / 2.827M -- 73% / 84% fewer tokens at identical accuracy. The two suites hold different tasks, so they are reported separately and never pooled. Prompt-level difficulty assessment and clarifying questions did not help.
+Measured on two office-data suites (one round each; tokens include cache reads; every run fully correct): lean-v3 used 1.437M / 0.481M against standard mode's 5.380M / 2.827M -- 73% / 83% fewer tokens at identical accuracy. The two suites hold different tasks, so they are reported separately and never pooled. Prompt-level difficulty assessment and clarifying questions did not help.
 
 Install from npm: `dsh plugin --profile web add dsh-flash-presets` (or from git: `github:LarryE135/dsh-flash-presets`), or run `bash scripts/install.sh --profile web` after cloning.
