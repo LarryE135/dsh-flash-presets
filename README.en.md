@@ -113,13 +113,15 @@ into `npm run verify` and `prepublishOnly`. Benchmark data is not shipped in the
 
 One full round per suite, averaged per group; **OPS refers to the `dsh-ops` project**; tokens **include cache reads**, in millions.
 
+<!-- bench-table:begin（本块由 scripts/render-bench-table.mjs 生成，勿手改）-->
 | Setup | Office benchmark v1 | vs standard | Office addendum v1 | vs standard |
 |---|---:|---:|---:|---:|
-| Standard mode | 5.380 M (n=5) | — | 2.827 M (n=5) | — |
-| OPS + standard | 4.693 M (n=5) | −12.8% | 2.141 M (n=5) | −24.3% |
-| PTC mode | 3.553 M (n=5) | −34.0% | 1.560 M (n=5) | −44.8% |
-| OPS + PTC | 3.499 M (n=4) | −35.0% | 1.404 M (n=5) | −50.3% |
-| lean-v3 | 1.437 M (n=5) | −73.3% | 0.481 M (n=5) | −83.0% |
+| Standard mode | 5.380 M(n=5) | — | 2.827 M(n=5) | — |
+| OPS + standard | 4.693 M(n=5) | −12.8% | 2.141 M(n=5) | −24.3% |
+| PTC mode | 3.553 M(n=5) | −34.0% | 1.560 M(n=5) | −44.8% |
+| OPS + PTC | 3.499 M(n=4) | −35.0% | 1.404 M(n=5) | −50.3% |
+| lean-v3 | 1.437 M(n=5) | −73.3% | 0.481 M(n=5) | −83.0% |
+<!-- bench-table:end -->
 
 ![Average token consumption on the office benchmark and addendum suites (including cache reads)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
 

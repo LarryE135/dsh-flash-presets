@@ -123,6 +123,7 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 
 两个套件各跑一轮、每组取平均；**OPS 指项目 `dsh-ops`**，Token **含缓存读取**，单位百万。
 
+<!-- bench-table:begin（本块由 scripts/render-bench-table.mjs 生成，勿手改）-->
 | 配置 | 办公基准 v1 | 相对标准模式 | 办公追加 v1 | 相对标准模式 |
 |---|---:|---:|---:|---:|
 | 标准模式 | 5.380 M（n=5） | — | 2.827 M（n=5） | — |
@@ -130,6 +131,7 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 | PTC 模式 | 3.553 M（n=5） | −34.0% | 1.560 M（n=5） | −44.8% |
 | OPS + PTC | 3.499 M（n=4） | −35.0% | 1.404 M（n=5） | −50.3% |
 | lean-v3 | 1.437 M（n=5） | −73.3% | 0.481 M（n=5） | −83.0% |
+<!-- bench-table:end -->
 
 ![办公基准与追加基准的平均 Token 消耗（含缓存读取）](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
 

@@ -1,0 +1,82 @@
+{
+  "口径": "Token 含缓存读取，单位百万；两套件任务不同，不合并排名；OPS = 项目 dsh-ops。",
+  "suites": [
+    {
+      "id": "office",
+      "zh": "办公基准 v1",
+      "en": "Office benchmark v1"
+    },
+    {
+      "id": "addendum",
+      "zh": "办公追加 v1",
+      "en": "Office addendum v1"
+    }
+  ],
+  "rows": [
+    {
+      "key": "standard",
+      "zh": "标准模式",
+      "en": "Standard mode",
+      "office": {
+        "m": 5.38,
+        "n": 5
+      },
+      "addendum": {
+        "m": 2.827,
+        "n": 5
+      }
+    },
+    {
+      "key": "ops-standard",
+      "zh": "OPS + 标准模式",
+      "en": "OPS + standard",
+      "office": {
+        "m": 4.693,
+        "n": 5
+      },
+      "addendum": {
+        "m": 2.141,
+        "n": 5
+      }
+    },
+    {
+      "key": "ptc",
+      "zh": "PTC 模式",
+      "en": "PTC mode",
+      "office": {
+        "m": 3.553,
+        "n": 5
+      },
+      "addendum": {
+        "m": 1.56,
+        "n": 5
+      }
+    },
+    {
+      "key": "ops-ptc",
+      "zh": "OPS + PTC",
+      "en": "OPS + PTC",
+      "office": {
+        "m": 3.499,
+        "n": 4
+      },
+      "addendum": {
+        "m": 1.404,
+        "n": 5
+      }
+    },
+    {
+      "key": "lean-v3",
+      "zh": "lean-v3",
+      "en": "lean-v3",
+      "office": {
+        "m": 1.437,
+        "n": 5
+      },
+      "addendum": {
+        "m": 0.482,
+        "n": 5
+      }
+    }
+  ]
+}
