@@ -24,6 +24,9 @@
     },
     "./package.json": "./package.json"
   },
+  "scripts": {
+    "test": "bash test/run.sh"
+  },
   "files": [
     "lib",
     "cordis.patch.yml",

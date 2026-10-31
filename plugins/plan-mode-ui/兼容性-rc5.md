@@ -1,6 +1,6 @@
 # 兼容性检查 · DSH 0.2.1-rc.5（2026-10-30）
 
-对象：dsh-plan-mode-ui 0.4.3（本插件）、dsh-flash-presets 0.2.5（预设包）。
+对象：dsh-plan-mode-ui 0.5.2（本插件）、dsh-flash-presets 0.2.5（预设包）。版本号以两个 package.json 为准，本文件只描述兼容面。
 环境：DSH 0.2.1-rc.2 → **0.2.1-rc.5**（安装 2026-10-30 10:27，宿主 10:29:53 重启）。
 
 ## 结论

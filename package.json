@@ -24,8 +24,9 @@
   "scripts": {
     "build": "node scripts/compose-bundle-patch.mjs",
     "check": "node scripts/compose-bundle-patch.mjs --check",
-    "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs",
-    "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && bash scripts/selftest.sh",
+    "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/verify-versions.mjs",
+    "verify:versions": "node scripts/verify-versions.mjs",
+    "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && node scripts/verify-versions.mjs && bash scripts/selftest.sh",
     "lint": "node scripts/lint-presets.mjs",
     "guard:bench": "node scripts/guard-bench-leak.mjs",
     "bench:office": "node benchmarks/office/tools/check.mjs",
