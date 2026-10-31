@@ -105,6 +105,20 @@ function checkTask(where, dir) {
     if (!(file in (manifest.outputs || {}))) fail(where, "题面声明了 manifest 里没有的交付文件 " + file);
   }
 
+  // 4) 输入件不得与交付件同构：inputs 里的 CSV 表头等于本题声明的交付表头，
+  //    基本只可能是把真值伪装成输入（真值只应存在于私有仓库）。
+  const outHeaderSet = new Set(Object.values(manifest.outputs || {}).map((o) => (o.headers || []).join(",")));
+  for (const f of inputManifest.files || []) {
+    if (!/\.csv$/i.test(f.path)) continue;
+    const p = join(dir, "inputs", f.path);
+    if (!existsSync(p)) continue;
+    const line = readFileSync(p, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
+    const h = line.split(",").map((s) => s.trim()).join(",");
+    if (outHeaderSet.has(h)) {
+      fail(where, "输入件与交付件同构：" + f.path + " 的表头等于本题交付表头（真值不能当输入）");
+    }
+  }
+
   return { inputs, inputBytes, outputs: Object.keys(manifest.outputs || {}) };
 }
 
@@ -128,6 +142,17 @@ else {
       fail(where, "任务目录 input_bytes=" + t.input_bytes + " 实际 " + r.inputBytes);
     }
     if (!quiet) console.log("  · " + t.task_id + " 输入 " + r.inputs + " 个 / " + r.inputBytes + " B，交付 " + r.outputs.join(","));
+  }
+  const catCsv = join(baseRoot, "任务目录.csv");
+  if (!existsSync(catCsv)) {
+    fail("base-v1", "缺少 任务目录.csv");
+  } else {
+    const lines = readFileSync(catCsv, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const hdr = (lines[0] || "").split(",").map((s) => s.trim());
+    if (!hdr.includes("task_id")) fail("base-v1", "任务目录.csv 表头缺 task_id（被覆盖过？）");
+    if (lines.length - 1 !== catalog.length) {
+      fail("base-v1", "任务目录.csv 行数 " + (lines.length - 1) + " ≠ 任务目录.json 题目数 " + catalog.length);
+    }
   }
   notes.push("base-v1 题目数 " + catalog.length);
 }
