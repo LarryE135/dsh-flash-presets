@@ -23,6 +23,7 @@ param(
   [switch]   $Help,
   [switch]   $Legacy,
   [switch]   $Uninstall,
+  [switch]   $WithPlanMode,
   [switch]   $AllPresets
 )
 
@@ -135,6 +136,44 @@ function Install-Modern {
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
+  if ($WithPlanMode) { Install-PlanMode }
+}
+
+# 计划模式插件（可选组件）：dist/ 里现成的 tgz → 现打一个 → 目录。没有 dsh 时只打印命令。
+function Install-PlanMode {
+  Write-Host ""
+  Write-Host "-- 计划模式插件（-WithPlanMode）------------------------------"
+  $spec = $null
+  $dist = Join-Path $here "dist"
+  $tgz = Get-ChildItem -Path $dist -Filter "dsh-plan-mode-ui-*.tgz" -ErrorAction SilentlyContinue |
+         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($tgz) { $spec = $tgz.FullName }
+  elseif ((Get-Command npm -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $here "plugins\plan-mode-ui\package.json"))) {
+    New-Item -ItemType Directory -Force -Path $dist | Out-Null
+    Push-Location (Join-Path $here "plugins\plan-mode-ui")
+    try { npm pack --ignore-scripts --pack-destination $dist | Out-Null } catch { } finally { Pop-Location }
+    $tgz = Get-ChildItem -Path $dist -Filter "dsh-plan-mode-ui-*.tgz" -ErrorAction SilentlyContinue |
+           Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($tgz) { $spec = $tgz.FullName; Write-Host "已打包插件：$($tgz.Name)" }
+  }
+  if (-not $spec -and (Test-Path (Join-Path $here "plugins\plan-mode-ui"))) {
+    $spec = (Join-Path $here "plugins\plan-mode-ui")
+    Write-Host "WARN 没有 tgz，退回目录方式（开发用；正式安装建议先 npm pack）"
+  }
+  if (-not $spec) { Write-Host "WARN 找不到插件来源，跳过。手动装：dsh plugin --profile $Profile add dsh-plan-mode-ui"; return }
+  if (Get-Command dsh -ErrorAction SilentlyContinue) {
+    dsh plugin --profile $Profile add $spec
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "OK 插件已装：dsh-plan-mode-ui（重启 dsh web 后硬刷新页面）"
+      Write-Host "  体检：node scripts\doctor.mjs --profile $Profile --all"
+    } else {
+      Write-Host "WARN 插件安装失败（预设已装好，不受影响）。手动重试："
+      Write-Host "  dsh plugin --profile $Profile add `"$spec`""
+    }
+  } else {
+    Write-Host "WARN PATH 里没有 dsh 命令，插件未安装。等 dsh 可用后手动执行："
+    Write-Host "  dsh plugin --profile $Profile add `"$spec`""
+  }
 }
 
 function Uninstall-Modern {

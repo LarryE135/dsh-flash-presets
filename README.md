@@ -75,6 +75,19 @@ node scripts/compose-bundle-patch.mjs --check    # 断言 cordis.patch.yml 与 p
 dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 ```
 
+## 与计划模式插件一起用（可选）
+
+仓库里还带一个客户端插件 `plugins/plan-mode-ui`（发布名 `dsh-plan-mode-ui`），做**两阶段计划模式**：同一回合里先出计划、你批准后再执行，结束时把实测验收数字写回卡片。两者职责不重叠——预设管**每轮怎么花钱**（预算、折叠、收尾判定），插件管**这一回合先想后做**。
+
+```console
+bash scripts/install.sh --with-plan-mode        # 预设 + 插件一次装齐（没有 dsh 时只打印等价命令）
+dsh plugin --profile web add dsh-plan-mode-ui   # 上架 npm 后可直接装；现在也能用本地 tgz / 目录
+node scripts/doctor.mjs --profile web --all     # [1]–[5] 预设、[6] 插件、[7] 合成配置
+```
+
+插件是纯可选项：**没装时预设行为完全不变**，`doctor` 只给一行 `⚠ 未安装（纯可选）`，不计入失败。装了之后入口在输入框左侧，档位 off / light / full 独立于预设设置。
+
+**为什么值得一起用**：v3 的预算纪律治「跑太多」，计划模式治「方向错了才跑多」——先花一个计划回合把方案定下来，比跑到第 40 轮才发现跑偏便宜。
 ## 行为约束
 
 v3 的 persona 后缀含 13 条编号规则，分五类：

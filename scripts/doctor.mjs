@@ -148,9 +148,46 @@ if (!yaml) {
   }
 }
 
-// ── 6. 可选 dump-config ──────────────────────────────────────────────────────
-if (flag('--dump')) {
-  console.log('[6] dsh --dump-config 是否认得这些预设');
+// ── 6. 计划模式插件（可选组件）──────────────────────────────────────────────
+console.log('[6] 计划模式插件（可选）');
+const PLUGIN = 'dsh-plan-mode-ui';
+const profileDir = path.join(home, 'profiles', profile);
+const pluginDir = path.join(profileDir, 'node_modules', PLUGIN);
+if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
+  let pv = '?';
+  try { pv = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8')).version; } catch {}
+  ok('已装 ' + PLUGIN + '@' + pv);
+  if (fs.existsSync(path.join(pluginDir, 'lib', 'client.js'))) ok('客户端入口存在（lib/client.js）');
+  else { warn('缺少 lib/client.js —— 客户端不会加载'); problems.push('插件客户端入口缺失'); }
+  if (fs.existsSync(path.join(pluginDir, 'cordis.patch.yml'))) ok('自带 cordis.patch.yml（bundle 由安装器合并）');
+} else {
+  let dep = null;
+  try {
+    const pkgFile = path.join(profileDir, 'package.json');
+    if (fs.existsSync(pkgFile)) {
+      const pj = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+      dep = (pj.dependencies || {})[PLUGIN] || null;
+    }
+  } catch {}
+  if (dep) {
+    warn('profile 依赖里有 ' + PLUGIN + '@' + dep + '，但 node_modules 里没有 —— 重装一次：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
+    problems.push('插件声明存在但未落盘');
+  } else {
+    warn('未安装（纯可选）：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
+  }
+}
+const stateFile = path.join(home, 'plan-mode-ui', 'state.json');
+if (fs.existsSync(stateFile)) {
+  try {
+    const st = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    const n = st && st.sessions ? Object.keys(st.sessions).length : 0;
+    ok('状态文件有 ' + n + ' 条会话记录（最多 50 条，LRU 淘汰）');
+  } catch { warn('状态文件存在但解析失败：' + stateFile); }
+}
+
+// ── 7. 可选 dump-config ──────────────────────────────────────────────────────
+if (flag('--dump') || flag('--all')) {
+  console.log('[7] dsh --dump-config 是否认得这些预设');
   try {
     const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
     for (const id of PRESETS) {
