@@ -30,8 +30,6 @@
 
 **默认只装 v3**：npm 包与安装器都不再插入 v1/v2 的行，装完预设列表里只多一项。需要 A/B 对照时显式装三份 —— `bash scripts/install.sh --all-presets` 或 `pwsh scripts/install.ps1 -AllPresets`（v1/v2 源文件仍随包发布）。具体适配情况见 release 说明。
 
-v3 相对 v2 的改动集中在验证阶段：验收门通过即交付，不再追加随机测试与压测轮。改动针对的实测现象是失败模式从「答案错误」迁移到「超时」与「单个任务耗时过长」。
-
 ## 安装、更新、卸载
 
 ### npm（推荐）
@@ -67,33 +65,6 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 `--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的三个 insert 条目（v1、v2、v3）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
 更新时重复执行同一条 `add`，或先 `remove` 再 `add`。卸载时把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖；由脚本写入的托管块用 `scripts/install.sh --uninstall` 清除。
-
-### 脚本
-
-```bash
-git clone https://github.com/LarryE135/dsh-flash-presets.git
-cd dsh-flash-presets
-```
-
-Linux / macOS / WSL / Git Bash：
-
-```bash
-bash scripts/install.sh                         # DSH 0.1.7+ 写 profile 补丁；更旧版本回退到目录式
-bash scripts/install.sh --profile desktop       # 默认 web
-bash scripts/install.sh --uninstall
-DSH_HOME=/path/to/.dsh bash scripts/install.sh
-```
-
-Windows（PowerShell 5.1+ 或 7）：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-.\scripts\install.ps1 -Profile desktop
-.\scripts\install.ps1 -Uninstall
-.\scripts\install.ps1 -DshHome D:\tmp\.dsh
-```
-
-两个安装器共用 `scripts/merge-presets.mjs`：先备份 `cordis.patch.yml.bak-<时间戳>`，再整块替换托管块，可重复执行。
 
 ### 校验
 
