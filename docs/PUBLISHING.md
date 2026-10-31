@@ -150,18 +150,32 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 
 ## 7.5 0.2.6 起：插件与本包一起发
 
-发布顺序固定为「先 npm，再 Release」，因为 Release 正文要引用已存在的包版本：
+发布顺序固定为「先插件、再主包、最后 Release」，因为插件一旦上了 npm，主包 README 就能直接写
+`dsh plugin add dsh-plan-mode-ui`（而不只是本地 tgz）：
 
 ```bash
-# 1) 主包
+# 0) 打包插件 + 自检（6 个文件：lib/ cordis.patch.yml README.md LICENSE package.json）
+node scripts/pack-plugin.mjs            # → dist/dsh-plan-mode-ui-A.B.C.tgz
+npm test --prefix plugins/plan-mode-ui  # 11 个测试全跑
+
+# 1) 插件先上 npm（需要 OTP；两个包用同一个 OTP 窗口内连发）
+npm publish plugins/plan-mode-ui --otp <code> --access public
+
+# 2) 主包
 npm publish --otp <code>
-# 2) 主版本 Release（正文写「插件 dsh-plan-mode-ui vA.B.C 见附件」）
+
+# 3) 主版本 Release（正文写「插件 dsh-plan-mode-ui vA.B.C 见附件」）
 gh release create vX.Y.Z dist/dsh-flash-presets-X.Y.Z.tgz --title "vX.Y.Z" --notes-file /tmp/notes.md
-# 3) 插件 zip 作为同一 Release 的附件（不单独建 Release、不打 plan-mode-ui-* tag）
+
+# 4) 插件 zip 作为同一 Release 的附件（不单独建 Release、不打 plan-mode-ui-* tag）
 gh release upload vX.Y.Z ~/.dsh/artifacts/dsh-plan-mode-ui-vA.B.C.zip
-# 4) 核对：Releases / tags 里都不该出现 plan-mode-ui-*
-npm run verify:release
+
+# 5) 核对：Releases / tags 里都不该出现 plan-mode-ui-*；两个包版本与文档一致
+npm run verify:release && npm run verify:versions
 ```
+
+第 1 步走完之后，主 README 的安装段可以退回成一行 `dsh plugin --profile web add dsh-plan-mode-ui`，
+`--with-plan-mode` 则保留为「离线/内网也能一次装齐」的路径（它优先用 `dist/` 里的 tgz）。
 
 ## 8. 发布后验证（建议每次都做）
 

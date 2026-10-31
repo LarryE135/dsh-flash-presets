@@ -27,6 +27,9 @@
   "scripts": {
     "test": "bash test/run.sh"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "lib",
     "cordis.patch.yml",

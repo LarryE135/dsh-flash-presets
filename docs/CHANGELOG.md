@@ -16,6 +16,17 @@
   「含基准节 / 含 `bench:office`」两项为 True。
 - 插件 `dsh-plan-mode-ui` 0.5.2 与本版**一起发**：zip 作为 Release 附件，npm 页面随后刷新；
   `docs/规格-规划插件-v1.md` 维持不进 npm 包（内部文档），使用者从仓库查规格。
+- **两个安装器支持一次装齐**（`--with-plan-mode` / `-WithPlanMode`）：装完预设后按 `dist/*.tgz`
+  → 现打一份 → 插件目录的顺序找来源，有 `dsh` 就执行 `dsh plugin add`，没有就只打印等价命令；
+  不带开关时行为不变。
+- **`doctor` 新增插件一节**（`[6]`，`--all` 同时跑 `[7]` 合成配置）：报插件版本、客户端入口、
+  半装状态（profile 依赖有声明但 `node_modules` 没有）；没装只提示一行「纯可选」，不计失败。
+- **README 实测表改由 `docs/bench-office-results.json` 生成**（`scripts/render-bench-table.mjs`）：
+  基准行现算降幅，杜绝上次 `0.461 M / −83.7%` 那种手抄错误；`--check` 接进 `verify` 与 `prepublishOnly`。
+- **版本一致性闸**（`scripts/verify-versions.mjs`）：以两个 `package.json` 为真源，断言 lock、marketplace、
+  中英 README、版本表、插件兼容性文档、`dist/` 附件名共 7 处一致 —— 上线即抓到两处真实漂移（已修）。
+- **测试补强**：插件 `test/run.sh` 由只跑 2 个改为全跑 11 个；CI 新增 `plugin-tests`（node 20/22 矩阵）
+  与 `integration`（真 dsh 环境跑预设+插件整体自测），另在 verify job 跑无 dsh 的降级分支。
 
 ## 0.2.5 — 2026-10-30
 
