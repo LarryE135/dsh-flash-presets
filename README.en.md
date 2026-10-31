@@ -33,8 +33,6 @@ The presets control three things: the budget and round limit (counted by rounds,
 
 **Only v3 is installed by default**: neither the npm package nor the installers insert v1/v2 rows any more, so the preset list grows by exactly one entry. For A/B comparisons install all three explicitly with `bash scripts/install.sh --all-presets` or `pwsh scripts/install.ps1 -AllPresets` (the v1/v2 sources still ship with the package). Because model and framework behavior changes over time, v3 is generally the recommended choice; see the release notes for compatibility details.
 
-Compared with v2, v3 mainly changes the verification phase: once the acceptance gate passes, it delivers instead of adding random tests or load-test rounds. This responds to an observed shift in failure modes from wrong answers toward timeouts and single-task overrun.
-
 ## Install, update, and uninstall
 
 ### npm (recommended)
@@ -70,34 +68,7 @@ This is useful for an unpublished branch or local changes. The same GitHub spec 
 
 To update, repeat the same `add` command, or remove and add the package again. To uninstall, remove the package from `dsh.profile.bundles` and the dependency list, then reinstall dependencies. Use `scripts/install.sh --uninstall` to remove the managed block written by the installer.
 
-#### Scripts
-
-```bash
-git clone https://github.com/LarryE135/dsh-flash-presets.git
-cd dsh-flash-presets
-```
-
-Linux / macOS / WSL / Git Bash:
-
-```bash
-bash scripts/install.sh                         # DSH 0.1.7+ writes the profile patch; older versions fall back to the directory layout
-bash scripts/install.sh --profile desktop       # default is web
-bash scripts/install.sh --uninstall
-DSH_HOME=/path/to/.dsh bash scripts/install.sh
-```
-
-Windows (PowerShell 5.1+ or 7):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-.\scripts\install.ps1 -Profile desktop
-.\scripts\install.ps1 -Uninstall
-.\scripts\install.ps1 -DshHome D:\tmp\.dsh
-```
-
-Both installers share `scripts/merge-presets.mjs`: back up `cordis.patch.yml.bak-<timestamp>`, replace the managed block in place, safe to re-run.
-
-## Verification
+### Verification
 
 ```console
 node scripts/verify-presets.mjs                  # Structure and value assertions
