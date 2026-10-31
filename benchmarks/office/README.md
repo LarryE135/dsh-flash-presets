@@ -60,6 +60,7 @@ benchmarks/office/
 ```bash
 node benchmarks/office/tools/check.mjs          # 详见每题输入数与交付文件
 node benchmarks/office/tools/check.mjs --quiet  # 只报结果
+npm run checklist:bench                         # 发布前人工复核（自动收集证据，人只确认三项）
 ```
 
 校验内容：每题四件必备、`input_manifest.json` 逐文件 sha256 与字节数、
