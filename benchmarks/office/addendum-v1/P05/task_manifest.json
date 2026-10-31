@@ -1,0 +1,19 @@
+{
+  "task_id": "P05",
+  "version": "5.5.0",
+  "title": "账单付款、退款与拒付对账",
+  "input_manifest_sha256": "2669c42a27bbdee21f6dce38aafa4b872cffea0e1f9aff5787d16f5936737ad9",
+  "prompt_sha256": "022477ff13229a99c3ddc7805714973216839340c8d86d62555690670a1b0aae",
+  "outputs": {
+    "reconciliation.csv": {
+      "headers": [
+        "bill_id",
+        "amount_cents",
+        "net_paid_cents",
+        "status",
+        "source_ref"
+      ],
+      "key": "bill_id"
+    }
+  }
+}

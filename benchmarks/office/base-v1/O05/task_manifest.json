@@ -1,0 +1,27 @@
+{
+  "task_id": "O05",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "客户通讯录合并与冲突待办",
+  "outputs": {
+    "mapping.csv": {
+      "headers": [
+        "record_id",
+        "customer_id",
+        "status",
+        "reason_code",
+        "source_ref"
+      ],
+      "key": "record_id",
+      "types": {
+        "record_id": "string",
+        "customer_id": "string",
+        "status": "string",
+        "reason_code": "string",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "50f52c0b7b4f27898a4d2a34bb3edd89b7ab11aadc446af289fa684e77d1cd77",
+  "prompt_sha256": "a2bf0bb5e88c01ee66284068cedd3698e8c3fb861395ca5977b956adc493baf7"
+}

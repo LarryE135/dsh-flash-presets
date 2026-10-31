@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "path": "leave.csv",
+      "bytes": 2259,
+      "sha256": "e8639f84a82177bacd7a07bbd35cd013441f8fac783fc4a0a6b615e150630ad2"
+    },
+    {
+      "path": "shifts.csv",
+      "bytes": 10380,
+      "sha256": "1b2b7627cf929d26d0f8686cf12786e27b14974961d2329de2b0c7929142ddbd"
+    }
+  ]
+}

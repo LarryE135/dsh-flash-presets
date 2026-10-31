@@ -1,0 +1,27 @@
+{
+  "task_id": "O07",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "用政策与业务台账核验周会结论",
+  "outputs": {
+    "decisions.csv": {
+      "headers": [
+        "claim_id",
+        "verdict",
+        "resolved_value",
+        "reason_code",
+        "source_ref"
+      ],
+      "key": "claim_id",
+      "types": {
+        "claim_id": "string",
+        "verdict": "string",
+        "resolved_value": "integer_or_unknown",
+        "reason_code": "string",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "1a35139a85a778749ea9db007f4ba8f3af141015ee6e185e9572231d73b71d3e",
+  "prompt_sha256": "8407e190b11df4d171684d17d34ddcd2cb70833bd52ab61cf83d328870abf0a0"
+}

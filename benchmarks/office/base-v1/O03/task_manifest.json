@@ -1,0 +1,44 @@
+{
+  "task_id": "O03",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "销售更正与退货月报",
+  "outputs": {
+    "clean.csv": {
+      "headers": [
+        "order_id",
+        "status",
+        "net_quantity",
+        "net_cny_cents",
+        "region",
+        "source_ref"
+      ],
+      "key": "order_id",
+      "types": {
+        "order_id": "string",
+        "status": "string",
+        "net_quantity": "integer",
+        "net_cny_cents": "integer",
+        "region": "string",
+        "source_ref": "string"
+      }
+    },
+    "monthly.csv": {
+      "headers": [
+        "region",
+        "net_quantity",
+        "net_cny_cents",
+        "source_ref"
+      ],
+      "key": "region",
+      "types": {
+        "region": "string",
+        "net_quantity": "integer",
+        "net_cny_cents": "integer",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "db013ce54758145e0d795449d6cb76a0148c300f9bf911e4c58457749642d91b",
+  "prompt_sha256": "a90593c92fdf99488553e832e623f5eba616a98d5ec260caeff3b092e6b60009"
+}

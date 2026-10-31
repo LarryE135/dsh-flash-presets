@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "path": "people.csv",
+      "bytes": 6360,
+      "sha256": "fc2c591efe6df618f5c9c49cf37c976fdccfa7f0d17c99e1d401f62292737204"
+    },
+    {
+      "path": "support.csv",
+      "bytes": 293270,
+      "sha256": "4bb937464cdf104c8379b9f59735223311992926ed32f43c3029b92478f5ed0d"
+    }
+  ]
+}

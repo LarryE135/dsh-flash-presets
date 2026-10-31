@@ -15,3 +15,6 @@
 *.zip   binary
 # plugins/ 只在仓库里做版本管理，不随 git archive 进 Release 包（预设包本身不需要它们）
 plugins/ export-ignore
+# 办公基准测试：inputs 必须按字节保留（含 UTF-8 BOM 与 CRLF），否则 input_manifest 的 sha256 全部失效。
+# -text 关闭行尾转换与文本 diff（这批是数据件，本就不该被编辑）。
+benchmarks/office/**/inputs/** -text

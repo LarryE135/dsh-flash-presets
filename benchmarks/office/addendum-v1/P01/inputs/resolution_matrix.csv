@@ -1,0 +1,6 @@
+﻿error_code,severity,action
+DB_TIMEOUT,SEV1,检查连接池并回滚最近发布
+AUTH_EXPIRED,SEV2,刷新服务凭证并复测
+RATE_LIMIT,SEV2,核对限流策略与突发流量
+SCHEMA_MISMATCH,SEV2,比对字段版本并回滚不兼容变更
+UNKNOWN,SEV3,升级人工值班并保留现场

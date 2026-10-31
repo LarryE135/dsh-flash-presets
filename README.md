@@ -192,6 +192,21 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 5. 本包只安装预设行，不携带工具：profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
 
+## 办公基准测试（benchmarks/office）
+
+仓库里带两个虚构的日常办公数据处理套件，用于横向比较模型在"杂乱材料 → 特定格式交付物"上的表现：
+
+- **办公基准测试 v1**（`benchmarks/office/base-v1/`，包内 v5.0.0）：`O01`–`O08` 共 8 题
+- **办公追加测试 v1**（`benchmarks/office/addendum-v1/`，包内 v5.5.0）：`P01`–`P05` 共 5 题
+
+```bash
+npm run bench:office     # 结构 + 完整性 + 题面表头一致性校验
+```
+
+题目数据是合成数据（不含真实个人信息），三层 sha256 把输入钉死；**不要改 `inputs/`**，
+改题面必须回写对应的 `prompt_sha256`。口径细节与评分现状见 [benchmarks/office/README.md](benchmarks/office/README.md)。
+基准数据不随 npm 包分发（不在 `files` 白名单里）。
+
 ## 仓库结构
 
 ```

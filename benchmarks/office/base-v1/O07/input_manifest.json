@@ -1,0 +1,139 @@
+{
+  "files": [
+    {
+      "path": "catalog.csv",
+      "bytes": 856,
+      "sha256": "8fc411b5fb0bd92e86ca67c6087f74947d38d5f059e56926ed6a59e52c6a3329"
+    },
+    {
+      "path": "claims.csv",
+      "bytes": 1377,
+      "sha256": "fc624b682361fd4db8b42ace2f0ac053eb503fedb1f68fd8032a96ed16abc958"
+    },
+    {
+      "path": "facts.csv",
+      "bytes": 205887,
+      "sha256": "39dd7d71409a92166edeeca0e5944c05b9241ac8609ec7f303aa55ef5990b110"
+    },
+    {
+      "path": "policies/D011617cf4.md",
+      "bytes": 253,
+      "sha256": "68e467071eb5c524c873c558898b27e0e3c0ed65ed1305a40a439c4d9130e884"
+    },
+    {
+      "path": "policies/D02a952f38.md",
+      "bytes": 253,
+      "sha256": "1b6c7a888fdcfc79bf2b3261c4086341135a529ccb21221ad5a22c4dbd5dff45"
+    },
+    {
+      "path": "policies/D21d929c85.md",
+      "bytes": 250,
+      "sha256": "7d2e4e7de2d25f50494863c614fe3b62824b39ae67bee26b72cc680530e2a4d1"
+    },
+    {
+      "path": "policies/D319461226.md",
+      "bytes": 250,
+      "sha256": "59a1df494746a1479f6394cb6ee143b6044d951e69fa7bfffbf959767a58dc23"
+    },
+    {
+      "path": "policies/D3590892d3.md",
+      "bytes": 250,
+      "sha256": "70ccc7f009ef6fc98b8e78965931c78426d83dcef667f955686449c12b9cf9d8"
+    },
+    {
+      "path": "policies/D4975d6d7b.md",
+      "bytes": 250,
+      "sha256": "98b685bd6cd44502e0d1db311308ccd7316b5df4da0d4a6211038c607bae388d"
+    },
+    {
+      "path": "policies/D55d54ee82.md",
+      "bytes": 253,
+      "sha256": "f1c98511af0bd3b682afa1d6710ba6643b0ea85b2f03d88ff23a7f37a85895f9"
+    },
+    {
+      "path": "policies/D64538a5f1.md",
+      "bytes": 253,
+      "sha256": "883ee498ca94ce12be21d470e35e4a97a6139b02c03986bee502d9750e47aa9e"
+    },
+    {
+      "path": "policies/D68dd3eae9.md",
+      "bytes": 250,
+      "sha256": "d46df3a79e1a06025ff43e0da66b01b26789f7b737a9d70509823f0abc00cbad"
+    },
+    {
+      "path": "policies/D6c1f2e952.md",
+      "bytes": 253,
+      "sha256": "6417e2aa1a6115d52a20db740e49f84856dc1f6d98e9997c54ae95bc6d079f1d"
+    },
+    {
+      "path": "policies/D7f89d5c6f.md",
+      "bytes": 253,
+      "sha256": "cdf40b1f43b2c89af40301591a364f8ad88697b4590d5ce425ec9ff7bf688a8e"
+    },
+    {
+      "path": "policies/D857f22b1e.md",
+      "bytes": 253,
+      "sha256": "0b55506439b8a4bae7d405b945b5ca1e1a9c4f5c6f9269f51e3e1ddb2c0cd923"
+    },
+    {
+      "path": "policies/D8e0ab888e.md",
+      "bytes": 253,
+      "sha256": "869616ea7885f02974f42dd188f711d744b517fd3883715996fb9ea5251a6767"
+    },
+    {
+      "path": "policies/D9bf0bcd8d.md",
+      "bytes": 253,
+      "sha256": "319acbbbf6fc50612ef27e7e9c48a227e24db867eaa217a55423346da3aa61e5"
+    },
+    {
+      "path": "policies/D9c8186eb2.md",
+      "bytes": 250,
+      "sha256": "e591f18ceaae4270ce7f5728109332f6d56c1c412e619cfc894b5cca97e4299e"
+    },
+    {
+      "path": "policies/D9f45cebf0.md",
+      "bytes": 253,
+      "sha256": "e82d2a6b54fad8132339330665774f2daa8cef9991a0d28c1b08279e00753814"
+    },
+    {
+      "path": "policies/Da3690f181.md",
+      "bytes": 253,
+      "sha256": "438da14f64035b55487079bad03c17524f181014e67053c2fb18d33c57f4fd14"
+    },
+    {
+      "path": "policies/Da6ba1ae03.md",
+      "bytes": 253,
+      "sha256": "6f17fff8771083b4a3854a4cc9bb915b0c178f653ee676079d36a15dc0830e26"
+    },
+    {
+      "path": "policies/Dab75634bb.md",
+      "bytes": 253,
+      "sha256": "350bfd5ed958fd874c874c1d7260bd189a3e1751856488ecc6adca6418987b50"
+    },
+    {
+      "path": "policies/Dabb1fe0cf.md",
+      "bytes": 253,
+      "sha256": "fe7a22ed45d02f822755690def7f55a0b37da08159582999f25a55c6b48a801a"
+    },
+    {
+      "path": "policies/Dac838854b.md",
+      "bytes": 253,
+      "sha256": "c2e0ac9d1d34c13e1f9694ba1a71c57194eda59eb9b37571d2fd438f3ce5ad5d"
+    },
+    {
+      "path": "policies/Db461073e2.md",
+      "bytes": 250,
+      "sha256": "e3584f008136d55566c6dd7be3261bd29503f5a6c78446732a0c901fd457afdb"
+    },
+    {
+      "path": "policies/Dc033825d3.md",
+      "bytes": 253,
+      "sha256": "fdb3f3e91091f52d4d04bc051bfb0e9e13c2bd71c7e1bc34daf243d555dc302c"
+    },
+    {
+      "path": "policies/Ddffb98f72.md",
+      "bytes": 250,
+      "sha256": "1ba3ec7d77606f179eed785f22b2e06735410af0c1e41171c766e665c995c795"
+    }
+  ]
+}

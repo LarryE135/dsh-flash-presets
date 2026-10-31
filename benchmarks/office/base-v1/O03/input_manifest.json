@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "orders.csv",
+      "bytes": 565504,
+      "sha256": "8bc1d03725b70e0edeccb93491e647a3e265ee0a44607e458d18acc88c5690c7"
+    },
+    {
+      "path": "rates.csv",
+      "bytes": 70,
+      "sha256": "40b4c481d10ef66afe6dfc76a42f04800eebb68e0f3e09adecfc9fce979a0e57"
+    },
+    {
+      "path": "returns.csv",
+      "bytes": 64856,
+      "sha256": "02c2a49d9c464c4be2affd99a4075bc8c4951a3bfc8ebcbb37620b6972b213ec"
+    }
+  ]
+}

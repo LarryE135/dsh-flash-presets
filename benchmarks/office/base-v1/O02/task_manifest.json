@@ -1,0 +1,48 @@
+{
+  "task_id": "O02",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "月度报销核验与部门汇总",
+  "outputs": {
+    "claims.csv": {
+      "headers": [
+        "invoice_id",
+        "decision",
+        "reason_code",
+        "allowed_cents",
+        "bank_id",
+        "department",
+        "source_ref"
+      ],
+      "key": "invoice_id",
+      "types": {
+        "invoice_id": "string",
+        "decision": "string",
+        "reason_code": "string",
+        "allowed_cents": "integer",
+        "bank_id": "string",
+        "department": "string",
+        "source_ref": "string"
+      }
+    },
+    "summary.csv": {
+      "headers": [
+        "department",
+        "allowed_cents",
+        "accepted_count",
+        "held_count",
+        "source_ref"
+      ],
+      "key": "department",
+      "types": {
+        "department": "string",
+        "allowed_cents": "integer",
+        "accepted_count": "integer",
+        "held_count": "integer",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "8d8e733950d5d7f5e5102d572d2beed3beaff7c2b6944f6aaf2f88dfca75d0b3",
+  "prompt_sha256": "bd1df11ab33731d11e3390957ad0ab8a1e578ae7ec33b64c8427856bae1eaf4a"
+}

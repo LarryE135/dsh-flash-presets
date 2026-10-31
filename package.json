@@ -27,6 +27,7 @@
     "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs",
     "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && bash scripts/selftest.sh",
     "lint": "node scripts/lint-presets.mjs",
+    "bench:office": "node benchmarks/office/tools/check.mjs",
     "verify:runtime": "node scripts/verify-runtime.mjs"
   },
   "files": [

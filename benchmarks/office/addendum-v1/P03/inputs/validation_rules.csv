@@ -1,0 +1,5 @@
+﻿priority,field,rule
+1,name,required_after_trim
+2,phone,digits_only_after_trim
+3,email,exactly_one_at_no_spaces
+4,tax_id,required_unless_approved_exception

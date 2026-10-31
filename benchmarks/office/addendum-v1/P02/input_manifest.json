@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "change_log.csv",
+      "bytes": 6300,
+      "sha256": "282c4b3374745bcf86912488c698e2fb0aebd47b3afcf53174d08852c6cec36b"
+    },
+    {
+      "path": "config_inventory.csv",
+      "bytes": 2887,
+      "sha256": "cc9c799c7da8290dac31128d39210173254c38dc97277db559e4c3b656641cf3"
+    },
+    {
+      "path": "dependencies.csv",
+      "bytes": 883,
+      "sha256": "ad46fc8549542e76c4cf4c4869b04db300c760d457aff3c9f05cb6cc76c392d2"
+    }
+  ]
+}

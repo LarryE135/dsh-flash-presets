@@ -1,0 +1,30 @@
+{
+  "task_id": "P03",
+  "version": "5.5.0",
+  "title": "客户资料导入与例外审核",
+  "input_manifest_sha256": "f07c85dd875f6e8ebd39de300e5c0822c859e4f5b71f7478e434ed89adbdf95f",
+  "prompt_sha256": "4c54f006dfd1ca5ebcbbba075b9944b9d385785dea15edd02f7588f6668468e9",
+  "outputs": {
+    "accepted.csv": {
+      "headers": [
+        "record_id",
+        "name",
+        "phone",
+        "email",
+        "tax_id",
+        "status",
+        "source_ref"
+      ],
+      "key": "record_id"
+    },
+    "rejected.csv": {
+      "headers": [
+        "record_id",
+        "status",
+        "reason_code",
+        "source_ref"
+      ],
+      "key": "record_id"
+    }
+  }
+}

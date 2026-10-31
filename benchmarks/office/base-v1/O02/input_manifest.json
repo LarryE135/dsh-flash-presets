@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "path": "bank.csv",
+      "bytes": 33962,
+      "sha256": "87cd3c03c09e9c03363e4442d8bdd3fee946d34a6600ea60751d66f1f92ae3bd"
+    },
+    {
+      "path": "exceptions.csv",
+      "bytes": 8202,
+      "sha256": "3d8f4375bfdf8990a5e387b64b5f262f8af4976b4f5dbee314976b4bf0cf6449"
+    },
+    {
+      "path": "invoices.csv",
+      "bytes": 43451,
+      "sha256": "78f5f1421ce3dc5c52648f362dec750f264201f4d273292cbbe285e5cd97dbe1"
+    },
+    {
+      "path": "policies.csv",
+      "bytes": 76,
+      "sha256": "3d45702984706353a31710f9e7f0e1fbc6c8672b6ad8e3811f81f0f0e8516a51"
+    }
+  ]
+}

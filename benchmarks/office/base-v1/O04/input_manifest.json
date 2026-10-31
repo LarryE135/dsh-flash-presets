@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "path": "events.csv",
+      "bytes": 253712,
+      "sha256": "83917eb20ddd41d43e57db2962e8e89d090f4462c9748b9e415899b2b7dc2373"
+    },
+    {
+      "path": "opening.csv",
+      "bytes": 2726,
+      "sha256": "a7ce297b2510116a678ed7935eaf5f941e99d784173a74814e66784862887cae"
+    }
+  ]
+}

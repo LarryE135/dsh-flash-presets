@@ -1,0 +1,27 @@
+{
+  "task_id": "O06",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "客服记录对外分享前脱敏",
+  "outputs": {
+    "sanitized.csv": {
+      "headers": [
+        "case_id",
+        "subject",
+        "body",
+        "amount_cents",
+        "source_ref"
+      ],
+      "key": "case_id",
+      "types": {
+        "case_id": "string",
+        "subject": "string",
+        "body": "string",
+        "amount_cents": "integer",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "f3c9772cc574f309b96ab0b41318515c2436d0dae52abc271f8ab927b9d16369",
+  "prompt_sha256": "72bf44a7eb1a020919d8499988a8b22bdf9ef55cc6c30cabe96b40a06f623f2e"
+}

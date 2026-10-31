@@ -1,0 +1,31 @@
+{
+  "task_id": "O08",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "扫描小票与付款流水核验",
+  "outputs": {
+    "receipts.csv": {
+      "headers": [
+        "receipt_id",
+        "observed_date",
+        "observed_amount_cents",
+        "decision",
+        "allowed_cents",
+        "bank_id",
+        "source_ref"
+      ],
+      "key": "receipt_id",
+      "types": {
+        "receipt_id": "string",
+        "observed_date": "string",
+        "observed_amount_cents": "integer_or_unknown",
+        "decision": "string",
+        "allowed_cents": "integer",
+        "bank_id": "string",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "1273f5b57d80d438c83d941e79e35b148083e8b8d6bfb4ec8c460795b1115415",
+  "prompt_sha256": "b6d1ea641313d2d79a14cc8c1f8068e24ad5a68f7cdf455f34ba1511a05f6ce6"
+}

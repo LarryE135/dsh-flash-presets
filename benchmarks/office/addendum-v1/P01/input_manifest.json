@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "path": "deploys.csv",
+      "bytes": 6641,
+      "sha256": "b9c6d3174a17020766c7db6352360395a400b67737973d3d9a1d8575731c918c"
+    },
+    {
+      "path": "events.csv",
+      "bytes": 17429,
+      "sha256": "f6cb031aeb8096d3cceaa250a74f704723d38d07904a146a848e256282262a14"
+    },
+    {
+      "path": "resolution_matrix.csv",
+      "bytes": 296,
+      "sha256": "d945c1607b57b783d96fc7dd72a8aaaa740a09d3f807274c9780cb903876b1a6"
+    },
+    {
+      "path": "tickets.csv",
+      "bytes": 4354,
+      "sha256": "eb9d8510a5241b928f576920cdf59cd9412ab2c9c715b45d837114b06e4e2e79"
+    }
+  ]
+}

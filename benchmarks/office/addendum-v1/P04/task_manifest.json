@@ -1,0 +1,18 @@
+{
+  "task_id": "P04",
+  "version": "5.5.0",
+  "title": "跨日值班与部分请假冲突核验",
+  "input_manifest_sha256": "63b6a11e4cf0bdb3d67dc23bd15f534f228681b4acbc5ce36140a82939194f8f",
+  "prompt_sha256": "755dea8e3f79bad9997dd0ff3ec1b42e5d6a15b314b9103dc5870f9d7411b12d",
+  "outputs": {
+    "schedule_review.csv": {
+      "headers": [
+        "shift_id",
+        "status",
+        "conflict_code",
+        "source_ref"
+      ],
+      "key": "shift_id"
+    }
+  }
+}

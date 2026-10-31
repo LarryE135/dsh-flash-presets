@@ -1,0 +1,93 @@
+[
+  {
+    "task_id": "O01",
+    "title": "整理项目周报中的最新承诺",
+    "scale": "36项目、216份更新、108个字段",
+    "input_files": 218,
+    "input_bytes": 74708,
+    "output_rows": {
+      "status.csv": 108
+    },
+    "manifest_sha256": "2652a88180d8fdf9505ed6624e05c729d3fe3268a818287d929944e19d2d130e"
+  },
+  {
+    "task_id": "O02",
+    "title": "月度报销核验与部门汇总",
+    "scale": "900票据、1373流水、6部门",
+    "input_files": 4,
+    "input_bytes": 85691,
+    "output_rows": {
+      "claims.csv": 900,
+      "summary.csv": 6
+    },
+    "manifest_sha256": "db3399a6235d84ed003c8accabae69e7bcaa6100e36a9a28614c64b28c74f12a"
+  },
+  {
+    "task_id": "O03",
+    "title": "销售更正与退货月报",
+    "scale": "9559修订事件、覆盖2400订单、1800退货事件",
+    "input_files": 3,
+    "input_bytes": 630430,
+    "output_rows": {
+      "clean.csv": 2400,
+      "monthly.csv": 4
+    },
+    "manifest_sha256": "4806f384c9d89b1bbd3200898d878f924f758f1fb2058597e4cc84ae4b081217"
+  },
+  {
+    "task_id": "O04",
+    "title": "月末库存与补录冲销",
+    "scale": "180库存键、4800条出入库/补录事件",
+    "input_files": 2,
+    "input_bytes": 256438,
+    "output_rows": {
+      "stock.csv": 180,
+      "quarantine.csv": 65
+    },
+    "manifest_sha256": "9a965628b7c05ce656390ea7b2d02c81001c2d8c89e92ec3cff3373f71bd97c1"
+  },
+  {
+    "task_id": "O05",
+    "title": "客户通讯录合并与冲突待办",
+    "scale": "1200条通讯录、400客户、时效关系",
+    "input_files": 3,
+    "input_bytes": 115759,
+    "output_rows": {
+      "mapping.csv": 1200
+    },
+    "manifest_sha256": "4bd7d7068fb60dcf1f53b6534927628ee2c122be1cd73f9636fdb6c96c5ae4be"
+  },
+  {
+    "task_id": "O06",
+    "title": "客服记录对外分享前脱敏",
+    "scale": "1200条多行客服工单、80人字典",
+    "input_files": 2,
+    "input_bytes": 299630,
+    "output_rows": {
+      "sanitized.csv": 1200
+    },
+    "manifest_sha256": "ee044d9b601a601fe69a7f11e614dafe1ef15e2bc24158aaeb4a985046e729e1"
+  },
+  {
+    "task_id": "O07",
+    "title": "用政策与业务台账核验周会结论",
+    "scale": "24份简短政策、4800事实行、36项不同主张",
+    "input_files": 27,
+    "input_bytes": 214168,
+    "output_rows": {
+      "decisions.csv": 36
+    },
+    "manifest_sha256": "84b3115d8def03ce369468068f8afa3399d849960a34e894db952e7b3c3606f0"
+  },
+  {
+    "task_id": "O08",
+    "title": "扫描小票与付款流水核验",
+    "scale": "36小票/9页、184付款流水",
+    "input_files": 10,
+    "input_bytes": 614437,
+    "output_rows": {
+      "receipts.csv": 36
+    },
+    "manifest_sha256": "a81bc698f673933e5fe62186f461301c65361a0c55018ef6cee8fb3f57572c03"
+  }
+]

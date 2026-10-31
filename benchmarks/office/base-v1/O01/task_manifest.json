@@ -1,0 +1,27 @@
+{
+  "task_id": "O01",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "整理项目周报中的最新承诺",
+  "outputs": {
+    "status.csv": {
+      "headers": [
+        "item_id",
+        "project_id",
+        "field",
+        "value",
+        "source_ref"
+      ],
+      "key": "item_id",
+      "types": {
+        "item_id": "string",
+        "project_id": "string",
+        "field": "string",
+        "value": "string",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "f0285b8c71bd8b5161ac772b6f150b972cd79b75b6f046982bb964fbacaa2d72",
+  "prompt_sha256": "f58d797f2f6a1f625206acf88e98ae90abd891242c994fdcc8ccc2b0010bb630"
+}

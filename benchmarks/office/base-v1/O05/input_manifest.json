@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "accounts.csv",
+      "bytes": 67385,
+      "sha256": "4622c356337a8f5f611469cb9a5737281cc993f4063e5297400ccc8976f0ea3a"
+    },
+    {
+      "path": "crosswalk.csv",
+      "bytes": 36745,
+      "sha256": "6ce5100d3a1bb9345d357d057475429fd0fa20dec926f6b147fe6a51a494e1bf"
+    },
+    {
+      "path": "registry.csv",
+      "bytes": 11629,
+      "sha256": "ffbfbe5e683e44d7f65aec79c01d6fe33dcee2d0aabb6d7a96a111913d4bba98"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "task_id": "P02",
+  "version": "5.5.0",
+  "title": "生产配置依赖与回滚评估",
+  "input_manifest_sha256": "16bc1aaba6d8254ab14d95d4a88628f101de877ce3a92182a0e354aa0920bb86",
+  "prompt_sha256": "325ca256b9d9dc3e1b599057b2c9ef502ea759e0d893aa0915f6983a714ba9f3",
+  "outputs": {
+    "config_review.csv": {
+      "headers": [
+        "config_key",
+        "target_value",
+        "actual_value",
+        "audit_status",
+        "action",
+        "source_ref"
+      ],
+      "key": "config_key"
+    }
+  }
+}

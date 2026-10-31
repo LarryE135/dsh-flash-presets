@@ -1,0 +1,19 @@
+{
+  "task_id": "P01",
+  "version": "5.5.0",
+  "title": "生产故障证据归并",
+  "input_manifest_sha256": "da0dd8ac015c84004300fcc826ad6c832d0bf682009c4fb7d5df3e48f4143977",
+  "prompt_sha256": "d6b0a24fb28bcc239a68347e70313f56a1123d80428041fb0b0022d0217d3852",
+  "outputs": {
+    "triage.csv": {
+      "headers": [
+        "incident_id",
+        "severity",
+        "root_cause",
+        "recommended_action",
+        "source_ref"
+      ],
+      "key": "incident_id"
+    }
+  }
+}

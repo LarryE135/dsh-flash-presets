@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "path": "bills.csv",
+      "bytes": 4354,
+      "sha256": "e0ec0dbeac11e4b4687ef677de9fb828fcd5992b0a2a5b869aae1c115e638ae4"
+    },
+    {
+      "path": "transactions.csv",
+      "bytes": 10056,
+      "sha256": "43b3ea7b6b7d85ac34f3ff3606a8ef6f58eb388f4a50cad7d00c40dbe383724a"
+    }
+  ]
+}

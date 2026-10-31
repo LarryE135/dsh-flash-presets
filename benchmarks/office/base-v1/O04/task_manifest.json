@@ -1,0 +1,36 @@
+{
+  "task_id": "O04",
+  "version": "5.0.0",
+  "synthetic": true,
+  "title": "月末库存与补录冲销",
+  "outputs": {
+    "stock.csv": {
+      "headers": [
+        "stock_key",
+        "closing_qty",
+        "source_ref"
+      ],
+      "key": "stock_key",
+      "types": {
+        "stock_key": "string",
+        "closing_qty": "integer",
+        "source_ref": "string"
+      }
+    },
+    "quarantine.csv": {
+      "headers": [
+        "event_id",
+        "reason_code",
+        "source_ref"
+      ],
+      "key": "event_id",
+      "types": {
+        "event_id": "string",
+        "reason_code": "string",
+        "source_ref": "string"
+      }
+    }
+  },
+  "input_manifest_sha256": "a5bad923ded5bc6e53d2cf00657093cdc179e95acca5f35bcb90ff4e63a89416",
+  "prompt_sha256": "21fb59baae345195f4c031f525c4d2aacfb7ebbb758562795ff5e1ec5ee0de06"
+}

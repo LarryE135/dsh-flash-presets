@@ -1,0 +1,54 @@
+{
+  "files": [
+    {
+      "path": "bank.csv",
+      "bytes": 3984,
+      "sha256": "5622c5cfafe395e21bc61e8c3ae0b3075c113928fab81dc74ff9b6b399692a1e"
+    },
+    {
+      "path": "pages/page-01.png",
+      "bytes": 65463,
+      "sha256": "fab399781098beee62b6e9be633b7125aa8c135afc9f2df7d7b5cf2c39bd5761"
+    },
+    {
+      "path": "pages/page-02.png",
+      "bytes": 68510,
+      "sha256": "76c00703f95261ebfa72a173a451059a34be62357f6dfeda0b6264324a222c05"
+    },
+    {
+      "path": "pages/page-03.png",
+      "bytes": 67713,
+      "sha256": "cfdbc1f0a0f83056205fad5be380365cf4509539532f4e115aa3f8ba0bee1291"
+    },
+    {
+      "path": "pages/page-04.png",
+      "bytes": 69190,
+      "sha256": "e7bf20ff4c8b5745e65e9791d2c9f0b09746787f686cdcca92b81b8a675b3be6"
+    },
+    {
+      "path": "pages/page-05.png",
+      "bytes": 68129,
+      "sha256": "1d5686ada4a1b6b7c965682dc5470570ffe922d8e867e5fdd631d7a83e20cbb8"
+    },
+    {
+      "path": "pages/page-06.png",
+      "bytes": 68583,
+      "sha256": "644a5bd6184d9fd7a6b087f3259c1e2f81e4e5c8a628896fa72e3170ffe23f96"
+    },
+    {
+      "path": "pages/page-07.png",
+      "bytes": 66902,
+      "sha256": "44c061c31edf0be4e2f81f0d6e3fec4441e01b886d0639a95c11d7143b28a127"
+    },
+    {
+      "path": "pages/page-08.png",
+      "bytes": 68625,
+      "sha256": "b5696034ee665090f08144b3ec30dd1592104440ff830e9eba46b737eeb9cbfb"
+    },
+    {
+      "path": "pages/page-09.png",
+      "bytes": 67338,
+      "sha256": "bb13e3acd4665ac321f1f92cd3c121c9b3acc318485c93ed78b0d1a8b4e0a6b2"
+    }
+  ]
+}
