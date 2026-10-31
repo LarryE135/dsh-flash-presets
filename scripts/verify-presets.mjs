@@ -155,12 +155,29 @@ for (const [name, exp] of Object.entries(EXPECT)) {
 // ── A3. 行尾与文档链接（2026-10-24 审计补）───────────────────────────────────
 // 行尾检查以 .gitattributes 为准：eol=lf 的文件不许有 CR，eol=crlf 的（*.ps1/.cmd/.bat）必须是 CRLF。
 const attrText = read(path.join(repo, '.gitattributes')) || '';
-const lfPatterns = [];
-const crlfPatterns = [];
+// 以整条属性行为准解析，并尊重后出现的更具体规则（如 `benchmarks/office/**/inputs/** -text`）。
+// 旧实现只认 `eol=`，会把 `* text=auto eol=lf` 上的 -text 例外也当成"必须是 LF"，导致数据件误报。
+const attrRules = [];
 for (const line of attrText.split(/\r?\n/)) {
-  const m = /^\s*(\S+)\s+.*\beol=(lf|crlf)\b/.exec(line);
-  if (m) (m[2] === 'lf' ? lfPatterns : crlfPatterns).push(m[1]);
+  const m = /^\s*(\S+)\s+(.+)$/.exec(line);
+  if (!m || m[1].startsWith('#')) continue;
+  const eolM = /\beol=(lf|crlf)\b/.exec(m[2]);
+  attrRules.push({ pattern: m[1], eol: eolM ? eolM[1] : null, unsetText: /(^|\s)-text(\s|$)/.test(m[2]), index: attrRules.length });
 }
+const globToRe = (p) => new RegExp('^' + p.split('**').map((seg) => seg.split('*').map((s) => s.replace(/[.+^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*') + '$');
+const specificity = (p) => (p.includes('**') ? 3 : p.includes('/') ? 2 : p.includes('*') ? 1 : 0);
+const effectiveEol = (rel, name) => {
+  const posix = rel.split(path.sep).join('/');
+  let best = null;
+  for (const r of attrRules) {
+    const hit = r.pattern === '*' ? true : r.pattern.includes('*') && r.pattern.includes('/') ? globToRe(r.pattern).test(posix) : matches(r.pattern, name);
+    if (!hit) continue;
+    const score = specificity(r.pattern);
+    if (!best || score > best.score || (score === best.score && r.index > best.index)) best = { ...r, score };
+  }
+  if (!best || best.unsetText) return null; // -text：按字节保留，不参与行尾断言
+  return best.eol;
+};
 const matches = (pattern, name) => (pattern === '*' ? true : pattern.startsWith('*.') ? name.endsWith(pattern.slice(1)) : name === pattern);
 const lfViolations = [];
 const crlfViolations = [];
@@ -176,8 +193,9 @@ const walkRepo = (dir) => {
     if (SKIP_EXT.test(entry.name)) continue;
     const rel = path.relative(repo, full);
     const buf = fs.readFileSync(full);
-    if (lfPatterns.some((p) => matches(p, entry.name)) && buf.includes(13)) lfViolations.push(rel);
-    if (crlfPatterns.some((p) => matches(p, entry.name)) && !buf.includes(13)) crlfViolations.push(rel);
+    const eol = effectiveEol(rel, entry.name);
+    if (eol === "lf" && buf.includes(13)) lfViolations.push(rel);
+    if (eol === "crlf" && !buf.includes(13)) crlfViolations.push(rel);
   }
 };
 walkRepo(repo);

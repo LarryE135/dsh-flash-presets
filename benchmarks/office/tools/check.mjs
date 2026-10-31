@@ -153,6 +153,25 @@ if (!/benchmarks\/office\/\*\*\/inputs\/\*\*\s+-text/.test(gitattributes)) {
   fail(".gitattributes", "缺少 benchmarks/office/**/inputs/** -text：git 会把 CRLF 规范化成 LF，导致输入 sha256 全部失效");
 }
 
+// ---- 公开评分标准：自证哈希 + 私有指纹齐备 ----
+const gradePath = existsSync(join(ROOT, "grading", "公开评分标准", "文件校验.json"))
+  ? join(ROOT, "grading", "公开评分标准", "文件校验.json")
+  : null;
+if (gradePath === null) {
+  fail("grading", "缺少 grading/公开评分标准/文件校验.json：评分规则没有版本锚点");
+} else {
+  const doc = JSON.parse(readFileSync(gradePath, "utf8"));
+  for (const f of doc.files || []) {
+    const p = join(dirname(gradePath), f.name);
+    if (!existsSync(p)) { fail("grading", "缺少 " + f.name); continue; }
+    const buf = readFileSync(p);
+    if (sha(buf) !== f.sha256) fail("grading", f.name + " 内容与 文件校验.json 不符（规则被改动过）");
+    if (typeof f.bytes === "number" && buf.length !== f.bytes) fail("grading", f.name + " 字节数不符");
+  }
+  if ((doc.source_fingerprints || []).length === 0) fail("grading", "文件校验.json 缺少 source_fingerprints（防泄漏守卫没有黑名单）");
+  notes.push("评分规则 " + (doc.files || []).length + " 个文件自证一致，私有指纹 " + (doc.source_fingerprints || []).length + " 条");
+}
+
 // ---- 汇总 ----
 for (const n of notes) if (!quiet) console.log("  " + n);
 if (problems.length === 0) {

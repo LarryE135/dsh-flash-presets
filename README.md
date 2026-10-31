@@ -204,7 +204,11 @@ npm run bench:office     # 结构 + 完整性 + 题面表头一致性校验
 ```
 
 题目数据是合成数据（不含真实个人信息），三层 sha256 把输入钉死；**不要改 `inputs/`**，
-改题面必须回写对应的 `prompt_sha256`。口径细节与评分现状见 [benchmarks/office/README.md](benchmarks/office/README.md)。
+改题面必须回写对应的 `prompt_sha256`。口径细节见 [benchmarks/office/README.md](benchmarks/office/README.md)。
+
+**评分规则公开、真值私有**：规则在 `benchmarks/office/grading/`（v5 六维加权 / v5.5 单元格精确匹配，两者不可混用）；
+真值与评分器在独立**私有**仓库。公开仓库由 `npm run guard:bench` 保证"一个字节都不泄漏"
+（哈希黑名单 + 命名黑名单 + `inputs/` 之外禁止出现表格文件），已接入 `npm run verify` 与 `prepublishOnly`。
 基准数据不随 npm 包分发（不在 `files` 白名单里）。
 
 ## 仓库结构

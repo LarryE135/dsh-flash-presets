@@ -1,0 +1,52 @@
+{
+  "version": "2026-10-31",
+  "scope": "公开评分标准；未重新评分历史交付；不含私有答案或评分器",
+  "files": [
+    {
+      "name": "01-v5评分标准.md",
+      "bytes": 3183,
+      "sha256": "8ddb3278e49495544e9b1b7560bc0a50dc2837b211dcdabd9ada10a2e8ba66cf"
+    },
+    {
+      "name": "02-v5.5评分标准.md",
+      "bytes": 3032,
+      "sha256": "ca84fa45c9f7887c8603692f4722a2d022e2e68ccf70036d62a34a5311310f23"
+    },
+    {
+      "name": "03-计量与现有图表口径.md",
+      "bytes": 3345,
+      "sha256": "988f3ab4c5fbf733abba9e1311060a9ca6bd6117bc5c4fb8d6caa707055d7757"
+    },
+    {
+      "name": "README.md",
+      "bytes": 1006,
+      "sha256": "9c12ed762e3f2f936e34d9f52a2ae0647dd11f1fe7d3521fc9c30a6eb5062671"
+    }
+  ],
+  "source_fingerprints": [
+    {
+      "source": "output/office-benchmark-v5/02-评分与计量.md",
+      "sha256": "e505e37f1ffd7a7b6ac37ca710c47576fd514dbc6bb1f8e2ecd52ca2c4975755"
+    },
+    {
+      "source": "output/office-benchmark-v5/bench.py",
+      "sha256": "d820cd0d8521a1d3fa51e14a463905f02c796d4023a2ce7fe0b506a7bb0efe2f"
+    },
+    {
+      "source": "output/office-benchmark-v5-supplement-v5.5/执行与评分说明.md",
+      "sha256": "f8bfdc39c5d0984e1e789b820398a2a1f5eccce489c1495c9be3842925199ebe"
+    },
+    {
+      "source": "output/office-benchmark-v5-supplement-v5.5/score.py",
+      "sha256": "5a69a3da9812435a0770a80d7dbe23ea1162ba050191dc6e8a6ef71fb64ce38b"
+    },
+    {
+      "source": "output/office-benchmark-v5-supplement-v5.5/grade_batch.py",
+      "sha256": "eef4c9a8bb77cc5f0dbc76ce706b9ab303c388b36d9ef4e7bf5148861074799f"
+    },
+    {
+      "source": "output/promo-office-benchmarks-v5-v5.5/数据说明.md",
+      "sha256": "b8acf910b4e10cbb24ea21ad08cad5d73df2a2655bcc020e23f4fc2528cdc9b2"
+    }
+  ]
+}
