@@ -132,6 +132,11 @@ jobs:
         shell: bash
         run: bash scripts/selftest.sh
 
+      # 整体组合：预设 + 插件装进临时 DSH_HOME（本 job 没装 dsh → 验证降级提示）
+      - name: 整体组合自测（无 dsh 分支）
+        shell: bash
+        run: bash scripts/selftest-integration.sh
+
       # 没装 pwsh 的机器上也能审 PowerShell 脚本（三平台都跑）
       - name: Static check (PowerShell scripts)
         shell: bash
@@ -214,6 +219,20 @@ jobs:
           dsh --profile web --dump-config > "$RUNNER_TEMP/dump.yml" 2>/dev/null || rc=$?
           if [ "$rc" -ne 0 ]; then echo "dsh 无法合成 —— latest 可能不兼容"; exit 1; fi
           node scripts/verify-runtime.mjs "$RUNNER_TEMP/dump.yml"
+
+  # 真实 dsh 环境下的整体组合：--with-plan-mode 装插件 + doctor --all 全绿
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: 安装 DSH 与 pnpm
+        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.2
+      - name: 整体组合自测（有 dsh 分支）
+        run: bash scripts/selftest-integration.sh
 
   # 插件自测：11 个 test/*.mjs 全跑（v0.5.3 起从 2 个扩到 11 个；之前 CI 完全不跑插件测试）。
   plugin-tests:
