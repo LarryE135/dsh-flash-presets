@@ -120,6 +120,23 @@ curl -s -X POST -H "Authorization: token $T" -H 'Accept: application/vnd.github+
   -d '{"tag_name":"vX.Y.Z","name":"vX.Y.Z — 摘要","body":"...","draft":false}'
 ```
 
+### 插件（`dsh-plan-mode-ui`）不单独建 Release
+
+插件版本号（当前 `0.5.2`）独立演进，但**发布面跟着主版本走**：
+
+- **不打 `plan-mode-ui-*` tag**，也不单独建 Release。一旦打了，Releases 页会多出一条，
+  而且按提交时间排序时它常常变成 `Latest`，把主版本顶下去（2026-10-31 实测踩过，已撤销）。
+- 需要发插件时，**把 zip 作为主版本 Release 的附件**挂上去：
+
+```bash
+gh release upload vX.Y.Z ~/.dsh/artifacts/dsh-plan-mode-ui-vA.B.C.zip
+```
+
+  并在正文里写一句「插件 `dsh-plan-mode-ui` vA.B.C 见附件」。
+- 插件源码在 `plugins/plan-mode-ui/`（`.gitattributes` 里 `export-ignore`，不进 npm 包），
+  重新打包命令见 `plugins/plan-mode-ui/README.md`。
+- 有 `scripts/verify-release-hygiene.mjs` 守着这条约定，`npm run verify` 时会检查。
+
 ## 7. 收尾：删 token
 
 ```bash

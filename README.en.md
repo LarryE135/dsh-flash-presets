@@ -266,7 +266,7 @@ marketplace/                      Plugin marketplace submission material
 ### v0.1.0 (2026-09-23 to 2026-09-24)
 
 - First release: v1 with compaction 0.3 / 50k, 14 constraints, and the PTC presentation layer.
-- Earlier v1.0.0, v1.0.1, and v1.1.0 tags belong to the same generation and are folded into this version. Those tags were removed when the 0.2.5 tags were rewritten; the remote now only carries `v0.1.0`, `v0.2.0`-`v0.2.5`, and the plugin tag `plan-mode-ui-v0.5.2`.
+- Earlier v1.0.0, v1.0.1, and v1.1.0 tags belong to the same generation and are folded into this version. Those tags were removed when the 0.2.5 tags were rewritten; the remote now only carries `v0.1.0` and `v0.2.0`-`v0.2.5`.
 
 ## Documentation
 

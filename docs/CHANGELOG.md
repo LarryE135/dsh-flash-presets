@@ -1,5 +1,12 @@
 # 变更日志
 
+## 0.2.6 — 未发布
+
+- 计划把 plan mode 插件 `dsh-plan-mode-ui`（当前 0.5.2）的 zip **作为本版本 Release 的附件**发布，
+  不再为插件单独建 Release / 打 tag（`plan-mode-ui-v0.5.2` 已于 2026-10-31 撤销）。
+- 新增 `npm run verify:release`：断言 Releases 与远端 tags 里都没有 `plan-mode-ui-*`，
+  且 `docs/PUBLISHING.md` 仍保留该约定（接进 `prepublishOnly`）。
+
 ## 0.2.5 — 2026-10-30
 
 本轮同时是本包在 npm 的首次发布；默认只装一个预设（v3）。
