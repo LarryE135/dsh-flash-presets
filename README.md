@@ -98,12 +98,13 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 ```
 
 题目数据是合成数据，三层 sha256 把输入钉死；**不要改 `inputs/`**，
-改题面必须回写对应的 `prompt_sha256`。口径细节见 [benchmarks/office/README.md](benchmarks/office/README.md)。
+改题面必须回写对应的 `prompt_sha256`。口径细节见 [benchmarks/office/README.md](https://github.com/LarryE135/dsh-flash-presets/blob/main/benchmarks/office/README.md)。
 
-**评分规则公开、真值私有**：规则在 `benchmarks/office/grading/`（v5 六维加权 / v5.5 单元格精确匹配，两者不可混用）；
+**题目与评分规则文件只在仓库里**，npm 包不含 `benchmarks/`（整包 34 个文件、约 270 kB），上面两个命令要在仓库内跑；从 npm 装到的只是预设本身。
+
+**评分规则公开、真值私有**：规则在 [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading)（v5 六维加权 / v5.5 单元格精确匹配，两者不可混用）；
 真值与评分器在独立**私有**仓库。公开仓库由 `npm run guard:bench` 保证"一个字节都不泄漏"
 （哈希黑名单 + 命名黑名单 + `inputs/` 之外禁止出现表格文件），已接入 `npm run verify` 与 `prepublishOnly`。
-
 
 ## 实测
 
@@ -117,11 +118,11 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 | OPS + PTC | 3.499 M（n=4） | −35.0% | 1.404 M（n=5） | −50.3% |
 | lean-v3 | 1.437 M（n=5） | −73.3% | 0.481 M（n=5） | −83.0% |
 
-![办公基准与追加基准的平均 Token 消耗（含缓存读取）](docs/images/bench-office-token.png)
+![办公基准与追加基准的平均 Token 消耗（含缓存读取）](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
 
 三条口径：`OPS + PTC` 在基准 v1 只有 4 次有效运行（图上标 n=4），其余均为 5 次；两个套件任务不同、
 **不合并排名**，只分别对比；这里只有 Token，质量分不在本表，评分规则与真值口径见
-[benchmarks/office/grading/](benchmarks/office/grading/)。
+[benchmarks/office/grading/](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading)。
 
 补充两点：
 
@@ -267,11 +268,11 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 文档
 
-[实测证据](docs/实测证据.md)、[版本与兼容性](docs/版本与兼容性.md)、[0.2.0 历史 README](docs/README-0.2.0.md)、[变更日志](docs/CHANGELOG.md)
+[实测证据](docs/实测证据.md)、[版本与兼容性](docs/版本与兼容性.md)、[0.2.0 历史 README](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/README-0.2.0.md)、[变更日志](docs/CHANGELOG.md)
 
 实现与内部机制：[技术文档 · 实现方式与路径](docs/技术文档-精简预设实现.md)、[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)
 
-审计记录：[0.2.5 全量审计](docs/审计-0.2.5-全量.md)、[0.2.5 复检](docs/审计-0.2.5-复检.md)、[0.2.5 审计](docs/审计-0.2.5.md)
+审计记录：[0.2.5 全量审计](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-全量.md)、[0.2.5 复检](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-复检.md)、[0.2.5 审计](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5.md)
 
 ## 许可证
 

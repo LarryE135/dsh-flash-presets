@@ -6,6 +6,11 @@
   不再为插件单独建 Release / 打 tag（`plan-mode-ui-v0.5.2` 已于 2026-10-31 撤销）。
 - 新增 `npm run verify:release`：断言 Releases 与远端 tags 里都没有 `plan-mode-ui-*`，
   且 `docs/PUBLISHING.md` 仍保留该约定（接进 `prepublishOnly`）。
+- **npm 包收窄**：`files` 不再整目录发布 `docs/`，只发 5 篇（`CHANGELOG.md`、`版本与兼容性.md`、
+  两份技术文档、`实测证据.md`）；`scripts/` 排除发布脚本。tarball 从 50 文件 / 381 kB 降到 34 文件 / 271 kB，
+  审计记录、实验记录、`PUBLISHING.md` 不再对外可见。
+- **README 链接对 npm 友好**：`benchmarks/`、`docs/images/`、以及不再随包发布的文档改用绝对链接，
+  避免 npm 页面上出现死链；基准节补回「题目与评分规则只在仓库提供，npm 包不含 `benchmarks/`」这句口径。
 
 ## 0.2.5 — 2026-10-30
 

@@ -102,9 +102,9 @@ npm run checklist:bench    # pre-release human review (collects evidence, you co
 ```
 
 Task data is synthetic (contains no real personal information); a three-layer sha256 chain pins every input -- **do not modify `inputs/`**.
-Editing a prompt means rewriting the matching `prompt_sha256`. Details: [benchmarks/office/README.md](benchmarks/office/README.md).
+Editing a prompt means rewriting the matching `prompt_sha256`. Details: [benchmarks/office/README.md](https://github.com/LarryE135/dsh-flash-presets/blob/main/benchmarks/office/README.md).
 
-**Scoring rules are public; ground truth is private**: the rules live in `benchmarks/office/grading/` (v5 six-dimension weighted score
+**Scoring rules are public; ground truth is private**: the rules live in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading) (v5 six-dimension weighted score
 vs v5.5 exact cell matching -- the two must not be mixed); ground truth and graders live in a separate **private** repository.
 `npm run guard:bench` keeps this repository clean (hash denylist + name denylist + no tabular files outside `inputs/`) and is wired
 into `npm run verify` and `prepublishOnly`. Benchmark data is not shipped in the npm package.
@@ -121,11 +121,11 @@ One full round per suite, averaged per group; **OPS refers to the `dsh-ops` proj
 | OPS + PTC | 3.499 M (n=4) | −35.0% | 1.404 M (n=5) | −50.3% |
 | lean-v3 | 1.437 M (n=5) | −73.3% | 0.481 M (n=5) | −83.0% |
 
-![Average token consumption on the office benchmark and addendum suites (including cache reads)](docs/images/bench-office-token.png)
+![Average token consumption on the office benchmark and addendum suites (including cache reads)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
 
 Three caveats: `OPS + PTC` has only 4 valid runs on the v1 benchmark (the chart labels it n=4), all others have 5;
 the two suites contain different tasks and are **not pooled** into a single ranking; this table covers tokens only —
-for quality scoring rules and ground-truth policy see [benchmarks/office/grading/](benchmarks/office/grading/).
+for quality scoring rules and ground-truth policy see [benchmarks/office/grading/](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading).
 
 Two disclosures:
 
@@ -264,11 +264,11 @@ marketplace/                      Plugin marketplace submission material
 
 ## Documentation
 
-[Measured evidence](docs/实测证据.md), [version and compatibility](docs/版本与兼容性.md), [the 0.2.0 historical README](docs/README-0.2.0.md), and the [changelog](docs/CHANGELOG.md).
+[Measured evidence](docs/实测证据.md), [version and compatibility](docs/版本与兼容性.md), [the 0.2.0 historical README](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/README-0.2.0.md), and the [changelog](docs/CHANGELOG.md).
 
 Implementation notes: [technical reference](docs/技术文档-精简预设实现.md) and [the four token-saving mechanisms](docs/技术文档-省token四机制.md).
 
-Audit records: [full audit](docs/审计-0.2.5-全量.md), [re-check](docs/审计-0.2.5-复检.md), and [earlier audit](docs/审计-0.2.5.md).
+Audit records: [full audit](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-全量.md), [re-check](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-复检.md), and [earlier audit](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5.md).
 
 ## License
 
