@@ -286,13 +286,3 @@ marketplace/                      插件市场提交材料（不随包发布）
     </tr>
   </tbody>
 </table>
-
----
-
-## English summary
-
-Flash-tier agent presets for DSH, shipped as a patch-only bundle (`dsh.bundle`) that inserts `@deepseek-ai/dsh-agent-preset` rows into a profile. Three presets: `v1` (compaction 0.3/50k, 14 rules), `v2` (0.25/20k, 12 rules), `v3` (current, 0.25/20k, 13 rules, stops once the acceptance gate passes). No runtime code, no `main`, no `prepare`. Verified against DSH 0.2.1-rc.2 with a simulated install: temp `DSH_HOME`, install, `--dump-config` shows all three, idempotent re-install, clean uninstall. Not verified on macOS hardware, and no same-scale comparison for native (non-PTC) mode.
-
-Measured on two office-data suites (one round each; tokens include cache reads; every run fully correct): lean-v3 used 1.437M / 0.481M against standard mode's 5.380M / 2.827M -- 73% / 83% fewer tokens at identical accuracy. The two suites hold different tasks, so they are reported separately and never pooled. Prompt-level difficulty assessment and clarifying questions did not help.
-
-Install from npm: `dsh plugin --profile web add dsh-flash-presets` (or from git: `github:LarryE135/dsh-flash-presets`), or run `bash scripts/install.sh --profile web` after cloning.
