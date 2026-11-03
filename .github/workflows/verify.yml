@@ -82,36 +82,30 @@ jobs:
           node scripts/verify-yaml.mjs
           node scripts/verify-yaml.mjs "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"
 
-      # The legacy (DSH < 0.1.7) install path must keep working too.
-      - name: Legacy install path (bash)
+      # 0.2.6 移除了 presets/legacy-0.1.5，旧版入口必须明确拒绝（exit 3），不能静默跳过。
+      - name: Legacy install path is rejected (bash)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/dsh-legacy/.agent-presets"
-          # bash 3.2（macOS 自带）会把 `$p（` 里的全角括号吞进变量名，所以脚本里一律用 ${p}
           DSH_HOME="$RUNNER_TEMP/dsh-legacy" bash scripts/install.sh --legacy
           irc=$?
-          echo "install.sh --legacy 退出码: $irc"
-          find "$RUNNER_TEMP/dsh-legacy" -maxdepth 3 | sort
-          out=$(DSH_HOME="$RUNNER_TEMP/dsh-legacy" DSH_PROFILE=web node scripts/verify-presets.mjs 2>&1)
-          vrc=$?
-          echo "$out"
-          echo "verify 退出码: $vrc"
-          if [ "$irc" -ne 0 ] || [ "$vrc" -ne 0 ]; then
-            # 只把失败行发成注解：GitHub 每个 check-run 最多保留 10 条注解
-            echo "$out" | grep '✖' | head -8 | while IFS= read -r line; do echo "::error::legacy$line"; done
-            echo "::error::legacy install 退出码=$irc verify 退出码=$vrc"
-            exit 1
+          echo "install.sh --legacy 退出码: $irc（期望 3）"
+          if [ "$irc" -ne 3 ]; then echo "::error::legacy install 退出码应为 3，实际 $irc"; exit 1; fi
+          if [ -d "$RUNNER_TEMP/dsh-legacy/.agent-presets/flash-lean-ptc-v1" ]; then
+            echo "::error::legacy 不应写入目录"; exit 1
           fi
+          echo "legacy 已明确拒绝（exit 3，未写目录）"
 
-      - name: Legacy install path (PowerShell)
+      - name: Legacy install path is rejected (PowerShell)
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/dsh-legacy/.agent-presets" | Out-Null
           pwsh -NoProfile -File scripts/install.ps1 -DshHome "$env:RUNNER_TEMP/dsh-legacy" -Legacy
-          $env:DSH_HOME = "$env:RUNNER_TEMP/dsh-legacy"
-          node scripts/verify-presets.mjs
+          if ($LASTEXITCODE -ne 3) { Write-Error "legacy 退出码应为 3，实际 $LASTEXITCODE"; exit 1 }
+          if (Test-Path "$env:RUNNER_TEMP/dsh-legacy/.agent-presets/flash-lean-ptc-v1") { Write-Error 'legacy 不应写入目录'; exit 1 }
+          Write-Host 'legacy 已明确拒绝（exit 3，未写目录）'
 
       - name: Uninstall leaves the user patch intact
         shell: bash

@@ -29,7 +29,7 @@ export function resolvePlatformTags(text, platform = process.platform) {
   const leftover = out.match(/!!js[ \t]+[^\n]*/);
   if (leftover) {
     throw new Error('遇到不认识的 !!js 表达式，未做平台解析：' + leftover[0].trim() +
-      ' —— 请在 lib/platform-tags.mjs 里登记它，否则写进 profile 的补丁会被普通解析器判为坏文件');
+      ' —— 请在 scripts/platform-tags.mjs 里登记它，否则写进 profile 的补丁会被普通解析器判为坏文件');
   }
   return out;
 }

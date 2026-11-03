@@ -92,15 +92,12 @@ DSH_HOME="$FLOW" bash scripts/install.sh --profile web >/dev/null 2>&1 \
   && grep -q 'preset-flash-lean-ptc-v3' "$FLOW/profiles/web/cordis.patch.yml" \
   && ok "流式空数组 [ ]：安装成功" || bad "流式空数组 [ ]：安装失败"
 
-step "旧版安装（< 0.1.7 目录式）"
+step "旧版入口（< 0.1.7 目录式，0.2.6 起不再提供）"
 LEG="$TMP/legacy"; mkdir -p "$LEG/.agent-presets"
-DSH_HOME="$LEG" bash scripts/install.sh --legacy >"$TMP/legacy.log" 2>&1 \
-  && ok "legacy 安装退出码 0" || { bad "legacy 安装失败"; tail -4 "$TMP/legacy.log"; }
-[ -f "$LEG/.agent-presets/flash-lean-ptc-v1/agent.cordis.yml" ] && ok "legacy 安装出 v1" || bad "legacy 缺 v1"
-[ ! -d "$LEG/.agent-presets/flash-lean-ptc-v2" ] && ok "legacy 跳过 v2（不作失败）" || bad "legacy 不应装 v2"
-[ ! -d "$LEG/.agent-presets/flash-lean-ptc-v3" ] && ok "legacy 跳过 v3（不作失败）" || bad "legacy 不应装 v3"
-DSH_HOME="$LEG" node scripts/verify-presets.mjs >"$TMP/legacy.verify.log" 2>&1 \
-  && ok "legacy 场景校验通过（CI 同款断言）" || { bad "legacy 场景校验失败"; tail -4 "$TMP/legacy.verify.log"; }
+DSH_HOME="$LEG" bash scripts/install.sh --legacy >"$TMP/legacy.log" 2>&1
+lrc=$?
+[ "$lrc" -eq 3 ] && ok "legacy 明确报错（exit 3）" || { bad "legacy 退出码应为 3，实际 ${lrc}"; tail -4 "$TMP/legacy.log"; }
+[ ! -d "$LEG/.agent-presets/flash-lean-ptc-v1" ] && ok "legacy 不再写目录" || bad "legacy 不应写入"
 
 step "安装器容错（js-yaml 缺失不得中止）"
 SHIM="$TMP/shim"; mkdir -p "$SHIM"

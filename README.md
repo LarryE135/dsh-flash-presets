@@ -236,6 +236,14 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 版本历史
 
+### v0.2.6（未发布）
+
+- 预设收敛为 `轻量PTC-v3` 与 `轻量PTC-v3 max` 两个，移除 v1 / v2 / v3.1 变体与旧式目录 `presets/legacy-0.1.5/`
+- 计划模式插件拆成独立包 `dsh-plan-mode-ui`（0.7.0），插件列表里与预设各占一张卡，可分别安装、卸载、升级
+- 运行时调优随包落地：`ptc-runtime: persistent-in-memory`，`run_code` 的固定开销从 108 ms 降到 0，嵌套 bash 从 44 ms 降到 15 ms
+- 0.2.5 的 v3 会话完全兼容：id、order 27、20 个插件、persona 逐字节不变，只有名称与描述两行文案改了
+- 旧版目录式安装入口改为明确拒绝（exit 3），不再静默跳过
+
 ### v0.2.5（2026-10-30）
 
 - **默认只装 v3**：bundle 合成默认只取 `presets/flash-lean-ptc-v3.patch.yml`，安装后预设列表只多一项；v1/v2 转为对照版本（`--all` / `--all-presets` / `-AllPresets` 显式安装）

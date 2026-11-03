@@ -32,6 +32,8 @@
     `preset-flash-lean-ptc-v3-max`、`plan-mode-ui` 各一行，`persistent-in-memory` 一处；
     按各包自己的补丁层统计组件数为 2（预设）与 1（插件）。
 
+- **旧版入口明确拒绝**：`presets/legacy-0.1.5/` 移除后，`install.sh --legacy` 与 `install.ps1 -Legacy` 改为报错并以 3 退出；此前是静默跳过，CI 会把它误判为成功。
+
 - **文档**：`docs/实测证据.md` 增加「跨模型：长思考模型与 384k 上限」一节。10-18 那批三格 0/322 的原因是单次响应在约 14 分钟处被上游断流，不是 `maxTokens=64k` 截断；把上限提到 384k 复测后结果不变。
 
 - **运行时调优随包落地**（run_code / PTC 开销）：

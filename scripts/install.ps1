@@ -87,7 +87,10 @@ function Invoke-Merge([string[]]$ExtraArgs) {
 function Install-Legacy {
   foreach ($p in @('flash-lean-ptc-v1')) {
     $src = Join-Path $here "presets\legacy-0.1.5\$p"
-    if (-not (Test-Path $src)) { Write-Host "跳过 ${p}：本版未提供旧式目录（legacy 仅保留 v1）"; continue }
+    if (-not (Test-Path $src)) {
+      Write-Error '0.2.6 起不再提供旧式目录（presets/legacy-0.1.5 已移除）。旧版机制请装 0.2.5；新版机制用：scripts/install.ps1 -Profile <p>'
+      exit 3
+    }
     $dst = Join-Path $legacyDir $p
     if (Test-Path $dst) {
       Write-Host "已存在 $dst → 备份为 .bak-$stamp"

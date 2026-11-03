@@ -14,11 +14,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolvePlatformTags } from '../lib/platform-tags.mjs';
+import { resolvePlatformTags } from './platform-tags.mjs';
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const ALL_FILES = ['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml', 'flash-lean-ptc-v3.patch.yml'];
+const ALL_FILES = ['flash-lean-ptc-v3.patch.yml', 'flash-lean-ptc-v3-max.patch.yml'];
 // --only a,b：只合并指定预设（0.2.5 起默认只装 v3，安装器会显式指定）
 const onlyArg = (() => {
   const i = process.argv.indexOf('--only');

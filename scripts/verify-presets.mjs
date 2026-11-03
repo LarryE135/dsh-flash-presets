@@ -95,7 +95,8 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   const ps = read(path.join(here, 'install.ps1')) || '';
   check(/merge-presets\.mjs/.test(sh), 'install.sh 调用共享合并实现');
   check(/merge-presets\.mjs/.test(ps), 'install.ps1 调用共享合并实现');
-  check(/legacy-0\.1\.5/.test(sh) && /legacy-0\.1\.5/.test(ps), '两个安装器都保留旧版目录回退');
+  check(/legacy-0\.1\.5/.test(sh) && /legacy-0\.1\.5/.test(ps), '两个安装器的旧版入口都指向 presets/legacy-0.1.5');
+  check(/exit 3/.test(sh) && /exit 3/.test(ps), '旧版入口在 0.2.6 起明确报错（exit 3），不静默跳过');
   check(/--uninstall/.test(sh) && /Uninstall/.test(ps), '两个安装器都支持卸载');
 
   const readme = read(path.join(repo, 'README.md')) || '';

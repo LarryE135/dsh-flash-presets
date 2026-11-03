@@ -34,10 +34,10 @@ check(listed.length > 0 && listed.every(id => knownFiles.includes(id)) && listed
 const newest = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();
 check((ps1 || '').includes('id: preset-' + newest), 'install.ps1 自检 id 指向 ' + newest);
 
-// 旧版目录式：缺失时应跳过而不是抛错
+// 旧版目录式：0.2.6 移除 presets/legacy-0.1.5 后，缺目录必须明确报错（exit 3），不能静默跳过
 // 注意：不能写成 [^}]*，因为提示文案里的变量占位符自带一个右花括号
-check(/-not \(Test-Path \$src\)\)[\s\S]{0,200}?continue/.test(ps1 || ''),
-      'install.ps1 的 legacy 分支：缺目录时 continue（不 throw）');
+check(/-not \(Test-Path \$src\)\)[\s\S]{0,300}?exit 3/.test(ps1 || ''),
+      'install.ps1 的 legacy 分支：缺目录时 exit 3（明确拒绝）');
 
 // 卸载 / 重复安装路径仍在
 check(/Uninstall-Legacy/.test(ps1 || ''), 'install.ps1 保留 legacy 卸载分支');
