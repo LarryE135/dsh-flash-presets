@@ -106,6 +106,7 @@ jobs:
           if ($LASTEXITCODE -ne 3) { Write-Error "legacy 退出码应为 3，实际 $LASTEXITCODE"; exit 1 }
           if (Test-Path "$env:RUNNER_TEMP/dsh-legacy/.agent-presets/flash-lean-ptc-v1") { Write-Error 'legacy 不应写入目录'; exit 1 }
           Write-Host 'legacy 已明确拒绝（exit 3，未写目录）'
+          exit 0   # 否则 step 的退出码会沿用上一条原生命令的 3
 
       - name: Uninstall leaves the user patch intact
         shell: bash
