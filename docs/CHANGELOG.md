@@ -32,6 +32,8 @@
     `preset-flash-lean-ptc-v3-max`、`plan-mode-ui` 各一行，`persistent-in-memory` 一处；
     按各包自己的补丁层统计组件数为 2（预设）与 1（插件）。
 
+- **文档**：`docs/实测证据.md` 增加「跨模型：长思考模型与 384k 上限」一节。10-18 那批三格 0/322 的原因是单次响应在约 14 分钟处被上游断流，不是 `maxTokens=64k` 截断；把上限提到 384k 复测后结果不变。
+
 - **运行时调优随包落地**（run_code / PTC 开销）：
   - 预设包 `cordis.patch.yml` 末尾追加一段 `- id: ptc-runtime` → `executionMode: persistent-in-memory`：
     PTC 运行时改为**会话内常驻进程**，每个 program 只付一次启动成本；
