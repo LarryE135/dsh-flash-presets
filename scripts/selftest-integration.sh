@@ -27,8 +27,7 @@ grep -q "plan-mode v1 已随本包提供" <<<"$out" && ok "安装器说明计划
 if command -v dsh >/dev/null 2>&1; then
   ok "(dsh 可用：跳过本地路径断言)"
 else
-  grep -q "dsh plugin --profile web add" <<<"$out" && ok "无 dsh 时给出等价命令" || bad "无 dsh 时未给出等价命令"
-  grep -q "预设已装好\|不受影响" <<<"$out" || true
+  grep -q "装成插件卡" <<<"$out" && ok "无 dsh 时给出插件卡安装方式" || bad "无 dsh 时未给出插件卡安装方式"
 fi
 
 dout=$(DSH_HOME="$TMP" node "$HERE/scripts/doctor.mjs" --profile web --all 2>&1)

@@ -101,6 +101,7 @@ install_modern() {
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「轻量PTC-v3」与「轻量PTC-v3 max」。"
   echo "  计划模式 plan-mode v1 已随本包提供（同一张卡的第三个组件），无需单独安装"
+  echo "  装成插件卡：dsh plugin --profile $PROFILE add dsh-flash-presets（三个组件都在这张卡里）"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-max'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
