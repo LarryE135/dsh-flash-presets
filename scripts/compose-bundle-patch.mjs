@@ -41,9 +41,16 @@ const RUNTIME = [
   '    executionMode: persistent-in-memory',
 ].join('\n');
 
-// 0.2.6 起本包只装预设：计划模式插件是独立包 dsh-plan-mode-ui（自带 cordis.patch.yml，
-// 由它自己的 - insert: 挂载）。这里若再插一行 plan-mode-ui，装两个包时会出现两个实例、
-// 计划协议注入两遍，所以本补丁层刻意不含插件行。
+// 计划模式（plan-mode v1）是本包的第三个组件：宿主半边由包根的 main（lib/index.js）提供，
+// 浏览器半边由 dsh.client 声明。这一行把组件挂到 profile，插件列表里显示在 dsh-flash-presets 卡下。
+// 注意 name 必须是本包名：解析器按 name 去找模块入口。
+const PLUGIN_ROW = [
+  '',
+  '# 计划模式组件（plan-mode v1）：宿主半边与浏览器半边都来自本包。',
+  '- insert:',
+  '    - id: plan-mode-ui',
+  "      name: 'dsh-flash-presets'",
+].join('\n');
 
 function compose() {
   const parts = SOURCES.map(rel => {
@@ -51,7 +58,7 @@ function compose() {
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

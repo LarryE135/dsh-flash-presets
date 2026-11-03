@@ -2,7 +2,7 @@
   "name": "dsh-flash-presets",
   "version": "0.2.6",
   "private": false,
-  "description": "DSH Flash 精简预设：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式安装到 profile。0.2.6 起只提供 v3（轻量PTC-v3，默认）与 v3 max（解除预算限制）两个预设；计划模式插件是独立包 dsh-plan-mode-ui，单独安装、单独管理。",
+  "description": "DSH Flash 精简预设：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式安装到 profile。0.2.6 起只提供 v3（轻量PTC-v3，默认）与 v3 max（解除预算限制）两个预设，并把计划模式（plan-mode v1）作为本包的第三个组件一并提供。",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -24,13 +24,13 @@
   "scripts": {
     "build": "node scripts/compose-bundle-patch.mjs",
     "check": "node scripts/compose-bundle-patch.mjs --check",
-    "verify": "node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && node scripts/check-bash32-cjk.mjs && node scripts/check-ps1.mjs",
+    "verify": "node scripts/sync-lib.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && node scripts/check-bash32-cjk.mjs && node scripts/check-ps1.mjs",
     "verify:versions": "node scripts/verify-versions.mjs",
     "ab:run": "bash scripts/ab-run.sh",
     "ab:overlay": "node scripts/ab-overlay.mjs",
     "verify:bench-table": "node scripts/render-bench-table.mjs --check",
     "render:bench-table": "node scripts/render-bench-table.mjs --write",
-    "prepublishOnly": "node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && bash scripts/selftest.sh",
+    "prepublishOnly": "node scripts/sync-lib.mjs --check && node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && bash scripts/selftest.sh",
     "lint": "node scripts/lint-presets.mjs",
     "guard:bench": "node scripts/guard-bench-leak.mjs",
     "bench:office": "node benchmarks/office/tools/check.mjs",
@@ -38,9 +38,10 @@
     "verify:runtime": "node scripts/verify-runtime.mjs",
     "verify:release": "node scripts/verify-release-hygiene.mjs",
     "pack:plugin": "node scripts/pack-plugin.mjs",
-    "prepack": "node scripts/compose-bundle-patch.mjs"
+    "prepack": "node scripts/sync-lib.mjs && node scripts/compose-bundle-patch.mjs"
   },
   "files": [
+    "lib/",
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
     "presets/flash-lean-ptc-v3-max.patch.yml",
@@ -59,12 +60,30 @@
     "README.en.md",
     "LICENSE"
   ],
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "*"
+  },
   "dsh": {
     "bundle": {
       "patch": "cordis.patch.yml"
     },
     "engines": {
       "dsh": ">=0.2.1-rc"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
     }
   },
   "publishedVersion": "0.2.5"

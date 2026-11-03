@@ -144,46 +144,14 @@ function Install-Modern {
 
 # 计划模式插件（可选组件）：dist/ 里现成的 tgz → 现打一个 → 目录。没有 dsh 时只打印命令。
 function Install-PlanMode {
-  # 计划模式插件是独立包：先装包，再落运行时调优。两者失败都不影响预设。
+  # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
   Write-Host ""
-  Write-Host "-- 计划模式插件（独立包 dsh-plan-mode-ui）---------------------"
-  $pluginVer = '0.7.0'
-  try { $pluginVer = (Get-Content (Join-Path $here 'plugins\plan-mode-ui\package.json') -Raw | ConvertFrom-Json).version } catch {}
-  if (-not (Get-Command dsh -ErrorAction SilentlyContinue)) {
-    Write-Host "WARN PATH 里没有 dsh 命令，跳过。稍后手动执行："
-    Write-Host "  dsh plugin --profile $Profile add dsh-plan-mode-ui"
-    Write-Host "  node scripts\tune-runtime.mjs --apply --profile $Profile"
-    return
-  }
-  $installed = $false
-  $pluginPkg = Join-Path $env:USERPROFILE ".dsh\profiles\$Profile\node_modules\dsh-plan-mode-ui\package.json"
-  if (Test-Path $pluginPkg) {
-    $cur = (Get-Content $pluginPkg -Raw | ConvertFrom-Json).version
-    if ($cur -eq $pluginVer) { Write-Host "OK 计划模式插件已是 ${cur}，跳过安装"; $installed = $true }
-    else { dsh plugin --profile $Profile remove dsh-plan-mode-ui 2>$null | Out-Null }
-  }
-  if (-not $installed) {
-    dsh plugin --profile $Profile add dsh-plan-mode-ui 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { Write-Host "OK 计划模式插件已装（npm：dsh-plan-mode-ui）"; $installed = $true }
-  }
-  if (-not $installed) {
-    $tgz = Join-Path $here ("dist\dsh-plan-mode-ui-{0}.tgz" -f $pluginVer)
-    if (Test-Path $tgz) {
-      dsh plugin --profile $Profile add ("file:" + $tgz) 2>$null | Out-Null
-      if ($LASTEXITCODE -eq 0) { Write-Host "OK 计划模式插件已装（本地包）"; $installed = $true }
-    }
-  }
-  if (-not $installed) {
-    Write-Host "WARN 计划模式插件没装上（npm 尚未发布它时属正常）。稍后手动二选一："
-    Write-Host "  dsh plugin --profile $Profile add dsh-plan-mode-ui"
-    Write-Host ("  dsh plugin --profile $Profile add file:" + (Join-Path $here ("dist\dsh-plan-mode-ui-{0}.tgz" -f $pluginVer)))
-  }
+  Write-Host "-- 计划模式（plan-mode v1）---------------------"
+  Write-Host "  已随本包安装，无需单独装 dsh-plan-mode-ui。"
   if (Get-Command node -ErrorAction SilentlyContinue) {
-    node (Join-Path $here "scripts\tune-runtime.mjs") --apply --profile $Profile | Out-Null
-    if ($LASTEXITCODE -eq 0) { Write-Host "OK 运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）" }
-    else { Write-Host "WARN 运行时调优未完成，稍后手动跑：node scripts\tune-runtime.mjs --apply --profile $Profile" }
+    $tune = Join-Path $here 'scripts\tune-runtime.mjs'
+    if (Test-Path $tune) { node $tune --apply --profile $Profile | Out-Null }
   }
-  Write-Host "  体检：node scripts\doctor.mjs --profile $Profile --all"
 }
 
 function Uninstall-Modern {

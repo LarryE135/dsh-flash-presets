@@ -10,7 +10,7 @@
 #   bash scripts/install.sh                       # profile "web" (autodetect)
 #   bash scripts/install.sh --profile headless     # another profile
 #   bash scripts/install.sh --legacy               # force the 0.1.5 directory layout
-#   bash scripts/install.sh --with-plan-mode       # 预设 + 计划模式插件（独立包）一次装齐
+#   bash scripts/install.sh --with-plan-mode       # 兼容旧参数：计划模式已随包提供
 #   bash scripts/install.sh --uninstall            # remove the managed block
 #   DSH_HOME=/tmp/dsh bash scripts/install.sh       # custom DSH home
 #
@@ -26,7 +26,7 @@ ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # 0.2.6 起只发两个预设：v3（默认）与 v3 max（解除预算限制）
 PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-max)
-# --with-plan-mode：预设之外再把计划模式插件（独立包 dsh-plan-mode-ui）装上；
+# --with-plan-mode：新装模式下无实际作用（计划模式已并入本包），保留参数以兼容旧脚本；
 # 两者互相独立，装失败不影响预设本身。
 PLAN_MODE=0
 
@@ -100,7 +100,7 @@ install_modern() {
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「轻量PTC-v3」与「轻量PTC-v3 max」。"
-  echo "  计划模式是独立包：bash scripts/install.sh --with-plan-mode（或 dsh plugin add dsh-plan-mode-ui）"
+  echo "  计划模式 plan-mode v1 已随本包提供（同一张卡的第三个组件），无需单独安装"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-max'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
@@ -110,49 +110,14 @@ install_modern() {
 # 计划模式插件是独立包（dsh-plan-mode-ui）：自带组合包补丁与浏览器半边，与预设包互不依赖。
 # 装它等于把这个包加进 profile；升级要先 remove 再 add（插件管理器不接受同名重复安装）。
 install_plan_mode() {
-  echo
-  echo "-- 计划模式插件（独立包 dsh-plan-mode-ui）-----------------------"
-  if ! command -v dsh >/dev/null 2>&1; then
-    echo "! PATH 里没有 dsh 命令，跳过。等 dsh 可用后手动执行："
-    echo "  dsh plugin --profile $PROFILE add dsh-plan-mode-ui"
-    echo "  node scripts/tune-runtime.mjs --apply --profile $PROFILE"
-    return 0
-  fi
-  _PLUGIN_VERSION="$(node -p "require('$HERE/plugins/plan-mode-ui/package.json').version" 2>/dev/null || echo "")"
-  _TGZ="$HERE/dist/dsh-plan-mode-ui-${_PLUGIN_VERSION}.tgz"
-  _INSTALLED=0
-  if [ -f "$DSH_DIR/profiles/$PROFILE/node_modules/dsh-plan-mode-ui/package.json" ]; then
-    _CUR="$(node -p "require('$DSH_DIR/profiles/$PROFILE/node_modules/dsh-plan-mode-ui/package.json').version" 2>/dev/null || echo "")"
-    if [ -n "$_CUR" ] && [ "$_CUR" = "$_PLUGIN_VERSION" ]; then
-      echo "✓ 计划模式插件已是 ${_CUR}，跳过安装"
-      _INSTALLED=1
-    else
-      dsh plugin --profile "$PROFILE" remove dsh-plan-mode-ui >/dev/null 2>&1 || true
-    fi
-  fi
-  if [ "$_INSTALLED" = "0" ]; then
-    # 本地 tgz 优先：npm 上的 dsh-plan-mode-ui 可能还是旧版，装错版本比不装更难查
-    if [ -f "$_TGZ" ] && dsh plugin --profile "$PROFILE" add "file:${_TGZ}" >/dev/null 2>&1; then
-      echo "✓ 计划模式插件已装（本地包 $(basename "$_TGZ")）"
-      _INSTALLED=1
-    elif dsh plugin --profile "$PROFILE" add dsh-plan-mode-ui >/dev/null 2>&1; then
-      echo "✓ 计划模式插件已装（npm：dsh-plan-mode-ui）"
-      _INSTALLED=1
-    fi
-  fi
-  if [ "$_INSTALLED" = "0" ]; then
-    echo "! 计划模式插件没装上（npm 尚未发布它时属正常）。稍后手动二选一："
-    echo "  dsh plugin --profile $PROFILE add dsh-plan-mode-ui"
-    echo "  dsh plugin --profile $PROFILE add file:${_TGZ}"
-  fi
+  # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
+  echo "-- 计划模式（plan-mode v1）---------------------------"
+  echo "  已随本包安装，无需单独装 dsh-plan-mode-ui。"
   if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
     if node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" >/dev/null 2>&1; then
-      echo "✓ 运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）"
-    else
-      echo "⚠ 运行时调优未完成，稍后可手动跑：node scripts/tune-runtime.mjs --apply --profile $PROFILE"
+      echo "  运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）"
     fi
   fi
-  echo "  体检：node scripts/doctor.mjs --profile $PROFILE --all"
 }
 
 install_legacy() {

@@ -19,18 +19,17 @@
     默认只报告，`--apply` 才写文件且先备份。
   - 明确**不保留** v2 兼容条目：本地有 42 个旧会话记录 `flash-lean-ptc-v2`，这些会话不再保证可恢复（用户确认可放弃）。
 
-- **计划模式插件保持独立包**（曾试行"二合一"，发布前撤回）：
-  - 预设包 `dsh-flash-presets` 只装预设：`cordis.patch.yml` 里两条 insert（v3、v3 max）+ 一条
-    `ptc-runtime` 覆盖，不再插入 `plan-mode-ui` 行，也不再带 `main` / `exports` / `dsh.client` / `lib/`；
-  - 插件包 `dsh-plan-mode-ui`（0.7.0）自带 `cordis.patch.yml`、宿主半边与浏览器半边，单独装、单独卸；
-  - 为什么分开：DSH 插件列表里**一张卡＝一个包**，卡内「包含的组件」就是该包补丁层 insert 的行。
-    合在一起时计划模式只能跟着预设一起装、一起卸、一起升级；分开后两张卡各自独立，
-    预设卡内仍是 v3 / v3 max 两个可单独开关的组件；
-  - 迁移：合并版（0.2.6 草案）装过的 profile，先 `dsh plugin remove dsh-flash-presets` 再按新版重装，
-    否则插件管理器会因"已安装"拒绝覆盖；
-  - 验证（临时 `DSH_HOME`，两个包各装一次）：`--dump-config` 里 `preset-flash-lean-ptc-v3`、
-    `preset-flash-lean-ptc-v3-max`、`plan-mode-ui` 各一行，`persistent-in-memory` 一处；
-    按各包自己的补丁层统计组件数为 2（预设）与 1（插件）。
+- **计划模式并回主包，成为第三个组件（plan-mode v1）**：
+  - `dsh-flash-presets` 一张卡带三个组件：预设 `preset-flash-lean-ptc-v3`、`preset-flash-lean-ptc-v3-max`，
+    加计划模式 `plan-mode-ui`；组件各自可单独开关，安装 / 卸载 / 升级只有一个动作；
+  - 实现：包根恢复 `main` / `exports` / `dsh.client` 与 `lib/`（由 `scripts/sync-lib.mjs` 从
+    `plugins/plan-mode-ui/lib/` 生成），补丁层末尾多一条 `- insert:`，`name` 指向本包；
+  - 版本口径：计划模式组件走 `plan-mode v1`（1.0.0），开发期的 0.7.x 只是内部编号，不再对外发布，
+    旧 tgz / zip 移到 `internal-dev/` 留档；
+  - 迁移：装过独立包 `dsh-plan-mode-ui` 的 profile，先 `dsh plugin remove dsh-plan-mode-ui`，
+    再重装本包，否则两处都会插入 `plan-mode-ui` 行、协议注入两遍；
+  - 验证（临时 `DSH_HOME`）：`--dump-config` 里预设两行 + `plan-mode-ui` 一行，
+    `persistent-in-memory` 一处，组件计数 3。
 
 - **旧版入口明确拒绝**：`presets/legacy-0.1.5/` 移除后，`install.sh --legacy` 与 `install.ps1 -Legacy` 改为报错并以 3 退出；此前是静默跳过，CI 会把它误判为成功。
 

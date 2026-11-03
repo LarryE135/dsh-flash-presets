@@ -391,3 +391,7 @@
 - id: ptc-runtime
   config:
     executionMode: persistent-in-memory
+# 计划模式组件（plan-mode v1）：宿主半边与浏览器半边都来自本包。
+- insert:
+    - id: plan-mode-ui
+      name: 'dsh-flash-presets'

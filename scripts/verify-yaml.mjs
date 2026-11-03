@@ -214,10 +214,14 @@ if (args.length) {
               '合成产物含 ' + EXPECT_IDS.join('/') + '（实际: ' + (ids.join(', ') || '无') + '）');
         check(ids.length === EXPECT_IDS.length,
               '合成产物只含 ' + EXPECT_IDS.join('/') + '，不含对照版本（实际: ' + (ids.join(', ') || '无') + '）');
-        // 0.2.6 起计划模式是独立包：预设包里再出现 plan-mode-ui 行，装两个包就会跑两个实例。
-        const flatNames = (cdoc || []).flatMap(e => (e && e.insert) || []).map(r => String(r.name || ''));
-        check(!flatNames.some(n => n.includes('plan-mode') || n === 'dsh-flash-presets'),
-              '合成产物不含计划模式行（计划模式是独立包 dsh-plan-mode-ui）');
+        // 计划模式是第三个组件：必须恰好一行 plan-mode-ui，且 name 指向本包（模块入口在 lib/index.js）。
+        const pluginRows = (cdoc || []).flatMap(e => (e && e.insert) || []).filter(r => r && r.id === 'plan-mode-ui');
+        check(pluginRows.length === 1,
+              '合成产物恰好一行 plan-mode-ui（实际 ' + pluginRows.length + ' 行）');
+        check(pluginRows[0] && pluginRows[0].name === 'dsh-flash-presets',
+              'plan-mode-ui 行指向本包 dsh-flash-presets');
+        check(!String(JSON.stringify(pluginRows)).includes('dsh-plan-mode-ui'),
+              '合成产物不再引用独立包 dsh-plan-mode-ui');
         const runtimeRows = (cdoc || []).filter(e => e && e.id === 'ptc-runtime' && e.insert === undefined);
         check(runtimeRows.length === 1 && JSON.stringify(runtimeRows[0]).includes('persistent-in-memory'),
               '运行时覆盖恰好一条 ptc-runtime → persistent-in-memory');

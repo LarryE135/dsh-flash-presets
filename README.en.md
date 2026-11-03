@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.6 (unpublished; the GitHub release and npm are still on 0.2.5). This package ships presets only (`v3` and `v3 max`); the plan-mode plugin `dsh-plan-mode-ui` 0.7.0 is a **separate package** — install, remove and upgrade it on its own, and it shows up as its own card with its own components. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.6 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries three components: the presets `v3` and `v3 max`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 

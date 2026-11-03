@@ -159,8 +159,8 @@ if (!yaml) {
 }
 
 // ── 6. 计划模式插件（可选组件）──────────────────────────────────────────────
-console.log('[6] 计划模式插件（可选）');
-const PLUGIN = 'dsh-plan-mode-ui';
+console.log('[6] 计划模式组件（plan-mode v1，随 dsh-flash-presets 提供）');
+const PLUGIN = 'dsh-flash-presets';
 const profileDir = path.join(home, 'profiles', profile);
 const pluginDir = path.join(profileDir, 'node_modules', PLUGIN);
 if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
@@ -169,7 +169,8 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
   ok('已装 ' + PLUGIN + '@' + pv);
   if (fs.existsSync(path.join(pluginDir, 'lib', 'client.js'))) ok('客户端入口存在（lib/client.js）');
   else { warn('缺少 lib/client.js —— 客户端不会加载'); problems.push('插件客户端入口缺失'); }
-  if (fs.existsSync(path.join(pluginDir, 'cordis.patch.yml'))) ok('自带 cordis.patch.yml（bundle 由安装器合并）');
+  if (fs.existsSync(path.join(pluginDir, 'lib', 'index.js'))) ok('宿主入口存在（lib/index.js）');
+  else { warn('缺少 lib/index.js —— 计划模式组件不会加载'); problems.push('计划模式宿主入口缺失'); }
 } else {
   let dep = null;
   try {
@@ -183,7 +184,7 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
     warn('profile 依赖里有 ' + PLUGIN + '@' + dep + '，但 node_modules 里没有 —— 重装一次：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
     problems.push('插件声明存在但未落盘');
   } else {
-    warn('未安装（纯可选）：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
+    warn('本包未安装：dsh plugin --profile ' + profile + ' add ' + PLUGIN + '（计划模式组件随包提供）');
   }
 }
 const stateFile = path.join(home, 'plan-mode-ui', 'state.json');
