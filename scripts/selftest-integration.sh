@@ -26,8 +26,10 @@ if command -v dsh >/dev/null 2>&1; then
   if [ -f "$TMP/profiles/web/node_modules/dsh-plan-mode-ui/package.json" ]; then
     ok "插件已落盘（dsh plan-mode-ui/package.json）"
     grep -q "插件已装" <<<"$out" && ok "安装器报告插件已装" || bad "安装器未报告插件已装"
+  elif grep -q "计划模式插件没装上" <<<"$out"; then
+    ok "无本地 tgz 且 npm 未发布时给出明确指引（不计失败）"
   else
-    bad "插件未落盘（dsh 可用时应装上）"
+    bad "插件未落盘，安装器也没有说明原因"
     printf "%s\n" "$out" | tail -5 | sed "s/^/       /"
   fi
 else

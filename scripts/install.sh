@@ -131,11 +131,12 @@ install_plan_mode() {
     fi
   fi
   if [ "$_INSTALLED" = "0" ]; then
-    if dsh plugin --profile "$PROFILE" add dsh-plan-mode-ui >/dev/null 2>&1; then
-      echo "✓ 计划模式插件已装（npm：dsh-plan-mode-ui）"
-      _INSTALLED=1
-    elif [ -f "$_TGZ" ] && dsh plugin --profile "$PROFILE" add "file:${_TGZ}" >/dev/null 2>&1; then
+    # 本地 tgz 优先：npm 上的 dsh-plan-mode-ui 可能还是旧版，装错版本比不装更难查
+    if [ -f "$_TGZ" ] && dsh plugin --profile "$PROFILE" add "file:${_TGZ}" >/dev/null 2>&1; then
       echo "✓ 计划模式插件已装（本地包 $(basename "$_TGZ")）"
+      _INSTALLED=1
+    elif dsh plugin --profile "$PROFILE" add dsh-plan-mode-ui >/dev/null 2>&1; then
+      echo "✓ 计划模式插件已装（npm：dsh-plan-mode-ui）"
       _INSTALLED=1
     fi
   fi

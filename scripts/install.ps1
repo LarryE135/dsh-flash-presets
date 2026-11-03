@@ -88,7 +88,7 @@ function Install-Legacy {
   foreach ($p in @('flash-lean-ptc-v1')) {
     $src = Join-Path $here "presets\legacy-0.1.5\$p"
     if (-not (Test-Path $src)) {
-      Write-Error '0.2.6 起不再提供旧式目录（presets/legacy-0.1.5 已移除）。旧版机制请装 0.2.5；新版机制用：scripts/install.ps1 -Profile <p>'
+      [Console]::Error.WriteLine('0.2.6 起不再提供旧式目录（presets/legacy-0.1.5 已移除）。旧版机制请装 0.2.5；新版机制用：scripts/install.ps1 -Profile <p>')
       exit 3
     }
     $dst = Join-Path $legacyDir $p
