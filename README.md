@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.5（GitHub Release 与 npm 同为 0.2.5）；plan mode 插件 `dsh-plan-mode-ui` 版本 0.5.2，**随主版本一起发布**（不单独发 Release、不单独打 tag，仍未上 npm），`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
+> 当前版本：v0.2.6（未发布；GitHub Release 与 npm 上仍是 0.2.5）。本包只装预设（`轻量PTC-v3` 与 `轻量PTC-v3 max`）；计划模式插件 `dsh-plan-mode-ui`（0.7.0）是**独立包**，单独安装、单独卸载、单独升级，装在一个 profile 里也各自成卡、各自开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -24,11 +24,10 @@
 
 | 预设 | id | order | 规则条数 | 压缩 | 用途 |
 |---|---|---|---|---|---|
-| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | 上下文余量优先，任务偏长（对照版本，默认不装） |
-| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | 与 v1 同代，更省，保守选择（对照版本，默认不装） |
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**，当前适用版本 |
+| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**。基础的轻量预设，满足绝大多数日常工作 |
+| v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | 解除预算限制的全量版，应对需要发挥能力的场景 |
 
-**默认只装 v3**：npm 包与安装器都不再插入 v1/v2 的行，装完预设列表里只多一项。需要 A/B 对照时显式装三份 —— `bash scripts/install.sh --all-presets` 或 `pwsh scripts/install.ps1 -AllPresets`（v1/v2 源文件仍随包发布）。具体适配情况见 release 说明。
+**本版只提供这两个预设**（0.2.6 起移除 v1/v2 与 v3.1 变体）：两个都随包安装，选择器里就这两项。v3 适合绝大多数日常任务；只有在你需要模型放开手脚、不在乎 token 消耗时选 v3 max。
 
 ## 安装、更新、卸载
 
@@ -41,7 +40,7 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-> 安装后预设列表里只出现 **v3**（`flash-lean-ptc-v3`）；v1/v2 是对照版本，默认不插入，见上文「预设」。
+> 安装后预设列表里出现 **v3** 与 **v3 max** 两项（`flash-lean-ptc-v3` / `flash-lean-ptc-v3-max`），见上文「预设」。
 
 <img width="413" height="283" alt="屏幕截图 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -62,7 +61,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 
 适合跟未发布的分支或本地改动。同样写在 GUI 的「插件 → 添加插件」里也能装。
 
-`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的三个 insert 条目（v1、v2、v3）叠加到该 profile。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
+`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的两个 insert 条目（v3、v3 max）叠加到该 profile，另外用一条 `ptc-runtime` 覆盖把 PTC 运行时切成常驻。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
 更新时重复执行同一条 `add`，或先 `remove` 再 `add`。卸载时把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖；由脚本写入的托管块用 `scripts/install.sh --uninstall` 清除。
 
@@ -77,13 +76,19 @@ dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 
 ## 与计划模式插件一起用（可选）
 
-仓库里还带一个客户端插件 `plugins/plan-mode-ui`（发布名 `dsh-plan-mode-ui`），做**两阶段计划模式**：同一回合里先出计划、你批准后再执行，结束时把实测验收数字写回卡片。两者职责不重叠——预设管**每轮怎么花钱**（预算、折叠、收尾判定），插件管**这一回合先想后做**。
+仓库里还带一个客户端插件 `plugins/plan-mode-ui`（发布名 `dsh-plan-mode-ui`，版本 0.7.0），做**两阶段计划模式**：同一回合里先出计划、你批准后再执行，结束时把实测验收数字写回卡片。两者职责不重叠——预设管**每轮怎么花钱**（预算、折叠、收尾判定），插件管**这一回合先想后做**。
+
+0.2.6 起两者是**两个独立包**：插件列表里各占一张卡，可以只装预设、只装插件，也可以装了预设之后单独把插件卸掉或升级，互不影响。装齐：
 
 ```console
-bash scripts/install.sh --with-plan-mode        # 预设 + 插件一次装齐（没有 dsh 时只打印等价命令）
-dsh plugin --profile web add dsh-plan-mode-ui   # 上架 npm 后可直接装；现在也能用本地 tgz / 目录
-node scripts/doctor.mjs --profile web --all     # [1]–[5] 预设、[6] 插件、[7] 合成配置
+dsh plugin --profile web add dsh-flash-presets      # 预设（两张预设行）
+dsh plugin --profile web add dsh-plan-mode-ui       # 计划模式（独立一张卡）
+# 或一次装齐（本地包/离线）：
+bash scripts/install.sh --with-plan-mode
+node scripts/doctor.mjs --profile web --all         # [1]–[5] 预设、[6] 插件、[7] 合成配置
 ```
+
+GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3` 与 `preset-flash-lean-ptc-v3-max` 两个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
 
 插件是纯可选项：**没装时预设行为完全不变**，`doctor` 只给一行 `⚠ 未安装（纯可选）`，不计入失败。装了之后入口在输入框左侧，档位 off / light / full 独立于预设设置。
 
@@ -208,10 +213,8 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 ```
 presets/
-  flash-lean-ptc-v1.patch.yml
-  flash-lean-ptc-v2.patch.yml
   flash-lean-ptc-v3.patch.yml     主版本（lean-v3）
-  legacy-0.1.5/                   DSH 0.1.7 以前的目录式回退，仅 v1
+  flash-lean-ptc-v3-max.patch.yml 全量版（解除预算限制）
 cordis.patch.yml                  由 presets/* 合成，勿手改，CI 断言一致性
 scripts/
   install.sh / install.ps1        安装器，共用 merge-presets.mjs

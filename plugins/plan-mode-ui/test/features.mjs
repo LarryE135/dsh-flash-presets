@@ -19,7 +19,7 @@ let stateHandler = null, sectionSpec = null;
 mod.default.apply({
   effect(fn) { return fn(); },
   on(ev, cb) { handlers.set(ev, cb); },
-  webServer: { register({ handler }) { stateHandler = handler; return () => {}; } },
+  webServer: { register(spec) { if (String(spec.path).endsWith("/state")) stateHandler = spec.handler; return () => {}; } },
   systemPrompt: { section(s) { sectionSpec = s; return {}; }, getSectionOrder() { return 500; } },
   get() { return null; }
 });

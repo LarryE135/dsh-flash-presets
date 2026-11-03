@@ -16,7 +16,6 @@ import { execFileSync } from 'node:child_process';
 
 const EXPECT = {
   'flash-lean-ptc-v1': { order: 21, rules: 14, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v2': { order: 22, rules: 12, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
 };
 // 0.2.5 起 bundle 默认只装 v3；v1/v2 是对照版本，装了才校验（--all-presets / -AllPresets）
@@ -67,7 +66,7 @@ for (const [name, exp] of Object.entries(EXPECT)) {
   check(/mode: ptc/.test(slice), 'PTC 展示层');
 }
 const installed = (dump.match(/id: preset-flash-lean-ptc-v/g) || []).length;
-check(installed >= 1 && installed <= 3, '预设行数 ' + installed + '（默认 1；--all-presets 时最多 3）');
+check(installed >= 1 && installed <= 3, '预设行数 ' + installed + '（v3 / v3 max）');
 
 console.log('');
 if (failed === 0) { console.log('运行时合成断言通过'); process.exit(0); }

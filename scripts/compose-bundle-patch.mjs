@@ -16,20 +16,34 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
-// 0.2.5 起默认只发布 v3（lean-v3，现行主版本）：装一次只多一个预设，不用在列表里挑。
-// 需要对照 v1/v2（做 A/B 时）用 --all 显式合成三份。
-const ALL_SOURCES = ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml', 'presets/flash-lean-ptc-v3.patch.yml'];
-const SOURCES = process.argv.includes('--all') ? ALL_SOURCES : ['presets/flash-lean-ptc-v3.patch.yml'];
+// 0.2.6 起只提供两个预设：v3（默认，基础轻量）与 v3 max（解除预算限制的全量版）。
+// 两者都随包安装，选择器里就这两项。
+const SOURCES = ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-max.patch.yml'];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件默认只叠加 v3（lean-v3，现行主版本）：安装后预设列表里只多这一项。',
-  '# v1/v2 是对照版本，源文件仍在 presets/，需要时用 --all 显式合成（做 A/B 才用得上）。',
-  '#   node scripts/compose-bundle-patch.mjs          # v3（默认）',
-  '#   node scripts/compose-bundle-patch.mjs --all    # v1 + v2 + v3',
+  '# 本文件叠加 v3 与 v3 max 两个预设；装一次，选择器里就这两项。',
+  '# 源文件：presets/flash-lean-ptc-v3.patch.yml 与 presets/flash-lean-ptc-v3-max.patch.yml。',
+  '#   node scripts/compose-bundle-patch.mjs          # v3 + v3 max',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',
 ].join('\n');
+
+// 运行时调优：随组合包一起落到 profile（B = PTC 常驻运行时）。
+// 不能写成插件代码里的热改——executionMode 在 ptc-runtime 构造函数里读，构造后改不动。
+const RUNTIME = [
+  '',
+  '# 运行时调优（随组合包生效，见 docs/压测-run_code开销.md）：PTC 运行时改为会话内常驻进程，',
+  '# 每个 run_code program 只付一次启动成本，嵌套工具调用 44ms → 15ms。',
+  '# 配套 scripts/tune-runtime.mjs --apply 负责 A（fs-search 的 glob/grep 只读并发）。',
+  '- id: ptc-runtime',
+  '  config:',
+  '    executionMode: persistent-in-memory',
+].join('\n');
+
+// 0.2.6 起本包只装预设：计划模式插件是独立包 dsh-plan-mode-ui（自带 cordis.patch.yml，
+// 由它自己的 - insert: 挂载）。这里若再插一行 plan-mode-ui，装两个包时会出现两个实例、
+// 计划协议注入两遍，所以本补丁层刻意不含插件行。
 
 function compose() {
   const parts = SOURCES.map(rel => {
@@ -37,7 +51,7 @@ function compose() {
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

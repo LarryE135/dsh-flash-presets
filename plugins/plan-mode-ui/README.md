@@ -242,6 +242,150 @@ dsh plugin --profile web remove dsh-plan-mode-ui
 
 完整规则原文和组件清单在 `~/.dsh/local-presets/flash-lean-ptc-v3.patch.yml`（13 条人设规则 + 工具/压缩/委派配置）。**换预设不需要改插件**，但如果新预设改了呈现模式（比如从 PTC 切回原生工具），第 2 条判据要重新验一遍。
 
+## v0.7.0（2026-11-01）：`DSH_PLAN_MODE_UI_HEADLESS=prompt` —— 只注入、不桥接
+
+**为什么需要**：light 与 full 的计划正文（`P0-EXEC/CONVENTIONS` vs `EVIDENCE/P1-TARGETS`）在原生 plan mode
+接管时会整段让位（`return merge(maxLine)`），因此无头实验里两档表现完全一样；
+而真的去桥接又会在无头里卡死 —— 没有评审通道，`exit_plan_mode` 永远等不到答案。
+
+**新取值**（`DSH_PLAN_MODE_UI_HEADLESS`）：
+
+| 取值 | 行为 |
+| --- | --- |
+| （未设） | 正常桥接（Web 端默认） |
+| `off` / `0` / `false` / `no` | 完全当关档：不注入、不桥接、不门控 |
+| `prompt` / `prompt-only` / `sections` | **照常注入计划正文与 todo 纪律，但不桥接、不门控**，并在末尾注明"就在本回合实现" |
+
+用途仅限对照实验与 CI：它让"轻量 vs 全量到底差多少"变成可测问题。
+
+回归测试 `test/headless-prompt.mjs`（22 个用例）：两档正文都能注入、尾巴带 same-turn 说明，
+且未设环境变量时行为与 0.6.x 完全一致。
+
+## v0.6.6（2026-11-01）：计划模式判定收敛成唯一判据
+
+**症状**：`/state.native` 说"计划模式开着"，同一秒的提示词装配却按"执行阶段"发指令（`TODO SYNC (do not batch)`）。
+
+**根因**：三条路径各看一半 —— 段落看会话投影、`/state.native` 看 `bridgeTier/nativeOpen` 簿记、
+`/progress.plan.native` 又单独读投影。簿记一旦陈旧（`plan/mode` 事件漏收、重启后残留），面板与提示词就会分叉，
+而这两者恰好决定"这一轮先建 todo 列表还是先别建"。
+
+**修法**：新增 `nativeState(ctx, session, key)` → `{ available, active, source }`，顺序固定为
+**投影（权威）→ planMode 服务 → 簿记兜底**，拿到权威结论时顺手把簿记校正一致；`/state.native`、
+`/progress.plan.native`、提示段判定三处全部改走它；探针 `sources` 改成 `{ via, available }`。
+
+回归测试 `test/native-consistency.mjs`（21 个用例）：构造"投影说关、服务说开"与"投影不可读、服务说开"，
+断言三处结论一致且以投影为准。
+
+## v0.6.5（2026-11-01）：面板去掉"待办进度"行
+
+按用户反馈，面板里那条 `待办 5/5 —— 同步中` 属于重复信息：真正的 todo 列表由 DSH 原生 TodoDock 显示，
+面板只需要管档位。因此删掉：轮询 `/api/plan-mode/progress` 的 effect、`nudge` 按钮、`progressRow()` 及其调用点。
+
+**保留**（宿主侧完全不动）：`/api/plan-mode/progress` 端点、`deriveProgress()`、滞后提醒与自动 nudge ——
+它们驱动的是模型行为（提醒它在滞后时更新原生 todo），不是面板像素。需要时仍可 curl 查看。
+
+回归测试 `test/client-no-progress.mjs` 静态盯住这四处，防止以后被"顺手加回来"。
+
+## v0.6.4（2026-11-01）：重启后首个请求的阶段误判
+
+**现象**：重启 web 后第一次请求仍拿到 `TODO SYNC (do not batch)`（要求立刻建列表），与 plan mode 冲突一次；
+到第三次装配才恢复成 `TODO SYNC (deferred)`。
+
+**根因**：段落里判断"原生计划是否在跑"用的是 `nativeOpen` / `bridgeTier` / 会话投影，三者在重启后的首个请求时
+都还没填充。插件其实已有权威判据 `builtinPlanActive(ctx, session)`（先问 `planMode` 服务，再读投影），
+状态路由的 `native` 字段就是它算出来的 —— 只是段落路径没用它。
+
+**修法**：段落判据收口为 `builtinPlanActive() || 投影 || 桥接簿记`；探针新增 `sources` 字段，
+直接显示这次判定是"服务 / 投影 / 簿记"哪一条给出 true，不用再猜。
+
+这个 bug 是 0.6.3 新加的 `debug.section` 探针自己在线上抓到的 —— 探针值回票价。
+
+## v0.6.3（2026-11-01）：计划阶段与执行阶段的 todo 文案分流
+
+**现象**：会话档位是 light、插件段落也确实注入了，但原生 plan mode 下永远没有 todo 列表。
+
+**根因**：两条指令同时注入且互相矛盾 ——
+
+- 本插件的 TODO_SYNC：「第一个工具调用之前就用 todo_write 建列表」；
+- DSH 原生 plan mode：「Do not use todo_write to track this planning phase」。
+
+模型服从后者（它是会话的主政策），于是列表直到执行阶段才出现，用户以为功能坏了。
+
+**修法**：按阶段分流两版文案，二者互斥 ——
+
+- 规划阶段（plan mode 生效或 phase=planning）→ `TODO SYNC (deferred)`：本阶段**不要**建列表，
+  写清「计划批准/收到执行指令后的第一个动作就是 todo_write」；
+- 执行阶段 → 原有的 `TODO SYNC (do not batch)`：立刻建列表 + 每关闭一项立刻打勾。
+
+**同时**：
+
+- `todos` 投影存在但本会话还没写过时，不再误报「降级·按事件」（改为可用但为空）；
+- `/api/plan-mode/state` 的 `debug.section` 现在给出**最近一次装配的探针**（会话键 / 档位 / 阶段 / 文案摘要），
+  以后核对「到底注入了哪一版」一次 curl 就够，不必解压会话日志；
+- `sessionKey()` 对字符串输入幂等补 `id:` 前缀，堵住静默回落默认档的通路。
+
+## v0.6.2（2026-11-01）：修掉一处系统性错判（todo/write 不带 turn）
+
+**症状**：面板几乎永远显示「已停滞 N 轮」，而模型明明刚更新过 todo；提醒要么一开始就连发，要么早早哑火。
+
+**根因**：`dsh-tool-todo` 写事件走的是 `session.append("todo/write", { todos })`，而 `session.append()`
+只构造 `{ type, seq, time, data }` —— **事件里没有 turn**。当前回合只能从 `turn/start|turn/end` 的
+`data.turn` 取。v0.6.1 直接用 `evTurn`（对 todo/write 恒为 undefined）写 `lastWriteTurn`，
+于是它永远停在 0，`lagTurns = 当前回合号`，健康度恒为 stalled。
+
+**为什么测试没抓到**：用例手工构造了带 `turn` 的 `todo/write`，与真实契约不符。现在补了
+`test/progress-contract.mjs`，用真实形状（turn/start 带 `data.turn`、todo/write 只带 `todos`）回归，
+该用例在 0.6.1 上是红的。
+
+**一并修掉**：
+
+- `todoSync: "strict"` 之前是死配置（与 remind 行为相同）：现在 strict = 只要还有未完成项就每回合提醒；
+- 提醒额度改为**送达时才扣**，被无关装配吞掉的不烧预算；
+- `capSet` 命中时刷新顺序（LRU 近似），热点会话不会被新会话挤掉。
+
+## v0.6.1（2026-11-01）：复查修正（5 处）
+
+自查 v0.6.0 的实现逻辑，修掉 5 个问题：
+
+1. **light 档与「原生计划接管」时 todo 纪律根本不注入** —— 纪律原先写在 `COPY.light/full` 里，
+   而这两条分支都提前 `return`，等于半死代码；用户按提示切到 light 仍然看不到列表。
+   现在 `TODO SYNC` 是**独立段**：只要插件启用且档位不是 off，任何路径都注入。
+   同时删掉该段里的 `P0-EXEC` 字样，避免原生计划模式在跑时与验收正文冲突（回归测试 A12 盯着）。
+2. **`POST /progress` 补 CSRF 考勤**：与 `/state` 一致，没带 `x-plan-mode-client: 1` 直接 403。
+3. **提醒额度会复位**：以前只在 `reset` 清空，长任务从第 3 次滞后起永久哑火；现在 `todo/write`
+   成功一次就清零（lagging 2 次 / stalled 4 次的单轮上限保留）。
+4. **四个监测表有界**：`todoTrack/turnTrack/syncNudge/nudgeCount` 统一走 `capSet`（上限 500），
+   多会话不再泄漏；`GET` 响应里加 `debug:{tracked,turns,nudges,counters}` 便于断言。
+5. **语义与轮询**：`plan` 拆成 `{native, planned, approved}`；`progressOf` 增加 `degraded`，
+   面板在降级时显示「降级·按事件」；轮询从固定 2 s 改为「无 todo 5 s / 有 todo 2 s / 页面隐藏暂停」。
+
+## v0.6.0（2026-11-01）：计划阶段接上 todo 列表 + 进度监测
+
+**症状**：计划模式下对话框上方没有 to-do list；即便有，也常常到任务快结束时才打勾。
+
+**原因**：列表不是本插件的产物 —— 它由 DSH 原生 `TodoDock` 渲染（`dsh-client-ui-conversation`，
+挂在 `conversation.composer.dock`），数据源只有会话投影里的 `todos`（由 `todo_write` 写入）。
+此前本插件只注入计划文案、渲染自己的按钮与面板，从没要求模型写 todo，所以列表恒为空。
+
+**改法**
+
+1. **提示词**：`PLANNING` 两档各加一段 `TODO SYNC (do not batch)` —— 先建条、每闭合一项立刻
+   `todo_write`、禁止把状态更新攒到收尾；light 档产物清单从 2 项变 3 项（第 3 项就是任务列表本身）。
+2. **进度监测**：`GET /api/plan-mode/progress?session=<id>` → `counts / items / lagTurns /
+   health(unused|synced|lagging|stalled) / source(projection|events) / plan`。优先读会话投影
+   `stateOf(session,"todos")`，读不到时退回 `todo/write` 事件缓存。
+3. **反滞后**：`turn/end` 时若滞后超过阈值，下一回合提示词追加一条一次性 `TODO SYNC (auto)`
+   （带落后轮数与当前进度），提醒模型先同步状态再干活。`POST /api/plan-mode/progress`
+   `{action:"nudge"|"reset"}` 可手动触发或清空监测状态。
+4. **面板**：新增「待办 x/y + 进度条 + 滞后 chip」，面板打开期间每 2 秒轮询；滞后时 chip 可点，
+   点了立刻排队一次提醒。
+
+**配置**（插件 config 或环境变量）：`todoSync: off|remind|strict`（默认 `remind`，env
+`DSH_PLAN_TODO_SYNC`）、`lagTurns: 2`（env `DSH_PLAN_LAG_TURNS`）。`off` 只保留接口、不注入提醒。
+
+**已知限制**：列表外观与交互由原生 `TodoDock` 决定，本插件不自建、不替换；提醒频率有上限
+（lagging 每会话 2 次、stalled 4 次），避免每轮往提示词里塞字节。
+
 ## v0.5.2（2026-10-31）：计划状态以会话投影为准
 
 **症状**：一直开着计划模式，却每轮都不出计划、也不弹审批。

@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.5, the same version on both the GitHub release and npm; the plan-mode plugin `dsh-plan-mode-ui` 0.5.2 ships together with the main release (no separate release, no tag, not on npm yet). `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.6 (unpublished; the GitHub release and npm are still on 0.2.5). This package ships presets only (`v3` and `v3 max`); the plan-mode plugin `dsh-plan-mode-ui` 0.7.0 is a **separate package** — install, remove and upgrade it on its own, and it shows up as its own card with its own components. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -27,11 +27,10 @@ The presets control three things: the budget and round limit (counted by rounds,
 
 | Preset | id | order | Rules | Compaction | Intended use |
 |---|---|---:|---:|---|---|
-| v1 | `flash-lean-ptc-v1` | 21 | 14 | 0.3 / 50k | More context headroom for longer tasks (reference version, not installed by default) |
-| v2 | `flash-lean-ptc-v2` | 22 | 12 | 0.25 / 20k | A more conservative, lower-cost preset from the same generation (reference version, not installed by default) |
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**; currently supported preset |
+| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. The baseline lightweight preset; covers most everyday work |
+| v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | Budget-free full version for tasks where you want the model to use its full capability |
 
-**Only v3 is installed by default**: neither the npm package nor the installers insert v1/v2 rows any more, so the preset list grows by exactly one entry. For A/B comparisons install all three explicitly with `bash scripts/install.sh --all-presets` or `pwsh scripts/install.ps1 -AllPresets` (the v1/v2 sources still ship with the package). Because model and framework behavior changes over time, v3 is generally the recommended choice; see the release notes for compatibility details.
+**This version ships exactly two presets** (v1/v2 and the v3.1 variants were removed in 0.2.6): both are installed, and the picker shows only these two. Pick v3 max only when you want the model to stop economising. See the release notes for compatibility details.
 
 ## Install, update, and uninstall
 

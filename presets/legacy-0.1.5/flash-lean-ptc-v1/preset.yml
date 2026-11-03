@@ -1,3 +1,0 @@
-name: Flash 精简·PTC v1（v4.1-flash）
-description: PTC 模式：工具经 run_code 编程式调用（多步合成一个程序、减少来回）。行为约束与压缩参数同 v1（0.3 / 50000），order 与插件行版本保持一致。
-order: 21

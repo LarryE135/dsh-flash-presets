@@ -13,6 +13,8 @@ import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { deriveProgress, syncLine } from "./progress.js";
+
 const API = "/api/plan-mode";
 const TIERS = new Set(["off", "light", "full"]);
 const SCOPES = new Set(["always", "auto", "first"]);
@@ -29,17 +31,44 @@ const ALREADY_EXECUTING_CALLS = 2;
 // 导致"回填实测值"这一步没法被脚本统一校验。这里给出唯一 schema。
 const P0_SCHEMA = "P0-EXEC.yml uses exactly these keys (tooling parses them — do not rename, and do not nest them differently):\n```yaml\nversion: 1\nsummary: { total: 12, passed: 12, failed: 0 }        # fill after running\nchecks:\n  - id: C1\n    assert: \"one line: what this check proves\"\n    run: \"exact shell command\"\n    expect: \"observable result: stdout text or exit code\"\n    measured: \"the value you actually observed\"        # fill after running\n    result: pass        # pass | fail -- fill after running\n```\nAfter execution, fill `measured` and `result` on EVERY row (not only the failing ones) and keep `summary` consistent with them.";
 
+// 计划阶段的 todo 纪律：原版的问题不是"没有列表"，而是列表只在收尾时打勾。
+// 这段把"建条 + 逐项打勾 + 禁止攒到底"写死进计划要求，DSH 原生 TodoDock 才有内容可渲染。
+// 注意：这段在任何档位都会注入（含 light 与原生接管），因此不能出现 P0-EXEC 之类的
+// 本插件专有产物名 —— 否则原生计划模式在跑时会与验收正文冲突（测试 A12 盯着这点）。
+const TODO_SYNC = [
+  "TODO SYNC (do not batch). Before the first tool call, open the step list with todo_write —",
+  "one item per plan step or acceptance check; full tier: one per planned stage.",
+  "After EVERY tool result that closes an item, immediately call todo_write again:",
+  "that item -> completed, exactly one next item -> in_progress.",
+  "Never leave all status updates to the end; a list that only fills in at the finish line is stale."
+].join("\n");
+
+// 规划阶段的变体：原生 plan mode 明确禁止用 todo_write 记录"规划过程"，
+// 而纪律版要求"第一个工具调用前就建列表"——两条同时注入时模型二选一，
+// 通常服从 plan mode，于是列表永远不出现（用户看到的正是"没有 todo list"）。
+// 所以按阶段分流：规划阶段只承诺"批准后的第一个动作就是建列表"。
+const TODO_SYNC_DEFER = [
+  "TODO SYNC (deferred). This step is a PLANNING step: do NOT open the step list yet — planning progress is",
+  "tracked by the plan itself, and the plan-mode policy forbids using todo_write to track it.",
+  "The moment the plan is approved (or an execution instruction arrives), your FIRST action is todo_write:",
+  "one item per plan step or acceptance check, first one in_progress. Then after EVERY tool result that closes",
+  "an item, immediately call todo_write again: that item -> completed, exactly one next item -> in_progress.",
+  "Never leave all status updates to the end; a list that only fills in at the finish line is stale."
+].join("\n");
+
 const COPY = {
   off: null,
   light: [
-    "PLANNING (tier=light). Before writing code, produce two small artifacts in the working directory:",
+    "PLANNING (tier=light). Before writing code, produce three small artifacts in the working directory:",
     "1. P0-EXEC.yml — 8 to 14 executable acceptance checks. Every check must be runnable by a command; no prose-only checks.",
     "2. CONVENTIONS.md — at most 20 rows, columns: ID | 约定 | 一句理由 | 违规如何被测出.",
+    "3. the step list itself, created with todo_write (see the TODO SYNC section).",
     P0_SCHEMA
   ].join("\n"),
   full: [
     "PLANNING (tier=full). Stage 1 — EVIDENCE.md: list every FACT / CONVENTION / AMBIGUITY / EDGE you rely on and tag each one as ✅可命令 (a command can confirm it), 👁只能看图 (only visual), or 🤷不知道 (must probe first).",
     "Stage 2 — copy only the ✅ items into P0-EXEC.yml (same fixed keys as the schema below, plus a source field pointing at the EVIDENCE row), move 👁 items to P1-TARGETS.yml, and probe every 🤷 item before planning on top of it.",
+    "Stage 3 — open the step list with todo_write: one item per planned stage, first one in_progress.",
     P0_SCHEMA
   ].join("\n")
 };
@@ -60,6 +89,15 @@ const HEADLESS_ENV = "DSH_PLAN_MODE_UI_HEADLESS";
 function headlessForced() {
   const v = String(process.env[HEADLESS_ENV] ?? "").trim().toLowerCase();
   return v === "off" || v === "0" || v === "false" || v === "no";
+}
+// 第三种无头语义（0.7.0）：=prompt —— 照常注入计划正文，但绝不桥接原生计划模式。
+// 为什么需要它：light 与 full 的正文（P0-EXEC/CONVENTIONS vs EVIDENCE/P1-TARGETS）在默认无头里
+// 因为"让位给原生计划"而一律不注入，两档表现完全一样，实验测不出差异；
+// 而真的桥接又会在无头里卡死（没有评审通道）。这个模式只用于对照实验。
+const HEADLESS_PROMPT_VALUES = new Set(["prompt", "prompt-only", "sections"]);
+function headlessPromptOnly() {
+  const v = String(process.env[HEADLESS_ENV] ?? "").trim().toLowerCase();
+  return HEADLESS_PROMPT_VALUES.has(v);
 }
 
 const SETTINGS_MAX = 50;                  // 每会话覆盖条数上限
@@ -187,6 +225,9 @@ const PLANNING_TTL_MS = 15 * 60 * 1000;
 // session/event 给的 session 与 context.agent.session 未必是同一个对象
 function sessionKey(session) {
   if (session === undefined || session === null) return undefined;
+  // 字符串输入统一补 "id:" 前缀（幂等）：sidOfKey 只认带前缀的键，
+  // 任何裸 id 通路都会静默回落到全局默认档 —— 这种坑查起来极费时间。
+  if (typeof session === "string") return session.startsWith("id:") ? session : "id:" + session;
   const id = session.id !== undefined ? session.id
     : session.sessionId !== undefined ? session.sessionId
     : session.key !== undefined ? session.key : undefined;
@@ -201,6 +242,9 @@ const ACTIVE_TURN_MAX_MS = 6 * 60 * 60 * 1000; // 回合进行中的兜底时限
 // 不给下一个回合发放规划许可（漏掉一个前缀 => 这条 steer 会被当成用户发话）。
 const STEER_PREFIX_RE = /^(PHASE 2|PHASE 1|PHASE APPROVAL|PLAN NOT FOUND|PLAN FIRST)/;
 const sectionStats = { evals: 0, hits: 0 }; // 自检：提示词装配是否看到当前阶段
+// 装配探针：最近一次算出的段落（键 → {tier, phase, planning, head}）。
+// 有了它，"到底注入了哪一版文案"用一次 curl 就能查，不必解压会话日志猜。
+const sectionProbe = new Map();
 let lastPlanCheck = { at: null, cwd: null, result: null }; // 自检：拦门在真实会话里能否拿到 cwd（全局兜底）
 const planChecks = new Map();             // sessionKey → 该会话最近一次拦门结果（诊断用）
 const WRITE_TOOL_RE = /^(write|edit|multi_?edit|apply_?patch|create_?file|delete_?file|move_?file|rename_?file)/i;
@@ -237,7 +281,9 @@ const headerCache = new Map();
 const headerMiss = new Map();  // 未命中的重试节流
 const CACHE_MAX = 500;         // header/cwd 缓存按会话增长，必须有界
 function capSet(map, k, v) {
-  if (map.size >= CACHE_MAX && !map.has(k)) map.delete(map.keys().next().value);
+  // 命中时先删再插：刷新插入顺序，热点会话不会被新会话挤掉（LRU 近似）
+  if (map.has(k)) map.delete(k);
+  else if (map.size >= CACHE_MAX) map.delete(map.keys().next().value);
   map.set(k, v);
 }
 // 只读文件开头的一小段并解出首帧：会话日志是多帧 zstd 且会一直变长，
@@ -297,6 +343,53 @@ function sessionHeader(session) {
   else capSet(headerMiss, k, Date.now());
   return head;
 }
+// ── todo 同步监测 ────────────────────────────────────────────────
+// 列表本身由 DSH 原生 TodoDock 渲染（数据源 = 会话投影 todos）；这里只管两件事：
+// ① 把「写没写、写晚没有」算成健康度并通过 /progress 暴露给客户端；
+// ② 滞后时在下一回合的系统提示里塞一条一次性提醒（治"只在收尾打勾"）。
+// 四个表一律用 capSet 写入（有界，避免多会话泄漏）；键与 state.sessions 一致：id:<sessionId>
+const todoTrack = new Map();   // key -> { todos, lastWriteTurn, at }
+const turnTrack = new Map();   // key -> 当前回合号
+const syncNudge = new Map();   // key -> 进度快照（单一来源，文案与计数不再混拼）
+const nudgeCount = new Map();  // key -> 已提醒次数（todo/write 成功即清零）
+let todoSyncMode = "remind";   // off | remind | strict
+let lagTurnsThreshold = 2;
+
+function todoModeOf(value) {
+  return value === "off" || value === "remind" || value === "strict" ? value : "remind";
+}
+
+// 会话投影里的 todos（tool-todo 注册的投影；拿不到时调用方退回事件缓存）
+function todosProjection(ctx, session) {
+  try {
+    let proj = null;
+    try { if (typeof ctx.get === "function") proj = ctx.get("sessionProjections") ?? null; } catch (error) { proj = null; }
+    if (proj === null || proj === undefined) proj = ctx.sessionProjections;
+    if (proj !== null && proj !== undefined && typeof proj.stateOf === "function") {
+      const st = proj.stateOf(session, "todos");
+      if (Array.isArray(st)) return { available: true, todos: st, service: true };
+      // 投影在、只是本会话还没写过 todo（stateOf 返回 null/undefined）→ 可用但为空。
+      // v0.6.2 把这种情况当"不可用"，面板会误显示「降级·按事件」。
+      return { available: true, todos: [], service: true };
+    }
+  } catch (error) { /* 没有该投影 */ }
+  return { available: false, todos: null, service: false };
+}
+
+// 某会话此刻的进度视图：投影优先，事件缓存兜底
+function progressOf(ctx, key) {
+  const agent = key === undefined ? undefined : agents.get(key);
+  const session = agent === undefined ? undefined : agent.session;
+  const proj = session === undefined ? { available: false, todos: null } : todosProjection(ctx, session);
+  const track = key === undefined ? undefined : todoTrack.get(key);
+  const todos = proj.available ? proj.todos : (track?.todos ?? []);
+  const turn = (key === undefined ? undefined : turnTrack.get(key)) ?? (track?.lastWriteTurn ?? 0);
+  const progress = deriveProgress({ todos, turn, lastWriteTurn: track?.lastWriteTurn ?? 0, threshold: lagTurnsThreshold });
+  return { ...progress, available: proj.available || track !== undefined, degraded: proj.service !== true,
+    lastWriteTurn: track?.lastWriteTurn ?? 0,
+    lastUpdatedAt: track?.at ?? null, source: proj.available ? "projection" : (track === undefined ? "none" : "events") };
+}
+
 // 内置计划模式（/plan）是否正在生效：生效时不抢它的流程
 let planModeService;
 // 会话投影里的真实计划状态（planMode 被 isolate 时这是唯一可靠来源）
@@ -356,8 +449,8 @@ function decidePlanning(ctx, session, key, evTurn, prompt) {
   const live = phaseRecords.get(key);
   if (live !== undefined && live.turn === evTurn) { gateStats.seen += 1; return; }
   const st = settingsFor(key);
-  if (headlessForced()) {
-    // 无头环境：主动退出可能残留的原生计划模式，然后当作 off 处理
+  if (headlessForced() || headlessPromptOnly()) {
+    // 无头环境（含 =prompt 的只注入模式）：不桥接、不门控；顺手退出可能残留的原生计划模式
     gateStats.off += 1;
     if (bridgeTier.has(key)) { cancelIntent.add(key); nativeLeave(ctx, agents.get(key), key); }
     return;
@@ -456,7 +549,7 @@ function turnRunning(key) {
 //   armed     —— 已开启但没有回合在跑（图标静止）
 //   planning  —— 已开启且回合进行中（书写动画）
 //   executing —— full 档批准后（原生已关，但正处于执行阶段，优先于 native）
-function indicatorOf(id) {
+function indicatorOf(ctx, id) {
   const key = id === null ? lastSession : "id:" + id;
   if (key === null || key === undefined || key === "") return "off";
   const rec = phaseRecords.get(key);
@@ -467,16 +560,43 @@ function indicatorOf(id) {
   // 结果在"投影说已开、我们从没桥接"的会话里永远拿不到 planned，直接掉回 off（黑色默认图标）。
   const approved = plannedAt.get(key);
   if (approved !== undefined && Date.now() - approved <= PLANNED_ICON_TTL_MS) return "planned";
-  if (nativeOf(id)) return turnRunning(key) ? "planning" : "armed";
+  if (nativeOf(ctx, id)) return turnRunning(key) ? "planning" : "armed";
   return "off";
 }
-function nativeOf(id) {
+// ── 计划模式的唯一判据 ──────────────────────────────────────────────
+// 之前三条路径各看一半：段落看投影、/state 看簿记、/progress 又看投影，于是出现
+// "面板说计划模式开着、提示词却按执行阶段发指令"的分裂。现在统一走这里：
+//   投影（权威）→ planMode 服务 → 簿记兜底（并把簿记校正成与权威一致）
+function syncNativeBook(key, active) {
+  if (key === undefined) return;
+  if (active) nativeOpen.add(key);
+  else nativeOpen.delete(key);   // bridgeTier 是"曾用哪档桥接"的记忆，不在此清
+}
+
+function nativeState(ctx, session, key) {
+  const k = key !== undefined ? key : sessionKey(session);
+  if (session !== undefined && session !== null) {
+    const proj = planProjection(ctx, session);
+    if (proj.available) {
+      syncNativeBook(k, proj.active === true);
+      return { available: true, active: proj.active === true, source: "projection" };
+    }
+    if (builtinPlanActive(ctx, session)) {
+      syncNativeBook(k, true);
+      return { available: true, active: true, source: "service" };
+    }
+  }
+  const book = k !== undefined && (bridgeTier.has(k) || nativeOpen.has(k));
+  return { available: false, active: book, source: "bookkeeping" };
+}
+
+function nativeOf(ctx, id) {
   if (id === null) {
     if (lastSession === null) return false;
-    return bridgeTier.has(lastSession) || nativeOpen.has(lastSession);
+    return nativeState(ctx, agents.get(lastSession)?.session, lastSession).active;
   }
   const key = "id:" + id;
-  return bridgeTier.has(key) || nativeOpen.has(key);
+  return nativeState(ctx, agents.get(key)?.session, key).active;
 }
 const pendingPhase2 = new Map();       // sessionKey → turn：批准发生在阶段记录被清理之后时暂存
 const phase2Turn = new Map();          // sessionKey → turn：同一回合只投递一次 PHASE 2
@@ -543,7 +663,7 @@ function runPlanCommand(ctx, agent, line) {
   }
 }
 function nativeEnter(ctx, agent, key, tier) {
-  if (headlessForced()) return false;      // 无头没有审批通道：进去就出不来
+  if (headlessForced() || headlessPromptOnly()) return false;   // 无头没有审批通道：进去就出不来
   if (agent === undefined || key === undefined) return false;
   const svc = planModeHandle(ctx);
   if (svc !== null) {
@@ -919,13 +1039,14 @@ async function handleState(req, res, ctx) {
     const sessionIdOut = requested !== null ? requested : (lastSession === null ? null : String(lastSession).replace(/^id:/, ""));
     const eff = settingsFor(requested === null ? null : "id:" + requested);
     sendJson(res, 200, { ok: true, tier: eff.tier, scope: eff.scope, max: eff.max, autoApprove: eff.autoApprove,
-      native: nativeOf(requested),   // 原生计划模式是否开着（兼容字段；胶囊隐藏/退出按钮用它）
-      indicator: indicatorOf(requested),   // 四态：off | armed | planning | executing（动画的唯一依据）
+      native: nativeOf(ctx, requested),   // 原生计划模式是否开着（权威判据；胶囊隐藏/退出按钮用它）
+      indicator: indicatorOf(ctx, requested),   // 四态：off | armed | planning | executing（动画的唯一依据）
       settings: { source: eff.source, overrides: Object.keys(state.sessions).length, default: state.default },
       updatedAt: state.updatedAt, phase, session: sessionIdOut, phases,
       planning: phase === "planning",
       headless: headlessForced(),
-      debug: { ...sectionStats, headless: headlessForced(), auto: { ...autoStats },
+      debug: { ...sectionStats, section: requested === null ? null : (sectionProbe.get("id:" + requested) ?? null),
+        headless: headlessForced(), auto: { ...autoStats },
         plan: (function () {
           const ag = requested === null ? undefined : agents.get("id:" + requested);
           if (ag === undefined || ag === null) return { available: false, active: null };
@@ -940,14 +1061,78 @@ async function handleState(req, res, ctx) {
 }
 
 
+// ── 进度监测端点 ────────────────────────────────────────────────
+// GET  /api/plan-mode/progress?session=<id>  -> 健康度 + 计数（面板轮询）
+// POST /api/plan-mode/progress {session?, action:"nudge"|"reset"}
+function handleProgress(req, res, ctx) {
+  try {
+    const url = new URL(String(req.url ?? "/"), "http://localhost");
+    const method = String(req.method ?? "GET").toUpperCase();
+    const qs = url.searchParams.get("session");
+    const key = qs === null || qs === "" ? undefined : "id:" + qs;
+
+    if (method === "POST") {
+      // 与 /state 同一考勤：不带客户端标记的跨站请求一律拒绝
+      if (req.headers["x-plan-mode-client"] !== "1") { sendJson(res, 403, { ok: false, message: "forbidden" }); return; }
+      let body = "";
+      req.on("data", (chunk) => { if (body.length < 65536) body += chunk; });
+      req.on("end", () => {
+        let payload = {};
+        try { payload = JSON.parse(body.length > 0 ? body : "{}"); } catch (error) { sendJson(res, 400, { ok: false, message: "invalid JSON" }); return; }
+        const target = payload?.session !== undefined && payload.session !== null ? "id:" + payload.session : key;
+        if (target === undefined) { sendJson(res, 400, { ok: false, message: "session required" }); return; }
+        if (payload?.action === "nudge") {
+          const pr = progressOf(ctx, target);
+          capSet(syncNudge, target, pr);   // 手动 nudge 同样在送达时才扣额度
+          sendJson(res, 200, { ok: true, action: "nudge", queued: true, progress: pr });
+          return;
+        }
+        if (payload?.action === "reset") {
+          todoTrack.delete(target); turnTrack.delete(target); syncNudge.delete(target); nudgeCount.delete(target);
+          sendJson(res, 200, { ok: true, action: "reset" });
+          return;
+        }
+        sendJson(res, 400, { ok: false, message: "unknown action" });
+      });
+      req.on("error", () => sendJson(res, 400, { ok: false, message: "read error" }));
+      return;
+    }
+
+    if (key === undefined) { sendJson(res, 200, { ok: true, session: null, available: false, reason: "no-session", mode: todoSyncMode, lagThreshold: lagTurnsThreshold }); return; }
+    const pr = progressOf(ctx, key);
+    const agent = agents.get(key);
+    const proj = agent === undefined || agent === null ? { available: false, active: false } : planProjection(ctx, agent.session);
+    sendJson(res, 200, { ok: true, session: key.slice(3), mode: todoSyncMode, lagThreshold: lagTurnsThreshold,
+      ...pr, plan: { native: proj.available ? proj.active === true : false,
+        planned: plannedSessions.has(key), approved: plannedSessions.has(key) },
+      debug: { tracked: todoTrack.size, turns: turnTrack.size, nudges: syncNudge.size, counters: nudgeCount.size } });
+  } catch (error) {
+    console.error("[plan-mode-ui] progress handler failed:", error);
+    sendJson(res, 500, { ok: false, message: String(error?.message ?? error) });
+  }
+}
+
 export default {
   inject: ["webServer", "systemPrompt"],
-  apply(ctx) {
+  apply(ctx, config) {
+    const cfg = config !== null && typeof config === "object" ? config : {};
+    todoSyncMode = todoModeOf(cfg.todoSync ?? process.env.DSH_PLAN_TODO_SYNC);
+    if (Number.isFinite(cfg.lagTurns)) lagTurnsThreshold = Math.max(1, Math.floor(cfg.lagTurns));
+    else {
+      const fromEnv = Number(process.env.DSH_PLAN_LAG_TURNS);
+      if (Number.isFinite(fromEnv) && fromEnv >= 1) lagTurnsThreshold = Math.floor(fromEnv);
+    }
     try { console.info("[plan-mode-ui] host ready (two-phase)"); } catch (e) {}
     ctx.effect(() => {
       const dispose = ctx.webServer.register({ kind: "exact", path: API + "/state", handler: (req, res) => handleState(req, res, ctx) });
       return () => { if (typeof dispose === "function") dispose(); };
     }, "plan-mode-ui: state route");
+
+    // 进度监测：面板轮询它；POST {action:"nudge"} 手动触发一次同步提醒
+    ctx.effect(() => {
+      const dispose = ctx.webServer.register({ kind: "exact", path: API + "/progress", handler: (req, res) => handleProgress(req, res, ctx) });
+      return () => { if (typeof dispose === "function") dispose(); };
+    }, "plan-mode-ui: progress route");
 
     // 计划进行中：turn/start..turn/end 之间置位，客户端据此切换图标动画。
     // 注意签名是 (session, event)；只收一个参数拿到的是 session，planning 会永远是 false。
@@ -958,6 +1143,32 @@ export default {
         const key = sessionKey(session);
         // 事件里的回合号：运行时给的是扁平对象，但日志里是 {type, data:{turn}}，两种都认
         const evTurn = event?.turn !== undefined ? event.turn : event?.data?.turn;
+        // todo 同步：记写入轮次与整表；回合结束判定滞后，置一次性提醒
+        if (key !== undefined) {
+          if (evTurn !== undefined) capSet(turnTrack, key, evTurn);
+          if (type === "todo/write") {
+            const payload = event?.data !== undefined ? event.data : event;
+            const list = Array.isArray(payload?.todos) ? payload.todos : null;
+            if (list !== null) {
+              // 关键：todo/write 事件本身不带 turn（session.append 只写 {type,seq,time,data}），
+              // 当前回合只能从 turnTrack（由 turn/start|turn/end 的 data.turn 维护）取，
+              // 否则 lastWriteTurn 恒为 0，lagTurns 会等于整条会话的回合数。
+              const writeTurn = turnTrack.get(key) ?? evTurn ?? (todoTrack.get(key)?.lastWriteTurn ?? 0);
+              capSet(todoTrack, key, { todos: list, lastWriteTurn: writeTurn, at: Date.now() });
+              syncNudge.delete(key);
+              nudgeCount.delete(key);   // 同步成功即清零额度：长任务不会因为早期用两次就永久哑火
+            }
+          } else if (type === "turn/end" && todoSyncMode !== "off") {
+            const pr = progressOf(ctx, key);
+            const limit = pr.health === "stalled" ? 4 : 2;
+            // strict：只要还有未完成项就每回合提醒；remind：只在滞后时提醒
+            const wants = todoSyncMode === "strict"
+              ? pr.counts.pending + pr.counts.inProgress > 0
+              : (pr.health === "lagging" || pr.health === "stalled");
+            // 额度只在"真正送进提示词"时才扣（见提示段装配处），排队不扣
+            if (wants && (nudgeCount.get(key) ?? 0) < limit) capSet(syncNudge, key, pr);
+          }
+        }
         // 只要有事件就刷新记录时间：长任务（>15 分钟）不会中途被 TTL 清掉
         const live = key === undefined ? undefined : phaseRecords.get(key);
         if (live !== undefined) live.planningAt = Date.now();
@@ -1250,6 +1461,22 @@ export default {
         const phase = rec === undefined ? "idle" : rec.phase;
         sectionStats.evals += 1;
         if (rec !== undefined) sectionStats.hits += 1;
+        // 滞后提醒：一次性取出并清除，避免每回合重复占字节
+        const syncKey = sessionKey(context?.agent?.session);
+        let syncText = "";
+        if (syncKey !== undefined && todoSyncMode !== "off") {
+          const pending = syncNudge.get(syncKey);
+          if (pending !== undefined) {
+            syncNudge.delete(syncKey);
+            syncText = syncLine(pending);   // 单一快照：health / lagTurns / counts 同源
+            // 真正送达才扣额度：被无关装配吞掉的提醒不消耗预算
+            capSet(nudgeCount, syncKey, (nudgeCount.get(syncKey) ?? 0) + 1);
+          }
+        }
+        // todo 纪律是独立段：light 档与「原生计划接管」时同样注入，
+        // 否则用户切到 light 仍然看不到列表（这正是 v0.5.x 的坑）。
+        let todoBlock = "";   // 规划/执行两版文案，取决于后文的投影判定
+        const merge = (s) => [s, todoBlock, syncText].filter(Boolean).join("\n");
         const head = "ACCEPTANCE (plan-mode tier=" + st.tier + ", scope=" + st.scope + ", phase=" + phase + ")";
         const scopeLine = st.scope === "first"
           ? "scope=first — produce the planning artifacts only on the first turn of this conversation; later turns implement directly without regenerating them."
@@ -1261,13 +1488,27 @@ export default {
         // 让位判据不能只看本地簿记（重启后它是空的）：以会话投影的真实状态为准。
         // 否则 light 档会掉进下面的通用分支，注入 P0-EXEC/CONVENTIONS/“然后实现”那一整套，
         // 与原生 plan:policy 的"只读、只出计划"直接冲突 —— 模型会挑那个让它干活的。
-        const projNow = context?.agent?.session === undefined ? { available: false, active: false } : planProjection(ctx, context.agent.session);
-        const nativeGoverning = projNow.available
-          ? projNow.active
-          : (bridgedTier === "light" || bridgedTier === "full"
-             || (bridgedNow !== undefined && nativeOpen.has(bridgedNow)));
-        if (st.tier === "light") return maxLine;       // 纯桥接档：永不注入计划/验收文本
-        if (nativeGoverning) return maxLine;           // 原生计划模式在跑：整段让位，只留 Max 行
+        // 单一判据（见 nativeState）：投影权威 → 服务 → 簿记，并顺手校正簿记。
+        const nsNow = nativeState(ctx, context?.agent?.session, bridgedNow);
+        const nativeGoverning = nsNow.active;
+        // 阶段分流：plan mode 生效（或本插件处于 planning）时用"延后建列表"版，
+        // 否则用"立刻建列表 + 逐项打勾"版 —— 两版不会同时出现，避免指令打架。
+        const planningNow = phase === "planning" || nativeGoverning;
+        todoBlock = todoSyncMode === "off" || st.tier === "off" ? ""
+          : planningNow ? TODO_SYNC_DEFER : TODO_SYNC;
+        if (bridgedNow !== undefined) capSet(sectionProbe, bridgedNow, { key: bridgedNow, tier: st.tier, phase,
+          planning: planningNow, head: todoBlock.slice(0, 160),
+          sources: { via: nsNow.source, available: nsNow.available },
+          at: Date.now() });
+        // 无头"只注入不桥接"：照常给出计划正文，尾巴明说"就在本回合实现"，避免卡在规划阶段
+        if (headlessPromptOnly()) {
+          if (body === null) return merge(maxLine);
+          const sameTurn = "Produce these planning artifacts in this directory, then implement and run every"
+            + " acceptance check in this same turn; do not wait for an approval step.";
+          return merge([body, sameTurn].filter(Boolean).join("\n"));
+        }
+        if (st.tier === "light") return merge(maxLine);       // 纯桥接档：不注入计划/验收文本（同步提醒仍要给）
+        if (nativeGoverning) return merge(maxLine);           // 原生计划模式在跑：整段让位，只留 Max 行 + 提醒
         // full 桥接：规划指令归原生，批准后（executing）才恢复我们的执行段
         const phaseBlock = bridgedTier === "full"
           ? (phase === "executing" ? PHASE2 : "")
@@ -1277,8 +1518,8 @@ export default {
           ? "In this step produce only the plan and its artifacts; implementation starts in the next step."
           : "Then implement and run every acceptance check before delivering, and report the measured numbers.";
         // Max 独立于档位：即便关了档，只要开了 Max 就注入那一行
-        if (body === null) return maxLine;
-        return [head, scopeLine, maxLine, phaseBlock, body, tail].filter(Boolean).join("\n");
+        if (body === null) return merge(maxLine);
+        return merge([head, scopeLine, maxLine, phaseBlock, body, tail].filter(Boolean).join("\n"));
       }
     }), "plan-mode-ui: prompt section");
   }

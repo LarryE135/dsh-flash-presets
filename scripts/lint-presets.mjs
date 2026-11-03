@@ -42,7 +42,7 @@ const PLATFORM_PATHS = [['/tmp/', 'POSIX 专属临时目录'], ['C:\\', 'Windows
 for (const file of fs.readdirSync(path.join(ROOT, 'presets')).filter((f) => f.endsWith('.patch.yml'))) {
   const full = path.join(ROOT, 'presets', file);
   const rules = parseRules(fs.readFileSync(full, 'utf8'));
-  if (rules.length === 0) { warn.push(f + ': 未解析到编号规则（若为故意留空可忽略）'); continue; }
+  if (rules.length === 0) { warn.push(file + ': 未解析到编号规则（若为故意留空可忽略）'); continue; }
 
   const nums = rules.map((r) => r.num);
   const expect = Array.from({ length: nums.length }, (_, i) => i + 1);

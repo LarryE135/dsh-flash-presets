@@ -3,8 +3,8 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v3
-        name: "Flash 精简·PTC v3（v4.1-flash）"
-        description: "精简模式的 PTC 版 · v3（lean-v3，2026-10-20 定稿）：在 v2 的轮数预算 / 按需折叠 / 路由感知之上加反过度自测——验收门一旦通过就交付，不再追加随机/压测轮。针对实测「失败模式从答错迁移到 TLE/拖时长」。轮数预算、按需折叠、路由感知同 v3b。"
+        name: "轻量PTC-v3"
+        description: "基础的轻量预设，满足绝大多数日常工作。"
         order: 27
         plugins:
           - id: persona

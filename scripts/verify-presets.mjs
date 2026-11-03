@@ -40,9 +40,8 @@ const repoOnly = ARGV.includes('--repo-only');
 const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
-  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: true, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3-max': { rules: 7, ptc: true, order: 28, legacy: false, thr: '0.25', retain: '20000' },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
@@ -76,10 +75,8 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
   // （工作目录走 runtime context，不走占位符）。
   const PROMPT_VARS = new Set(['provider', 'model']);
-  for (const f of ['presets/flash-lean-ptc-v1.patch.yml', 'presets/flash-lean-ptc-v2.patch.yml',
-                   'presets/flash-lean-ptc-v3.patch.yml', 'cordis.patch.yml',
-                   'presets/legacy-0.1.5/flash-lean-ptc-v1/agent.cordis.yml',
-                   'presets/legacy-0.1.5/flash-lean-ptc-v1/preset.yml']) {
+  for (const f of ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-max.patch.yml',
+                   'presets/flash-lean-ptc-v3.patch.yml', 'cordis.patch.yml',]) {
     const text = read(path.join(repo, f));
     if (text === null) continue;
     const used = [...text.matchAll(/\{\{([a-z_][a-z0-9_]*)\}\}/g)].map(m => m[1]);
@@ -285,6 +282,18 @@ if (modernInstalled) {
 } else {
   check(false, '未检测到安装（先运行 scripts/install.sh 或 scripts/install.ps1）');
 }
+}
+
+// 打包完整性：presets/ 下的每个补丁都必须出现在 package.json 的 files 白名单里，
+// 否则 npm 包里会缺文件，而文档又让人用 --patch presets/xxx 去装（0.2.6 曾漏了 v3.1 变体）。
+{
+  const repoRoot = path.resolve(here, '..');
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+  const files = pkg.files || [];
+  const missing = fs.readdirSync(path.join(repoRoot, 'presets'))
+    .filter((n) => n.endsWith('.patch.yml'))
+    .filter((n) => !files.includes('presets/' + n));
+  check(missing.length === 0, 'package.json files 覆盖全部预设补丁', missing.join(', '));
 }
 
 console.log('\n' + (failed ? '校验失败：' + failed + ' 项未通过。' : '校验通过：预设结构与跨平台检查全部通过。'));

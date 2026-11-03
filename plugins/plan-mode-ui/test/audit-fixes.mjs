@@ -24,7 +24,7 @@ async function boot(opts) {
     get: (n) => (n === "commands" ? commands : undefined),
     on: (n, fn) => handlers.set(n, fn),
     inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
-    webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
+    webServer: { register: (spec) => { if (String(spec.path).endsWith("/state")) route = spec.handler; return () => {}; } },
     systemPrompt: { section: (spec) => { sectionSpec = spec; return () => {}; }, getSectionOrder: () => 500 },
     logger: { warn() {}, info() {} }
   };
@@ -170,7 +170,9 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
 {
   const c = await boot({ tier: "light", projections: { stateOf: (s, n) => (n === "plan" ? { active: false } : undefined) } });
   c.fire("session/event", c.session, { type: "plan/mode", data: { active: true } });   // 造出陈旧簿记
-  if ((await c.state()).native !== true) throw new Error("A9 前置：簿记没建起来");
+  // 0.6.6 起 /state.native 以会话投影为准（单一判据）：这里投影故意说"已关"，
+  // 所以 native 必须是 false —— 恰恰证明陈旧簿记不再能让状态说谎。
+  if ((await c.state()).native !== false) throw new Error("A9 前置：陈旧簿记仍在冒充 native=true");
   c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
   c.fire("session/event", c.session, userMsg(1));
   await tick();

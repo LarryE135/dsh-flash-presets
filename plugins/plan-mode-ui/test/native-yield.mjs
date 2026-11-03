@@ -30,7 +30,7 @@ async function boot(tier, withCommands) {
     on: (n, fn) => handlers.set(n, fn),
     inject: () => {},
     effect: (fn) => { try { fn(); } catch (e) {} },
-    webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
+    webServer: { register: (spec) => { if (String(spec.path).endsWith("/state")) route = spec.handler; return () => {}; } },
     systemPrompt: { section: () => {}, getSectionOrder: () => 500 },
     logger: { warn() {}, info() {} }
   };

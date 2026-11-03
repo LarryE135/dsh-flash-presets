@@ -22,7 +22,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { resolvePlatformTags, hasPlatformTags } from '../lib/platform-tags.mjs';
+import { resolvePlatformTags, hasPlatformTags } from './platform-tags.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -34,7 +34,7 @@ const flag = n => argv.includes(n);
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const PRESETS = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'];
+const PRESETS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'];
 
 const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = opt('--profile', 'web');
@@ -81,10 +81,19 @@ if (!fs.existsSync(patchPath)) {
   process.exit(1);
 }
 const raw = fs.readFileSync(patchPath, 'utf8');
+// 0.2.6 起预设也可以完全由组合包提供（dsh plugin add dsh-flash-presets），此时没有托管块。
+const bundleInstalled = (() => {
+  try {
+    const pj = JSON.parse(fs.readFileSync(path.join(home, 'profiles', profile, 'package.json'), 'utf8'));
+    const bundles = (pj.dsh && pj.dsh.profile && pj.dsh.profile.bundles) || [];
+    return bundles.includes('dsh-flash-presets');
+  } catch { return false; }
+})();
 const blocks = raw.split('\n').filter(l => l.trim() === BEGIN).length;
 const ends = raw.split('\n').filter(l => l.trim() === END).length;
 if (blocks === 0) {
-  warn('没有托管块 —— 这些预设不是用本仓库的安装脚本装的（可能是手抄或 bundle patch）');
+  if (bundleInstalled) ok('没有托管块，但组合包 dsh-flash-presets 已装 —— 预设行由 bundle 提供');
+  else warn('没有托管块 —— 这些预设不是用本仓库的安装脚本装的（可能是手抄或 bundle patch）');
 } else if (blocks > 1 || ends !== blocks) {
   bad('托管块数量异常：BEGIN=' + blocks + ' / END=' + ends + ' —— 重复安装或块被截断');
   problems.push('托管块重复/截断');
@@ -105,6 +114,7 @@ const insideCount = id => (insideBlock.match(new RegExp('id: ' + id + '\\b', 'g'
 for (const id of PRESETS) {
   const n = insideCount(id) + (strayRows.includes(id) ? 1 : 0);
   if (strayRows.includes(id)) warn(id + '：块内 ' + insideCount(id) + ' 份 + 块外残留 1 份 → 预设列表会重复');
+  else if (n === 0 && bundleInstalled) ok(id + '：由组合包 dsh-flash-presets 提供');
   else if (n === 0) info(id + '：未安装');
   else if (n > 1) warn(id + '：出现 ' + n + ' 份（重复）');
   else ok(id + '：1 份');

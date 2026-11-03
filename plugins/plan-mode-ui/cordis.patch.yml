@@ -3,3 +3,10 @@
 - insert:
     - id: plan-mode-ui
       name: 'dsh-plan-mode-ui'
+
+# 运行时调优：PTC 运行时改用常驻进程（每个 run_code program 只付一次启动成本，
+# 嵌套工具调用 44ms → 15ms，实测见 docs/压测-run_code开销.md）。
+# 与插件同装同生效；若 profile 里已有同值配置，重复写入等价。
+- id: ptc-runtime
+  config:
+    executionMode: persistent-in-memory

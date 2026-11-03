@@ -25,7 +25,7 @@ async function boot(tier, opts = {}) {
     get: (n) => (n === "commands" ? commands : undefined),
     on: (n, fn, options) => { handlers.set(n, fn); handlerOpts.set(n, options); return () => {}; },
     inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
-    webServer: { register: (spec) => { route = spec.handler; return () => {}; } },
+    webServer: { register: (spec) => { if (String(spec.path).endsWith("/state")) route = spec.handler; return () => {}; } },
     systemPrompt: { section: () => () => {}, getSectionOrder: () => 500 },
     logger: { warn() {}, info() {} }
   };

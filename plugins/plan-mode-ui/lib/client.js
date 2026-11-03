@@ -497,6 +497,7 @@ window.__ModuleLoader__.load({
         }, 120);
       }
 
+      // 自适应轮询：没有 todo（unused）时 5 s 一次，其余 2 s；页面隐藏时暂停
       if (!s.open) return null;
 
       var idx = s.tier === "off" ? 0 : s.tier === "light" ? 1 : 2;

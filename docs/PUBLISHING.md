@@ -174,8 +174,8 @@ gh release upload vX.Y.Z ~/.dsh/artifacts/dsh-plan-mode-ui-vA.B.C.zip
 npm run verify:release && npm run verify:versions
 ```
 
-第 1 步走完之后，主 README 的安装段可以退回成一行 `dsh plugin --profile web add dsh-plan-mode-ui`，
-`--with-plan-mode` 则保留为「离线/内网也能一次装齐」的路径（它优先用 `dist/` 里的 tgz）。
+0.2.6 起计划模式插件已并入主包：安装主包即带宿主与浏览器半边，`--with-plan-mode` 只做旧插件清理与运行时调优；
+`dist/dsh-plan-mode-ui-*.tgz` 仍产出，供老用户单独装（升级须先 `dsh plugin remove dsh-plan-mode-ui`，否则同 id 双实例）。
 
 ## 8. 发布后验证（建议每次都做）
 

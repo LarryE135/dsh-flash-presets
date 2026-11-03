@@ -16,12 +16,16 @@ check(ps1 !== null, 'scripts/install.ps1 存在');
 check(pub !== null, 'scripts/publish.ps1 存在');
 
 // 预设名单必须与 presets/ 实际出货一致
-const presetFiles = fs.readdirSync(path.join(repo, 'presets'))
+const allPresetFiles = fs.readdirSync(path.join(repo, 'presets'))
   .filter(f => f.endsWith('.patch.yml')).map(f => f.replace('.patch.yml', '')).sort();
+// 变体预设（如 flash-lean-ptc-v3-1-high / -max）是稳定版的实验分支，不参与"最新"判定：
+// 否则每加一个变体，都被迫改安装器默认 —— 那是行为变更，不是加变体该付的代价。
+const VARIANT = /-v\d+-\d+(-[a-z0-9]+)*$/;   // -v3-1 / -v3-1-high / -v3-1-max 都算变体
+const presetFiles = allPresetFiles.filter(f => !VARIANT.test(f));
 const listMatch = (ps1 || '').match(/\$Presets\s*=\s*@\(([^)]*)\)/);
 const listed = listMatch ? listMatch[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).sort() : [];
 // 0.2.5 起安装器默认只装最新预设（对照版本仍在 presets/），这里检查子集 + 含最新
-const knownFiles = presetFiles.slice().sort();
+const knownFiles = allPresetFiles.slice().sort();   // 子集校验用全集，变体也可以被显式安装
 const newestOfAll = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();
 check(listed.length > 0 && listed.every(id => knownFiles.includes(id)) && listed.includes(newestOfAll),
       'install.ps1 预设名单是 presets/ 的子集且含最新（' + (listed.join(', ') || '未解析到') + '）');
@@ -63,10 +67,7 @@ check(/\*\.ps1[^\n]*eol=lf/.test(ga), '.gitattributes 把 *.ps1 钉为 LF（声�
 
 // 两个安装器的完成文案必须逐字提到同一批预设（防单侧漂移）
 const sh = read(path.join(here, 'install.sh')) || '';
-const listOf = s => {
-  const lists = s.match(/Flash 精简·PTC v[0-9]+(?:\s*\/\s*v[0-9]+)*/g) || [];
-  return lists.flatMap(x => x.match(/v[0-9]+/g) || []);
-};
+const listOf = s => (s.match(/轻量PTC-v[0-9]+(?:\s*max)?/g) || []).map(x => x.replace(/\s+/g, ' '));
 const shNames = listOf(sh);
 const psNames = listOf(ps1 || '');
 const uniq = a => [...new Set(a)].sort();

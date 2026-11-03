@@ -77,15 +77,13 @@ console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
 console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
-  'flash-lean-ptc-v1.patch.yml': { preset: 'flash-lean-ptc-v1', order: 21, rules: 14, ptcRow: true,
-                                  thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2 },
-  'flash-lean-ptc-v2.patch.yml': { preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
-                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
   'flash-lean-ptc-v3.patch.yml': { preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3-max.patch.yml': { preset: 'flash-lean-ptc-v3-max', order: 28, rules: 7, ptcRow: true,
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
 // bundle 默认只发 v3（EXPECT 里其余是源文件级的对照版本，不进合成产物）
-const BUNDLE_IDS = ['flash-lean-ptc-v3'];
+const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'];
 const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
@@ -181,7 +179,7 @@ if (args.length) {
       // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
       check(rows.includes('flash-lean-ptc-v3'),
             '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'];
+      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'];
       check(rows.every(id => known.includes(id)),
             '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {
@@ -216,19 +214,18 @@ if (args.length) {
               '合成产物含 ' + EXPECT_IDS.join('/') + '（实际: ' + (ids.join(', ') || '无') + '）');
         check(ids.length === EXPECT_IDS.length,
               '合成产物只含 ' + EXPECT_IDS.join('/') + '，不含对照版本（实际: ' + (ids.join(', ') || '无') + '）');
+        // 0.2.6 起计划模式是独立包：预设包里再出现 plan-mode-ui 行，装两个包就会跑两个实例。
+        const flatNames = (cdoc || []).flatMap(e => (e && e.insert) || []).map(r => String(r.name || ''));
+        check(!flatNames.some(n => n.includes('plan-mode') || n === 'dsh-flash-presets'),
+              '合成产物不含计划模式行（计划模式是独立包 dsh-plan-mode-ui）');
+        const runtimeRows = (cdoc || []).filter(e => e && e.id === 'ptc-runtime' && e.insert === undefined);
+        check(runtimeRows.length === 1 && JSON.stringify(runtimeRows[0]).includes('persistent-in-memory'),
+              '运行时覆盖恰好一条 ptc-runtime → persistent-in-memory');
       }
     }
   }
-  console.log('\n[presets/legacy-0.1.5（DSH < 0.1.7 回退用）]');
-  for (const name of ['flash-lean-ptc-v1']) {
-    const legacy = path.join(repo, 'presets', 'legacy-0.1.5', name, 'agent.cordis.yml');
-    if (!fs.existsSync(legacy)) { check(false, '缺少 ' + name + '/agent.cordis.yml'); continue; }
-    const text = fs.readFileSync(legacy, 'utf8');
-    check(/thresholdRatio:\s*0\.3\b/.test(text) && /retainTokens:\s*50000\b/.test(text),
-          name + '：旧式文件仍带 0.3 / 50000');
-  }
-  check(!fs.existsSync(path.join(repo, 'presets', 'legacy-0.1.5', 'flash-lean')),
-        '纯精简预设的旧式目录已移除');
+  check(!fs.existsSync(path.join(repo, 'presets', 'legacy-0.1.5')),
+        '旧式目录 presets/legacy-0.1.5 已移除（0.2.6 起只保留 v3 与 v3 max 两个插件行式预设）');
 }
 
 console.log('\n' + (failed ? 'YAML 校验失败：' + failed + ' 项。' : 'YAML 校验通过。'));

@@ -19,7 +19,7 @@
 param(
   [string]   $DshHome,
   [string]   $Profile = 'web',
-  [string[]] $Presets = @('flash-lean-ptc-v3'),
+  [string[]] $Presets = @('flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'),
   [switch]   $Help,
   [switch]   $Legacy,
   [switch]   $Uninstall,
@@ -30,7 +30,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 0.2.5 起默认只装 v3；-AllPresets 装 v1/v2/v3 三份（A/B 对照用）
-if ($AllPresets) { $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3') }
+if ($AllPresets) { $Presets = @('flash-lean-ptc-v3', 'flash-lean-ptc-v3-max') }
 
 if ($Help) {
   $self = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
@@ -131,9 +131,9 @@ function Install-Modern {
   }
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
-  Write-Host '「Flash 精简·PTC v3（v4.1-flash，lean-v3）」。'
-  Write-Host '  v1/v2 是对照版本，默认不装；需要 A/B 时重跑：scripts\install.ps1 -AllPresets'
-  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
+  Write-Host '  已安装：轻量PTC-v3 / 轻量PTC-v3 max（选择器里就这两项）'
+  Write-Host '  计划模式是独立包：加 -WithPlanMode（或 dsh plugin add dsh-plan-mode-ui）'
+  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-max'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
   if ($WithPlanMode) { Install-PlanMode }
@@ -141,39 +141,46 @@ function Install-Modern {
 
 # 计划模式插件（可选组件）：dist/ 里现成的 tgz → 现打一个 → 目录。没有 dsh 时只打印命令。
 function Install-PlanMode {
+  # 计划模式插件是独立包：先装包，再落运行时调优。两者失败都不影响预设。
   Write-Host ""
-  Write-Host "-- 计划模式插件（-WithPlanMode）------------------------------"
-  $spec = $null
-  $dist = Join-Path $here "dist"
-  $tgz = Get-ChildItem -Path $dist -Filter "dsh-plan-mode-ui-*.tgz" -ErrorAction SilentlyContinue |
-         Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if ($tgz) { $spec = $tgz.FullName }
-  elseif ((Get-Command npm -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $here "plugins\plan-mode-ui\package.json"))) {
-    New-Item -ItemType Directory -Force -Path $dist | Out-Null
-    Push-Location (Join-Path $here "plugins\plan-mode-ui")
-    try { npm pack --ignore-scripts --pack-destination $dist | Out-Null } catch { } finally { Pop-Location }
-    $tgz = Get-ChildItem -Path $dist -Filter "dsh-plan-mode-ui-*.tgz" -ErrorAction SilentlyContinue |
-           Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($tgz) { $spec = $tgz.FullName; Write-Host "已打包插件：$($tgz.Name)" }
+  Write-Host "-- 计划模式插件（独立包 dsh-plan-mode-ui）---------------------"
+  $pluginVer = '0.7.0'
+  try { $pluginVer = (Get-Content (Join-Path $here 'plugins\plan-mode-ui\package.json') -Raw | ConvertFrom-Json).version } catch {}
+  if (-not (Get-Command dsh -ErrorAction SilentlyContinue)) {
+    Write-Host "WARN PATH 里没有 dsh 命令，跳过。稍后手动执行："
+    Write-Host "  dsh plugin --profile $Profile add dsh-plan-mode-ui"
+    Write-Host "  node scripts\tune-runtime.mjs --apply --profile $Profile"
+    return
   }
-  if (-not $spec -and (Test-Path (Join-Path $here "plugins\plan-mode-ui"))) {
-    $spec = (Join-Path $here "plugins\plan-mode-ui")
-    Write-Host "WARN 没有 tgz，退回目录方式（开发用；正式安装建议先 npm pack）"
+  $installed = $false
+  $pluginPkg = Join-Path $env:USERPROFILE ".dsh\profiles\$Profile\node_modules\dsh-plan-mode-ui\package.json"
+  if (Test-Path $pluginPkg) {
+    $cur = (Get-Content $pluginPkg -Raw | ConvertFrom-Json).version
+    if ($cur -eq $pluginVer) { Write-Host "OK 计划模式插件已是 ${cur}，跳过安装"; $installed = $true }
+    else { dsh plugin --profile $Profile remove dsh-plan-mode-ui 2>$null | Out-Null }
   }
-  if (-not $spec) { Write-Host "WARN 找不到插件来源，跳过。手动装：dsh plugin --profile $Profile add dsh-plan-mode-ui"; return }
-  if (Get-Command dsh -ErrorAction SilentlyContinue) {
-    dsh plugin --profile $Profile add $spec
-    if ($LASTEXITCODE -eq 0) {
-      Write-Host "OK 插件已装：dsh-plan-mode-ui（重启 dsh web 后硬刷新页面）"
-      Write-Host "  体检：node scripts\doctor.mjs --profile $Profile --all"
-    } else {
-      Write-Host "WARN 插件安装失败（预设已装好，不受影响）。手动重试："
-      Write-Host "  dsh plugin --profile $Profile add `"$spec`""
+  if (-not $installed) {
+    dsh plugin --profile $Profile add dsh-plan-mode-ui 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Host "OK 计划模式插件已装（npm：dsh-plan-mode-ui）"; $installed = $true }
+  }
+  if (-not $installed) {
+    $tgz = Join-Path $here ("dist\dsh-plan-mode-ui-{0}.tgz" -f $pluginVer)
+    if (Test-Path $tgz) {
+      dsh plugin --profile $Profile add ("file:" + $tgz) 2>$null | Out-Null
+      if ($LASTEXITCODE -eq 0) { Write-Host "OK 计划模式插件已装（本地包）"; $installed = $true }
     }
-  } else {
-    Write-Host "WARN PATH 里没有 dsh 命令，插件未安装。等 dsh 可用后手动执行："
-    Write-Host "  dsh plugin --profile $Profile add `"$spec`""
   }
+  if (-not $installed) {
+    Write-Host "WARN 计划模式插件没装上（npm 尚未发布它时属正常）。稍后手动二选一："
+    Write-Host "  dsh plugin --profile $Profile add dsh-plan-mode-ui"
+    Write-Host ("  dsh plugin --profile $Profile add file:" + (Join-Path $here ("dist\dsh-plan-mode-ui-{0}.tgz" -f $pluginVer)))
+  }
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    node (Join-Path $here "scripts\tune-runtime.mjs") --apply --profile $Profile | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Host "OK 运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）" }
+    else { Write-Host "WARN 运行时调优未完成，稍后手动跑：node scripts\tune-runtime.mjs --apply --profile $Profile" }
+  }
+  Write-Host "  体检：node scripts\doctor.mjs --profile $Profile --all"
 }
 
 function Uninstall-Modern {

@@ -2,6 +2,58 @@
 
 ## 0.2.6 — 未发布
 
+- **预设收敛为两个：`v3` 与 `v3 max`**：
+  - `flash-lean-ptc-v3-1-max` 更名为 `flash-lean-ptc-v3-max`（row id `preset-flash-lean-ptc-v3-max`，order 28），
+    规则与原来一致（7 条，无预算 persona + 结尾一句 token 无限）；
+  - 移除 `flash-lean-ptc-v1`、`flash-lean-ptc-v2`、`flash-lean-ptc-v3-1-high` 与旧式目录 `presets/legacy-0.1.5/`，
+    `--all-presets` / `-AllPresets` 保留但等价于默认（两个都装）；
+  - **描述改为面向使用者的口语**：v3「基础的轻量预设，满足绝大多数日常工作」，
+    v3 max「解除预算限制的全量版，应对需要发挥能力的场景」；
+  - 组合包补丁层同时插入这两个预设行，安装后选择器里就这两项。
+  - **v3 兼容性（重点）**：`flash-lean-ptc-v3` 与 0.2.5 的差异**只有 name 与 description 两行**——
+    id / order 27 / 20 个插件 / persona 3399 字符全部逐字节一致（md5 变化只来自那两行文案）。
+    历史会话记录的是 id，恢复时按 id 解析，因此 0.2.5 造的 v3 会话在 0.2.6 下行为不变。
+  - **升级路径实测**：临时 profile 先装 npm 上的 0.2.5、再装本地 0.2.6 tgz →
+    预设行 1 → 2（v3 + v3 max），无 v1/v2/v3.1 残留，插件行 1，`ptc-runtime` 常驻生效。
+  - 新增 `scripts/prune-stale-presets.mjs`：清理历史镜像里可能残留的退役预设行（v1/v2/v3.1 变体），
+    默认只报告，`--apply` 才写文件且先备份。
+  - 明确**不保留** v2 兼容条目：本地有 42 个旧会话记录 `flash-lean-ptc-v2`，这些会话不再保证可恢复（用户确认可放弃）。
+
+- **计划模式插件保持独立包**（曾试行"二合一"，发布前撤回）：
+  - 预设包 `dsh-flash-presets` 只装预设：`cordis.patch.yml` 里两条 insert（v3、v3 max）+ 一条
+    `ptc-runtime` 覆盖，不再插入 `plan-mode-ui` 行，也不再带 `main` / `exports` / `dsh.client` / `lib/`；
+  - 插件包 `dsh-plan-mode-ui`（0.7.0）自带 `cordis.patch.yml`、宿主半边与浏览器半边，单独装、单独卸；
+  - 为什么分开：DSH 插件列表里**一张卡＝一个包**，卡内「包含的组件」就是该包补丁层 insert 的行。
+    合在一起时计划模式只能跟着预设一起装、一起卸、一起升级；分开后两张卡各自独立，
+    预设卡内仍是 v3 / v3 max 两个可单独开关的组件；
+  - 迁移：合并版（0.2.6 草案）装过的 profile，先 `dsh plugin remove dsh-flash-presets` 再按新版重装，
+    否则插件管理器会因"已安装"拒绝覆盖；
+  - 验证（临时 `DSH_HOME`，两个包各装一次）：`--dump-config` 里 `preset-flash-lean-ptc-v3`、
+    `preset-flash-lean-ptc-v3-max`、`plan-mode-ui` 各一行，`persistent-in-memory` 一处；
+    按各包自己的补丁层统计组件数为 2（预设）与 1（插件）。
+
+- **运行时调优随包落地**（run_code / PTC 开销）：
+  - 预设包 `cordis.patch.yml` 末尾追加一段 `- id: ptc-runtime` → `executionMode: persistent-in-memory`：
+    PTC 运行时改为**会话内常驻进程**，每个 program 只付一次启动成本；
+  - 插件包 `plugins/plan-mode-ui/cordis.patch.yml` 里有同一段，只装插件也能拿到常驻运行时；
+    两个包都装时是同一条覆盖的重复写入（同值），合成后只有一份配置；
+  - 新增 `scripts/tune-runtime.mjs`（`--check` 默认 / `--apply` 幂等 / `--profile` 限定）：
+    同时保证 A（`dsh-tool-fs-search` 的 `glob`/`grep` 打上 `isConcurrencySafe`，原生多调用可并行），
+    改文件前先备份，改完做语法检查；`scripts/install.sh --with-plan-mode` 装完插件自动调用一次；
+  - 实测（详见 `docs/压测-run_code开销.md`）：嵌套工具调用 **44 ms → 15 ms**（50 次仍线性，总 760 ms），
+    每个 program 固定成本 **108 ms → 0**，原生 3 路 `glob` **492 ms → 204 ms**；异常后同进程存活。
+    收益随 program 内调用密度线性增长（K=50 省约 1.5 s），单命令短任务几乎无感。
+
+- **plan mode 插件 0.7.0**（0.6.0 起 9 处实现问题逐个修掉，测试 22/22）：计划阶段接上 DSH 原生 todo 列表——
+  提示词要求 `todo_write` 先建条、再逐项打勾，并按阶段分流两种文案
+  （规划期用 `TODO SYNC (deferred)`，执行期用 `TODO SYNC (do not batch)`，避免与 plan mode 政策打架导致列表永不出现）。
+- 面板**只留档位/范围/Max**，「待办 x/y · 同步中」进度行已整体删除（0.6.5）；原生 TodoDock 是唯一 todo 视图。
+  `/api/plan-mode/progress` 端点保留但不再被面板轮询。
+- 判定收敛：`native` 只走一条判据链（投影 → planMode 服务 → 簿记），三处不再各说各话（0.6.6）。
+- 新增无头对照开关 `DSH_PLAN_MODE_UI_HEADLESS=prompt`：照常注入计划正文、但不桥接原生计划模式（0.7.0）。
+  实测（n=3，7 项验收）：light 与 full 均 **3/3 = 7/7**；full 中位 40.2 k tokens / 196 s，light 34.3 k / 147 s
+  —— full 贵约 26%、慢约 33%，正确率无差异，故默认推荐 light。
+
 - 计划把 plan mode 插件 `dsh-plan-mode-ui`（当前 0.5.2）的 zip **作为本版本 Release 的附件**发布，
   不再为插件单独建 Release / 打 tag（`plan-mode-ui-v0.5.2` 已于 2026-10-31 撤销）。
 - 新增 `npm run verify:release`：断言 Releases 与远端 tags 里都没有 `plan-mode-ui-*`，
