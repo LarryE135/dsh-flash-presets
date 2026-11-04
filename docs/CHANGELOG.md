@@ -1,5 +1,13 @@
 # 变更日志
 
+## 0.2.8（未发布）
+
+- **新增两个预设，GUI 选择器里可直接手动测试**
+  - `flash-lean-ptc-v3-lite`（「轻量PTC-v3 lite」，order 26，3 条规则）：保留 persona 前缀，只留引擎替代不了的三条——守语言与范围、不写密钥、同一路子连败两次就换并报确切命令与输出。
+  - `flash-lean-ptc-v3-none`（「轻量PTC-v3 none」，order 29，无 persona 行）：对照组，不含任何人格规则，仅供手动对照。
+- **实测**（三床对照，详见 `实测证据.md`）：hard-task 24 项 lite 与 v3 均 3/3 满分，lite token 为 v3 的 77%（中位）/ 78%（均值）；decision-task 21 项 v3 3/3 满分、lite 2/3、none 1/3，且 none 的中位 token 反比 lite 高 2.4 倍。
+- 校验同步：`verify-yaml` 对 `rules === 0` 的预设改断言「无 persona 行」，对 3 条版本只要求转录敏感一条；`compose` / `merge` / `doctor` / `install` 的预设清单都扩到四项。
+
 ## 0.2.7 — 未发布
 
 - **修复客户端插件加载失败（GUI 停在 “Failed to load plugins”）**：合并后 `lib/client.js` 的 `__ModuleLoader__.load({ id: ... })` 仍写着源码包名 `dsh-plan-mode-ui`，而 DSH 的客户端 boot graph 以**包名** `dsh-flash-presets` 作为行 id，`materialize(id)` 查不到 factory，该行永远“未到达”，前端渲染失败页。

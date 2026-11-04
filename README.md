@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.7（未发布；GitHub Release 与 npm 上仍是 0.2.5）。一张插件卡带三个组件：预设 `轻量PTC-v3`、`轻量PTC-v3 max`，以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。三个组件各自可单独开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
+> 当前版本：v0.2.8（未发布；GitHub Release 与 npm 上仍是 0.2.5）。一张插件卡带五个组件：预设 `轻量PTC-v3`、`轻量PTC-v3 max`、`轻量PTC-v3 lite`、`轻量PTC-v3 none`，以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。三个组件各自可单独开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -26,8 +26,10 @@
 |---|---|---|---|---|---|
 | v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**。基础的轻量预设，满足绝大多数日常工作 |
 | v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | 解除预算限制的全量版，应对需要发挥能力的场景 |
+| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | **省 token 优先**。只留 3 条引擎替代不了的规则，实测 token 约为 v3 的 1/3–4/5 |
+| v3 none | `flash-lean-ptc-v3-none` | 29 | 0 | 0.25 / 20k | 无人格规则的对照组，**仅用于手动测试**，不建议日常使用 |
 
-**本版只提供这两个预设**（0.2.6 起移除 v1/v2 与 v3.1 变体）：两个都随包安装，选择器里就这两项。v3 适合绝大多数日常任务；只有在你需要模型放开手脚、不在乎 token 消耗时选 v3 max。
+**本版提供四个预设**（0.2.6 起移除 v1/v2 与 v3.1 变体；0.2.8 增补 lite 与 none）：四个都随包安装，选择器里就是这四项。v3 适合绝大多数日常任务；v3 lite 适合纯功能型、想把 token 压到最低的活；v3 max 只在你需要模型放开手脚、不在乎消耗时选；v3 none 是手工对照 persona 影响的实验组。
 
 ## 安装、更新、卸载
 
@@ -40,7 +42,7 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-> 安装后预设列表里出现 **v3** 与 **v3 max** 两项（`flash-lean-ptc-v3` / `flash-lean-ptc-v3-max`），见上文「预设」。
+> 安装后预设列表里出现 **v3 / v3 lite / v3 max / v3 none** 四项（`flash-lean-ptc-v3` / `-lite` / `-max` / `-none`），见上文「预设」。
 
 <img width="413" height="283" alt="屏幕截图 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -88,7 +90,7 @@ bash scripts/install.sh --with-plan-mode
 node scripts/doctor.mjs --profile web --all         # [1]–[5] 预设、[6] 插件、[7] 合成配置
 ```
 
-GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3` 与 `preset-flash-lean-ptc-v3-max` 两个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
+GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3`、`preset-flash-lean-ptc-v3-max`、`preset-flash-lean-ptc-v3-lite`、`preset-flash-lean-ptc-v3-none` 四个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
 
 插件是纯可选项：**没装时预设行为完全不变**，`doctor` 只给一行 `⚠ 未安装（纯可选）`，不计入失败。装了之后入口在输入框左侧，档位 off / light / full 独立于预设设置。
 
@@ -215,6 +217,8 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 presets/
   flash-lean-ptc-v3.patch.yml     主版本（lean-v3）
   flash-lean-ptc-v3-max.patch.yml 全量版（解除预算限制）
+  flash-lean-ptc-v3-lite.patch.yml 省 token 版（3 条规则）
+  flash-lean-ptc-v3-none.patch.yml 无人格对照组（仅手动测试）
 cordis.patch.yml                  由 presets/* 合成，勿手改，CI 断言一致性
 scripts/
   install.sh / install.ps1        安装器，共用 merge-presets.mjs
@@ -235,6 +239,12 @@ marketplace/                      插件市场提交材料（不随包发布）
 ```
 
 ## 版本历史
+
+### v0.2.8（未发布）
+
+- 新增预设 `轻量PTC-v3 lite`（3 条规则）与 `轻量PTC-v3 none`（无人格对照），选择器里共四项
+- 三床实测：hard-task lite 与 v3 均满分、lite 省 22%；decision-task v3 3/3 满分、lite 2/3、none 1/3
+- `verify-yaml` 按规则条数分支断言，`none` 断言「无 persona 行」
 
 ### v0.2.7（未发布）
 

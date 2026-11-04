@@ -81,9 +81,13 @@ const EXPECT = {
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
   'flash-lean-ptc-v3-max.patch.yml': { preset: 'flash-lean-ptc-v3-max', order: 28, rules: 7, ptcRow: true,
                                   thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3-lite.patch.yml': { preset: 'flash-lean-ptc-v3-lite', order: 26, rules: 3, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3-none.patch.yml': { preset: 'flash-lean-ptc-v3-none', order: 29, rules: 0, ptcRow: true,
+                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
 };
 // bundle 默认只发 v3（EXPECT 里其余是源文件级的对照版本，不进合成产物）
-const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'];
+const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max', 'flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-none'];
 const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
@@ -125,13 +129,23 @@ function checkPatchFile(file, exp) {
   check(plugins.length >= 15, 'plugin 行数 ' + plugins.length + '（期望 ≥ 15）');
   check(flat.length >= plugins.length, '嵌套组可展开（展平后 ' + flat.length + ' 行）');
   const persona = flat.find(p => p.id === 'persona');
-  check(!!persona, 'persona 行存在');
-  const suffix = (persona && persona.config && persona.config.suffix) || '';
-  const nums = [...suffix.matchAll(/^\s*(\d+)\. /gm)].map(m => Number(m[1]));
-  check(nums.length === exp.rules, 'persona 规则条数 ' + nums.length + '（期望 ' + exp.rules + '）');
-  check(nums.every((n, i) => n === i + 1), 'persona 规则编号连续无重复（1..' + exp.rules + '）');
-  check(/Context discipline/.test(suffix) && /(Transcript sensitivity|Never put secrets, tokens)/.test(suffix),
-        'persona 含上下文纪律 / 转录敏感两条核心规则');
+  // rules === 0 即对照版 v3-none：故意不带 persona 行，只断言「确实没有」。
+  if (exp.rules === 0) {
+    check(!persona, 'persona 行不存在（对照版 none）');
+  } else {
+    check(!!persona, 'persona 行存在');
+    const suffix = (persona && persona.config && persona.config.suffix) || '';
+    const nums = [...suffix.matchAll(/^\s*(\d+)\. /gm)].map(m => Number(m[1]));
+    check(nums.length === exp.rules, 'persona 规则条数 ' + nums.length + '（期望 ' + exp.rules + '）');
+    check(nums.every((n, i) => n === i + 1), 'persona 规则编号连续无重复（1..' + exp.rules + '）');
+    // 上下文纪律 / 转录敏感是 v3 与 v3 max 的必备两条；lite 只保留引擎无法替代的部分。
+    if (exp.rules >= 7) {
+      check(/Context discipline/.test(suffix) && /(Transcript sensitivity|Never put secrets, tokens)/.test(suffix),
+            'persona 含上下文纪律 / 转录敏感两条核心规则');
+    } else {
+      check(/Never put secrets, tokens/.test(suffix), 'persona 含转录敏感（不写入密钥）一条');
+    }
+  }
 
   const cc = (flat.find(p => p.id === 'compaction-basic') || {}).config || {};
   check(cc.thresholdRatio === exp.thresholdRatio, '压缩阈值 thresholdRatio = ' + cc.thresholdRatio + '（期望 ' + exp.thresholdRatio + '）');
@@ -179,7 +193,7 @@ if (args.length) {
       // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
       check(rows.includes('flash-lean-ptc-v3'),
             '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max'];
+      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max', 'flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-none'];
       check(rows.every(id => known.includes(id)),
             '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-flash-presets",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": false,
   "description": "DSH Flash 精简预设：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式安装到 profile。0.2.6 起只提供 v3（轻量PTC-v3，默认）与 v3 max（解除预算限制）两个预设，并把计划模式（plan-mode v1）作为本包的第三个组件一并提供。",
   "keywords": [
@@ -45,6 +45,8 @@
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
     "presets/flash-lean-ptc-v3-max.patch.yml",
+    "presets/flash-lean-ptc-v3-lite.patch.yml",
+    "presets/flash-lean-ptc-v3-none.patch.yml",
     ".gitattributes",
     "scripts/",
     "!scripts/publish.sh",

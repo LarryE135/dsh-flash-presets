@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.7 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries three components: the presets `v3` and `v3 max`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.8 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries five components: the presets `v3`, `v3 max`, `v3 lite` and `v3 none`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -29,8 +29,10 @@ The presets control three things: the budget and round limit (counted by rounds,
 |---|---|---:|---:|---|---|
 | v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. The baseline lightweight preset; covers most everyday work |
 | v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | Budget-free full version for tasks where you want the model to use its full capability |
+| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | **Token-first**. Only the three rules the harness cannot enforce; measured at ~1/3-4/5 of v3 tokens |
+| v3 none | `flash-lean-ptc-v3-none` | 29 | 0 | 0.25 / 20k | No-persona control, **manual testing only** |
 
-**This version ships exactly two presets** (v1/v2 and the v3.1 variants were removed in 0.2.6): both are installed, and the picker shows only these two. Pick v3 max only when you want the model to stop economising. See the release notes for compatibility details.
+**This version ships four presets** (v1/v2 and the v3.1 variants were removed in 0.2.6; lite and none added in 0.2.8): all four are installed and the picker shows them. Pick v3 max only when you want the model to stop economising. See the release notes for compatibility details.
 
 ## Install, update, and uninstall
 
