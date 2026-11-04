@@ -1,5 +1,13 @@
 # 变更日志
 
+## 0.2.7 — 未发布
+
+- **修复客户端插件加载失败（GUI 停在 “Failed to load plugins”）**：合并后 `lib/client.js` 的 `__ModuleLoader__.load({ id: ... })` 仍写着源码包名 `dsh-plan-mode-ui`，而 DSH 的客户端 boot graph 以**包名** `dsh-flash-presets` 作为行 id，`materialize(id)` 查不到 factory，该行永远“未到达”，前端渲染失败页。
+  - 治本：`scripts/sync-lib.mjs` 同步 `lib/client.js` 时把注册 id 改写为 `package.json` 的 `name`；`--check` 按改写后内容比对，找不到源 id 直接报错（源码侧再改名不会被静默放过）。
+  - 防回归：`npm run verify` 与 `prepublishOnly` 都跑 `sync-lib --check`。
+
+- **0.2.6 的 tgz 作废**：`~/.dsh/profiles/web/vendor/dsh-flash-presets-0.2.6.tgz` 里存的仍是旧 id，任何人再执行 `dsh plugin add` 都会把缺陷装回来，故升版 0.2.7 并重打包。
+
 ## 0.2.6 — 未发布
 
 - **预设收敛为两个：`v3` 与 `v3 max`**：

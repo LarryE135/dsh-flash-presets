@@ -20,10 +20,28 @@ if (missing.length) {
   process.exit(1);
 }
 
+// 客户端 bundle 的注册 id 必须等于**本包名**：DSH 的 client-modules 以包名作为
+// boot graph 的 row id，而源码 bundle 里 window.__ModuleLoader__.load({ id }) 写的是
+// 源码包名 dsh-plan-mode-ui。原样拷贝会让本包这一行 import 失败，
+// GUI 报 "Failed to load plugins / <包名>: import failed"。
+const PKG_NAME = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name;
+const FROM = 'id: "dsh-plan-mode-ui"';
+const TO = 'id: "' + PKG_NAME + '"';
+
+function payloadOf(file, buf) {
+  if (file !== 'client.js') return buf;
+  const text = buf.toString('utf8');
+  if (!text.includes(FROM)) {
+    console.error('✖ client.js 中未找到注册 id（' + FROM + '），同步 id 改写逻辑需更新');
+    process.exit(1);
+  }
+  return Buffer.from(text.replace(FROM, TO), 'utf8');
+}
+
 if (!checkOnly) fs.mkdirSync(dstDir, { recursive: true });
 const drift = [];
 for (const f of FILES) {
-  const src = fs.readFileSync(path.join(srcDir, f));
+  const src = payloadOf(f, fs.readFileSync(path.join(srcDir, f)));
   const dstPath = path.join(dstDir, f);
   if (checkOnly) {
     if (!fs.existsSync(dstPath)) { drift.push(f + '（缺失）'); continue; }
@@ -46,7 +64,7 @@ if (checkOnly) {
     console.error('  改法：node scripts/sync-lib.mjs');
     process.exit(1);
   }
-  console.log('✓ lib/ 与 plugins/plan-mode-ui/lib/ 一致（' + FILES.length + ' 个文件）');
+  console.log('✓ lib/ 与 plugins/plan-mode-ui/lib/ 一致（' + FILES.length + ' 个文件，client 注册 id = ' + PKG_NAME + '）');
 } else {
-  console.log('✓ 已同步 ' + FILES.length + ' 个文件到 lib/');
+  console.log('✓ 已同步 ' + FILES.length + ' 个文件到 lib/（client 注册 id = ' + PKG_NAME + '）');
 }

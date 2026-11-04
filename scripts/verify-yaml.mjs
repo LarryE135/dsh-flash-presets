@@ -222,6 +222,13 @@ if (args.length) {
               'plan-mode-ui 行指向本包 dsh-flash-presets');
         check(!String(JSON.stringify(pluginRows)).includes('dsh-plan-mode-ui'),
               '合成产物不再引用独立包 dsh-plan-mode-ui');
+        // 客户端 bundle 的注册 id 必须等于包名：DSH 的 boot graph 用包名做行 id，
+        // 写错就会 materialize 不到 factory，页面停在 “Failed to load plugins”（0.2.6 的事故）。
+        const clientBundle = fs.existsSync(path.join(repo, 'lib', 'client.js'))
+          ? fs.readFileSync(path.join(repo, 'lib', 'client.js'), 'utf8') : '';
+        const regId = (clientBundle.match(/__ModuleLoader__\.load\(\{\s*id:\s*["']([^"']+)["']/) || [])[1] || '';
+        check(regId === 'dsh-flash-presets',
+              'lib/client.js 的注册 id = 包名（实际: ' + (regId || '未找到') + '）');
         const runtimeRows = (cdoc || []).filter(e => e && e.id === 'ptc-runtime' && e.insert === undefined);
         check(runtimeRows.length === 1 && JSON.stringify(runtimeRows[0]).includes('persistent-in-memory'),
               '运行时覆盖恰好一条 ptc-runtime → persistent-in-memory');
