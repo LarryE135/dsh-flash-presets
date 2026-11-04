@@ -29,8 +29,8 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "20"
 
@@ -48,4 +48,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add badges/downloads.json
           git commit -m "chore(badge): npm downloads $(date -u +%F)"
-          git push
+          # 守卫：本 job 与人工推送会撞车（2026-11-04 出现过 'remote rejected main -> main'，
+          # 因为 badge 运行期间 main 又被推了一次）。改成 rebase 重试：
+          # 冲突时只重建这一条提交，最多 5 次，仍失败才红。
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto origin/main"
+            git pull --rebase --autostash origin main
+            sleep $((attempt * 5))
+          done
+          echo "::error::badge push rejected 5 times"
+          exit 1
