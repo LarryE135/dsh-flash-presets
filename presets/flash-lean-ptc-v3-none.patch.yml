@@ -4,7 +4,7 @@
       config:
         id: flash-lean-ptc-v3-none
         name: "轻量PTC-v3 none"
-        description: "无人格规则的对照组：仅用于手动测试，不建议日常使用。"
+        description: "无人格规则的对照组；实测与 v3 质量无差异，仅用于手动对照。"
         order: 29
         plugins:
           - id: agent-instructions

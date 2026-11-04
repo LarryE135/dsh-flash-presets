@@ -29,7 +29,7 @@ The presets control three things: the budget and round limit (counted by rounds,
 |---|---|---:|---:|---|---|
 | v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. The baseline lightweight preset; covers most everyday work |
 | v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | Budget-free full version for tasks where you want the model to use its full capability |
-| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | **Token-first**. Only the three rules the harness cannot enforce; measured at ~1/3-4/5 of v3 tokens |
+| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | Only the three rules the harness cannot enforce; measured (n=5-15) no detectable difference vs v3 |
 | v3 none | `flash-lean-ptc-v3-none` | 29 | 0 | 0.25 / 20k | No-persona control, **manual testing only** |
 
 **This version ships four presets** (v1/v2 and the v3.1 variants were removed in 0.2.6; lite and none added in 0.2.8): all four are installed and the picker shows them. Pick v3 max only when you want the model to stop economising. See the release notes for compatibility details.

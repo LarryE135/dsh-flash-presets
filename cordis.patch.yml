@@ -391,7 +391,7 @@
       config:
         id: flash-lean-ptc-v3-lite
         name: "轻量PTC-v3 lite"
-        description: "精简人格（3 条核心规则）：日常与功能型任务的默认选择，token 约为 v3 的 1/3 到 4/5。"
+        description: "精简人格：只保留 3 条引擎无法替代的约束；实测与 v3 在质量、token 上均无可测差异。"
         order: 26
         plugins:
           - id: persona
@@ -554,7 +554,7 @@
       config:
         id: flash-lean-ptc-v3-none
         name: "轻量PTC-v3 none"
-        description: "无人格规则的对照组：仅用于手动测试，不建议日常使用。"
+        description: "无人格规则的对照组；实测与 v3 质量无差异，仅用于手动对照。"
         order: 29
         plugins:
           - id: agent-instructions

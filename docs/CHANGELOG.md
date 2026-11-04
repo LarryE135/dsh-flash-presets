@@ -5,7 +5,7 @@
 - **新增两个预设，GUI 选择器里可直接手动测试**
   - `flash-lean-ptc-v3-lite`（「轻量PTC-v3 lite」，order 26，3 条规则）：保留 persona 前缀，只留引擎替代不了的三条——守语言与范围、不写密钥、同一路子连败两次就换并报确切命令与输出。
   - `flash-lean-ptc-v3-none`（「轻量PTC-v3 none」，order 29，无 persona 行）：对照组，不含任何人格规则，仅供手动对照。
-- **实测**（三床对照，详见 `实测证据.md`）：hard-task 24 项 lite 与 v3 均 3/3 满分，lite token 为 v3 的 77%（中位）/ 78%（均值）；decision-task 21 项 v3 3/3 满分、lite 2/3、none 1/3，且 none 的中位 token 反比 lite 高 2.4 倍。
+- **实测与更正**（三床对照，n=5–15，详见 `实测证据.md`）：质量上各臂不可区分（算法床与 hard 床全满分；decision 床 20.13 / 19.73 / 19.73，CI 含 0）；token 配对检验无显著差异（lite/v3 = 0.86–1.22，CI 均含 1）。此前按 n=1 / n=3 得出的「lite 省 2/3 token」「persona 对结构化任务有用」等说法均在噪声内，已在文档中作废。该规模只能排除 >2 倍的差异。
 - 校验同步：`verify-yaml` 对 `rules === 0` 的预设改断言「无 persona 行」，对 3 条版本只要求转录敏感一条；`compose` / `merge` / `doctor` / `install` 的预设清单都扩到四项。
 
 ## 0.2.7 — 未发布
