@@ -128,6 +128,15 @@ function checkPatchFile(file, exp) {
   const flat = flatten(plugins);
   check(plugins.length >= 15, 'plugin 行数 ' + plugins.length + '（期望 ≥ 15）');
   check(flat.length >= plugins.length, '嵌套组可展开（展平后 ' + flat.length + ' 行）');
+  // DSH 0.2.2-rc.1 移除了 ./list-agents 子路径导出，list_agents 并入 control 的 root。
+  // 留着旧行 → 子路径 import 失败、预设 never started；把它改指 root → 同包两个实例、
+  // 工具名重复注册（already registered in this scope）。两种情况都在这里拦住。见 issue #19。
+  const stale = flat.filter(p => p && (p.id === 'tool-subagent-list-agents' ||
+    String(p.name || '').startsWith('@deepseek-ai/dsh-tool-subagent-control/')));
+  check(stale.length === 0, '不含已移除的 list-agents 子路径行（实际 ' + stale.length + ' 行）');
+  const controls = flat.filter(p => p && p.id === 'tool-subagent-control');
+  check(controls.length === 1,
+        'tool-subagent-control 恰好 1 行（实际 ' + controls.length + ' 行）');
   const persona = flat.find(p => p.id === 'persona');
   // rules === 0 即对照版 v3-none：故意不带 persona 行，只断言「确实没有」。
   if (exp.rules === 0) {
@@ -246,6 +255,18 @@ if (args.length) {
         const runtimeRows = (cdoc || []).filter(e => e && e.id === 'ptc-runtime' && e.insert === undefined);
         check(runtimeRows.length === 1 && JSON.stringify(runtimeRows[0]).includes('persistent-in-memory'),
               '运行时覆盖恰好一条 ptc-runtime → persistent-in-memory');
+        // 合成产物是实际安装到用户 profile 的那一份，必须同样不带已移除的子路径（issue #19）。
+        const composedText = fs.readFileSync(composed, 'utf8');
+        check(!/^\s*-\s*id:\s*tool-subagent-list-agents\s*$/m.test(composedText) &&
+              !composedText.includes('@deepseek-ai/dsh-tool-subagent-control/'),
+              '合成产物不含已移除的 list-agents 子路径行');
+        const presetRows = (cdoc || []).flatMap(e => (e && e.insert) || [])
+          .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'));
+        for (const r of presetRows) {
+          const ctrls = flatten(((r.config || {}).plugins) || []).filter(p => p && p.id === 'tool-subagent-control');
+          check(ctrls.length === 1,
+                (r.config || {}).id + '：tool-subagent-control 恰好 1 行（实际 ' + ctrls.length + ' 行）');
+        }
       }
     }
   }

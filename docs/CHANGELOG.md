@@ -2,6 +2,11 @@
 
 ## 0.2.8（未发布）
 
+- **修复 DSH 0.2.2-rc.1 上所有预设「会话不可用」（issue #19）**：该版把 `list_agents` 并入 `@deepseek-ai/dsh-tool-subagent-control` 的 root 导出并移除了 `./list-agents` 子路径，四个预设里残留的 `tool-subagent-list-agents` 行因此 import 失败，fiber `never started`，新建会话报 `agent-preset/invalid`。
+  - 删除四个 `presets/*.patch.yml` 与 `candidates/archive/flash-lean-ptc-v4b-budget-brake.patch.yml` 中该行（连同 `name` 两行整块），重跑 `compose-bundle-patch.mjs` 合成 `cordis.patch.yml`。root 一行已同时提供 `list_agents` / `send_message` / `interrupt_agent`；**不能只把 name 改指 root**，同包两实例会触发 `already registered in this scope`。
+  - 防回归：`compose-bundle-patch.mjs` 在唯一合成入口拒绝任何再引用该子路径的源预设；`verify-yaml.mjs` 逐预设断言「无子路径行」且「`tool-subagent-control` 恰好 1 行」，合成产物同样校验。
+  - 升级路径：`doctor.mjs` 新增 `[4b]` 检查项，`--fix` 就地摘掉旧安装写进 profile 的残留行（连同原有 `!!js` 解析一起、写盘前备份）；用 `--patch` 体检时后续提示也指回同一文件。
+  - 取舍：0.2.1 系列的 root 不含 `list_agents`，删行后该版少一个工具，会话与委派不受影响；未做双版本分发。README 中英文、版本与兼容性文档同步说明。
 - **新增两个预设，GUI 选择器里可直接手动测试**
   - `flash-lean-ptc-v3-lite`（「轻量PTC-v3 lite」，order 26，3 条规则）：保留 persona 前缀，只留引擎替代不了的三条——守语言与范围、不写密钥、同一路子连败两次就换并报确切命令与输出。
   - `flash-lean-ptc-v3-none`（「轻量PTC-v3 none」，order 29，无 persona 行）：对照组，不含任何人格规则，仅供手动对照。

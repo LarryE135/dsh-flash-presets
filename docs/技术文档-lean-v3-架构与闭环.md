@@ -49,7 +49,7 @@ agent loop：turn → step → tool call → tool result → 下一步
 | D 上下文治理 | `compaction`(group, isolate `compaction`+`toolResultPruner`) | 历史压缩 + 结果裁剪 | `compaction-basic`: `thresholdRatio 0.25`、`retainTokens 20000`、`compactionRetries 1`、`auto true` |
 | | `tool-result-pruner` | 单条工具结果裁中段 | `thresholdChars 8192` / `headChars 4096` / `tailChars 1024`，中段以 marker 取代 |
 | | `command-compact` | 手动触发压缩 | 逃生口 |
-| E 委派 | `delegation`(group, isolate `workflowEngine`) | 子代理 | `tool-subagent`(provider spawn) + list-agents + control 三件套；子代理有独立上下文，主上下文只留摘要 |
+| E 委派 | `delegation`(group, isolate `workflowEngine`) | 子代理 | `tool-subagent`(provider spawn) + `tool-subagent-control`（0.2.2-rc.1 起 root 一并提供 `list_agents`，旧的 `./list-agents` 子路径行已删除）；子代理有独立上下文，主上下文只留摘要 |
 | F 交互与交付 | `tool-ask-user` | 提问 | 与 plan 评审共用 user-questions 瀑布 |
 | | `tool-todo` | todo_write + `todos` 会话投影 | 原生 TodoDock 渲染；插件按它算"滞后" |
 | | `tool-web` / `tool-presentation` / `present` | 检索与外发 | present 只做"交付卡片"，不复制文件内容 |

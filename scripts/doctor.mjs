@@ -5,16 +5,18 @@
  *   node scripts/doctor.mjs                    # 体检 web profile
  *   node scripts/doctor.mjs --profile headless
  *   node scripts/doctor.mjs --patch <文件路径>   # 直接体检某个补丁文件
- *   node scripts/doctor.mjs --fix               # 就地修：把 !!js 平台标签解成布尔（先备份）
+ *   node scripts/doctor.mjs --fix               # 就地修：解析 !!js、清掉已移除的子路径行（先备份）
  *   node scripts/doctor.mjs --dump              # 额外跑一次 dsh --dump-config，确认预设真的被认
  *
  * 检查项（逐条给结论，不做猜测）：
- *   1. DSH 版本是否支持"插件行预设"（0.1.7+）
- *   2. 托管块数量（0=没装；>1=重复安装）
- *   3. 托管块外的裸行（老安装方式残留，会导致预设列表重复）
- *   4. !!js 标签（非标准 YAML，普通解析器必报错；装到用户机器上应已解析掉）
- *   5. 补丁能否被标准 YAML 解析器读通，报错给到行号
- *   6. 可选：dump-config 里能不能找到三个预设 id
+ *   1.  DSH 版本是否支持"插件行预设"（0.1.7+）
+ *   2.  托管块数量（0=没装；>1=重复安装）
+ *   3.  托管块外的裸行（老安装方式残留，会导致预设列表重复）
+ *   4.  !!js 标签（非标准 YAML，普通解析器必报错；装到用户机器上应已解析掉）
+ *   4b. 指向 DSH 0.2.2-rc.1 已移除的 ./list-agents 子路径的插件行
+ *   5.  补丁能否被标准 YAML 解析器读通，报错给到行号
+ *   6.  计划模式组件
+ *   7.  可选：dump-config 里能不能找到这些预设 id
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -35,6 +37,35 @@ const flag = n => argv.includes(n);
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
 const PRESETS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max', 'flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-none'];
+
+// DSH 0.2.2-rc.1 移除了 @deepseek-ai/dsh-tool-subagent-control 的 ./list-agents 子路径导出
+// （list_agents 并入 root）。0.2.8 及以前由本包安装脚本写进 profile 的预设里还有这个插件行，
+// 升级 DSH 后该 fiber 起不来：agent-preset/invalid / never started / 会话不可用。见 issue #19。
+// 只摘「id 行 + 紧随其后、缩进更深的 control 包 name 行」这一对，别的行一律不碰；
+// name 既可能是被移除的子路径，也可能是有人手工改指 root 后造成的重复注册。
+const LEGACY_ID = /^(\s*)-\s*id:\s*tool-subagent-list-agents\s*$/;
+const CONTROL_NAME = /^\s*name:\s*['"]?@deepseek-ai\/dsh-tool-subagent-control(?:\/[^'"]*)?['"]?\s*$/;
+
+function stripLegacyListAgentsRows(text) {
+  const lines = text.split('\n');
+  const out = [];
+  let removed = 0;
+  let orphan = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(LEGACY_ID);
+    if (m) {
+      const next = lines[i + 1] || '';
+      if (CONTROL_NAME.test(next) && next.search(/\S/) > m[1].length) {
+        i++;                 // 连 name 行一起摘掉
+        removed++;
+        continue;
+      }
+      orphan++;
+    }
+    out.push(lines[i]);
+  }
+  return { text: out.join('\n'), removed, orphan };
+}
 
 const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = opt('--profile', 'web');
@@ -135,6 +166,23 @@ if (tagLines.length === 0) {
   problems.push('含 !!js 标签 ' + tagLines.length + ' 处');
 }
 
+// ── 4b. DSH 0.2.2-rc.1 已移除的 ./list-agents 子路径 ────────────────────────
+console.log('[4b] 已移除的 list-agents 子路径插件行（DSH 0.2.2-rc.1+）');
+const legacyScan = stripLegacyListAgentsRows(raw);
+{
+  const subpath = (raw.match(/@deepseek-ai\/dsh-tool-subagent-control\//g) || []).length;
+  if (legacyScan.removed === 0 && legacyScan.orphan === 0 && subpath === 0) {
+    ok('没有指向已移除子路径的插件行');
+  } else {
+    bad('发现 ' + legacyScan.removed + ' 组旧插件行（子路径引用 ' + subpath + ' 处，形状不认识 ' +
+        legacyScan.orphan + ' 行）');
+    info('0.2.2-rc.1 起 list_agents 由 control 的 root 一并提供，./list-agents 子路径已删除；');
+    info('留着这行会让预设 never started、新建会话报「会话不可用」。用 --fix 就地摘掉，或重新装一次本包。');
+    info('不要只把 name 改指 root —— 同一个包会加载两次，报 already registered in this scope。');
+    problems.push('残留已移除的 list-agents 子路径插件行 ' + legacyScan.removed + ' 组');
+  }
+}
+
 // ── 5. YAML 能不能被标准解析器读通 ───────────────────────────────────────────
 console.log('[5] 标准 YAML 解析');
 const require = createRequire(import.meta.url);
@@ -214,16 +262,28 @@ if (flag('--dump') || flag('--all')) {
 
 // ── --fix ────────────────────────────────────────────────────────────────────
 if (flag('--fix')) {
-  console.log('[fix] 就地解析 !!js');
-  if (!hasPlatformTags(raw)) {
+  console.log('[fix] 就地修：!!js 平台标签 + 已移除的 list-agents 子路径行');
+  let fixed = raw;
+  const notes = [];
+  if (hasPlatformTags(fixed)) {
+    fixed = resolvePlatformTags(fixed);
+    notes.push('解析 !!js 平台标签');
+  }
+  const stripped = stripLegacyListAgentsRows(fixed);
+  if (stripped.removed > 0) {
+    fixed = stripped.text;
+    notes.push('摘掉 ' + stripped.removed + ' 组已移除的 list-agents 子路径插件行');
+  }
+  if (fixed === raw) {
     ok('无需修改');
   } else {
     const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
     const backup = patchPath + '.bak-doctor-' + stamp;
     fs.writeFileSync(backup, raw, 'utf8');
-    fs.writeFileSync(patchPath, resolvePlatformTags(raw), 'utf8');
-    ok('已解析并写回；原文件备份到 ' + path.basename(backup));
+    fs.writeFileSync(patchPath, fixed, 'utf8');
+    ok('已写回：' + notes.join('；') + '；原文件备份到 ' + path.basename(backup));
     info('如需回滚：cp "' + backup + '" "' + patchPath + '"');
+    if (stripped.orphan > 0) info('另有 ' + stripped.orphan + ' 行形状不认识，需手工检查');
   }
 }
 
@@ -233,7 +293,10 @@ if (problems.length === 0) {
   console.log('      下一步看浏览器 Console 的错误，以及同一份配置下用默认预设是否也异常。');
 } else {
   console.log('结论：发现 ' + problems.length + ' 项 —— ' + problems.join('；'));
+  // 用 --patch 体检时，后续命令也必须指回同一个文件，否则会误修默认 profile。
+  const targetArg = argv.includes('--patch') ? ' --patch "' + patchPath + '"' : ' --profile ' + profile;
   console.log('      先跑：node scripts/merge-presets.mjs --patch "' + patchPath + '"   （认领残留、重建托管块）');
-  console.log('      再跑：node scripts/doctor.mjs --profile ' + profile + (tagLines.length ? ' --fix' : ''));
+  console.log('      再跑：node scripts/doctor.mjs' + targetArg +
+              ((tagLines.length || legacyScan.removed) ? ' --fix' : ''));
   console.log('      仍不对：cp "' + patchPath + '.bak-*" "' + patchPath + '"  回滚到安装前');
 }

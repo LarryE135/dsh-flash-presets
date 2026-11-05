@@ -137,7 +137,7 @@ function Install-Modern {
   Write-Host '  已安装：轻量PTC-v3 / 轻量PTC-v3 max（选择器里就这两项）'
   Write-Host '  计划模式是独立包：加 -WithPlanMode（或 dsh plugin add dsh-plan-mode-ui）'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-none'"
-  Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
+  Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/子路径行/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
   if ($WithPlanMode) { Install-PlanMode }
 }

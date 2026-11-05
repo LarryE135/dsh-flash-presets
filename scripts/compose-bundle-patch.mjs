@@ -53,11 +53,23 @@ const PLUGIN_ROW = [
   "      name: 'dsh-flash-presets'",
 ].join('\n');
 
+// DSH 0.2.2-rc.1 把 list_agents 并进 @deepseek-ai/dsh-tool-subagent-control 的 root 导出，
+// 并移除了 ./list-agents 子路径。预设里再留一行指向该子路径，fiber 就起不来
+// （agent-preset/invalid: ... never started，新建会话失败）。见 issue #19。
+// 这里在唯一的合成入口挡住回归；verify-yaml.mjs 另有一份结构与计数断言。
+const REMOVED_SUBPATH = '@deepseek-ai/dsh-tool-subagent-control/list-agents';
+const LEGACY_ROW = /^\s*-\s*id:\s*tool-subagent-list-agents\s*$/m;
+
 function compose() {
   const parts = SOURCES.map(rel => {
     const abs = path.join(repo, rel);
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
-    return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
+    const text = fs.readFileSync(abs, 'utf8');
+    if (text.includes(REMOVED_SUBPATH) || LEGACY_ROW.test(text)) {
+      throw new Error(rel + ' 仍引用 DSH 0.2.2-rc.1 已移除的 list-agents 子路径；' +
+        '请删掉 tool-subagent-list-agents 整行（不要改指 root，会重复注册 list_agents）');
+    }
+    return text.replace(/\s+$/, '');
   });
   const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;

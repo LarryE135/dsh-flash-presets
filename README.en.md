@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.8 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries five components: the presets `v3`, `v3 max`, `v3 lite` and `v3 none`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.8 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries five components: the presets `v3`, `v3 max`, `v3 lite` and `v3 none`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot; compatibility with the DSH 0.2.2-rc.1 API change is covered under "Compatibility".
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -155,6 +155,22 @@ This repository has been regression-tested against DSH 0.2.1-rc.5 (rc.2 was also
 
 The installer runs in Windows PowerShell, Ubuntu, and macOS CI (see the matrix in `.github/workflows/verify.yml`). macOS hardware has not been tested. The scripts are written for bash 3.2 compatibility; variables followed by non-ASCII text use `${var}`. The `!!js` tag in the patch is interpreted by the DSH loader and is rejected by generic YAML parsers.
 
+### DSH 0.2.2-rc.1 and later
+
+DSH 0.2.2-rc.1 merged `list_agents` into the root export of `@deepseek-ai/dsh-tool-subagent-control` and **removed the `./list-agents` subpath**. Before this fix, all four presets (including the published npm 0.2.5) carried a `tool-subagent-list-agents` row pointing at that subpath. After upgrading DSH, that fiber never starts: new sessions fail with `agent-preset/invalid: tool-subagent-list-agents ... never started` and the composer shows "session unavailable". See [issue #19](https://github.com/LarryE135/dsh-flash-presets/issues/19).
+
+This version removes that row from all four presets (and from the archived candidate): the root row already provides `list_agents`, `send_message` and `interrupt_agent`. `scripts/compose-bundle-patch.mjs` and `scripts/verify-yaml.mjs` now guard against regressions. **Do not just point `name` at the root** — the package would be loaded twice and DSH reports `tool "list_agents" is already registered in this scope`.
+
+To upgrade (npm 0.2.5 still contains the old row; use the main branch until a fixed version is published):
+
+```bash
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets   # bundle patch updates with the package
+node scripts/doctor.mjs --profile web --fix    # removes leftover rows from script-installed managed blocks
+dsh --profile web --dump-config | grep -c "tool-subagent-list-agents"   # expect 0
+```
+
+Restart DSH for `desktop`, `headless` and `acp`; refresh the page for `web`. **Impact on DSH 0.2.1**: its root only registers `send_message` / `interrupt_agent`, so 0.2.1 loses the `list_agents` tool. Sessions, delegation and everything else in the four presets are unaffected (these presets do not delegate subagents by default, see persona rule 10). Stay on 0.2.5 if you are on 0.2.1 and need that tool. 0.2.2-rc.1 also requires Node.js >= 24.9; handle that when upgrading DSH.
+
 ## Known limitations
 
 The workflow “ask the model to assess difficulty first, then ask the user” did not help in testing. In the 2026-10-20 comparison, a run with only an acceptance-contract block had a median ratio of 1.05, while a run with the contract plus questions and answers had 1.06; both were worse than the direct-start ratio of 1.02. External grading and feeding failed items back into the next round were effective, so the presets do not include self-assessed difficulty or mandatory pre-start questions.
@@ -169,7 +185,7 @@ Start with one command instead of guessing:
 node scripts/doctor.mjs --profile web      # add --dump to also run dsh --dump-config
 ```
 
-It answers four things: is the DSH version new enough (plugin-row presets need 0.1.7+), is there exactly one managed block, are there stray legacy rows outside it, and does a standard YAML parser accept the file.
+It answers: is the DSH version new enough (plugin-row presets need 0.1.7+), is there exactly one managed block, are there stray legacy rows outside it, are there leftover rows pointing at the `./list-agents` subpath removed in DSH 0.2.2-rc.1 (use `--fix` to remove them), and does a standard YAML parser accept the file.
 
 | Symptom | Cause | Fix |
 |---|---|---|

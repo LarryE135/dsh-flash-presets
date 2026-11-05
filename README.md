@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.8（未发布；GitHub Release 与 npm 上仍是 0.2.5）。一张插件卡带五个组件：预设 `轻量PTC-v3`、`轻量PTC-v3 max`、`轻量PTC-v3 lite`、`轻量PTC-v3 none`，以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。三个组件各自可单独开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
+> 当前版本：v0.2.8（未发布；GitHub Release 与 npm 上仍是 0.2.5）。一张插件卡带五个组件：预设 `轻量PTC-v3`、`轻量PTC-v3 max`、`轻量PTC-v3 lite`、`轻量PTC-v3 none`，以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。三个组件各自可单独开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照；DSH 0.2.2-rc.1 的接口变更已兼容，见「兼容性」。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -87,7 +87,7 @@ dsh plugin --profile web add dsh-flash-presets      # 预设（两张预设行�
 dsh plugin --profile web add dsh-plan-mode-ui       # 计划模式（独立一张卡）
 # 或一次装齐（本地包/离线）：
 bash scripts/install.sh --with-plan-mode
-node scripts/doctor.mjs --profile web --all         # [1]–[5] 预设、[6] 插件、[7] 合成配置
+node scripts/doctor.mjs --profile web --all         # [1]–[5]（含 4b）预设、[6] 插件、[7] 合成配置
 ```
 
 GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3`、`preset-flash-lean-ptc-v3-max`、`preset-flash-lean-ptc-v3-lite`、`preset-flash-lean-ptc-v3-none` 四个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
@@ -173,6 +173,22 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 
 安装器在 Windows PowerShell、Ubuntu、macOS 上跑过三平台 CI（矩阵见 `.github/workflows/verify.yml`）。macOS 未在真机验证，脚本按 bash 3.2 兼容写，变量后接非 ASCII 字符时用 ${var}。补丁里的 `!!js` 标签由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。
 
+### DSH 0.2.2-rc.1 及以上
+
+DSH 0.2.2-rc.1 把 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 的 root 导出，**移除了 `./list-agents` 子路径**。本包 0.2.8 之前（含 npm 上的 0.2.5）四个预设里各有一行 `tool-subagent-list-agents` 指向该子路径，升级后这个 fiber 起不来，表现为新建会话失败、`agent-preset/invalid: tool-subagent-list-agents ... never started`、输入框显示「会话不可用」。详见 [issue #19](https://github.com/LarryE135/dsh-flash-presets/issues/19)。
+
+本版把四个预设（以及 `candidates/archive/` 里的实验件）中的这行整块删除：root 一行已提供 `list_agents` / `send_message` / `interrupt_agent`。`scripts/compose-bundle-patch.mjs` 与 `scripts/verify-yaml.mjs` 会拦住回归。**不要只把 `name` 改指 root**：同一个包会被加载两次，转而报 `tool "list_agents" is already registered in this scope`。
+
+升级办法（npm 的 0.2.5 仍带旧行，修复版发布前请用 main 分支直装）：
+
+```bash
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets   # bundle patch 随包更新
+node scripts/doctor.mjs --profile web --fix    # 脚本安装的旧托管块：就地摘掉残留行（先备份）
+dsh --profile web --dump-config | grep -c "tool-subagent-list-agents"   # 期望 0
+```
+
+`desktop` / `headless` / `acp` 需重启 DSH；`web` 刷新即可。**对 0.2.1 系列的影响**：那一版 root 只注册 `send_message` / `interrupt_agent`，删行后 0.2.1 上会少一个 `list_agents` 工具，但会话、委派与四个预设的其余行为不变（本包默认不主动委派子代理，见 persona 规则 10）。确实需要该工具且仍在 0.2.1 的用户请留在 0.2.5。另：0.2.2-rc.1 要求 Node.js ≥ 24.9，与本包无关，升级 DSH 时一并处理。
+
 ## 已知限制
 
 「先让模型评估难度、再向用户提问」这条路径在实测中无效。2026-10-20 的对照里，只加验收契约块的一臂中位比值 1.05，契约加提问与答复的一臂 1.06，都低于直接开跑的 1.02。有效的是外部判分加回灌失败清单。预设里因此没有难度自评与开工前提问。
@@ -187,14 +203,15 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-config
 ```
 
-它逐条回答：DSH 版本够不够（插件行预设要 0.1.7+）、托管块是不是只有一个、块外有没有老式残留行（会导致预设列表重复）、文件里还有没有 `!!js`、标准 YAML 解析器能不能读通（报错给到行号）。
+它逐条回答：DSH 版本够不够（插件行预设要 0.1.7+）、托管块是不是只有一个、块外有没有老式残留行（会导致预设列表重复）、文件里还有没有 `!!js`、有没有指向 DSH 0.2.2-rc.1 已移除子路径的旧插件行、标准 YAML 解析器能不能读通（报错给到行号）。
 
-三种最常见的情况：
+四种最常见的情况：
 
 | 症状 | 原因 | 处理 |
 |---|---|---|
 | 预设列表出现两三个同名项 | 旧安装方式留下的裸行 + 新托管块并存 | `node scripts/merge-presets.mjs --patch <补丁>` 自动认领 |
 | `js-yaml` 报 `unknown tag 'tag:yaml.org,2002:js'` | 文件里还有 `!!js` | `node scripts/doctor.mjs --fix`（先备份） |
+| 升级 DSH 0.2.2-rc.1 后新建会话失败、`agent-preset/invalid ... never started` /「会话不可用」 | 预设里还留着已移除的 `./list-agents` 子路径插件行 | 装含修复的版本；旧托管块用 `node scripts/doctor.mjs --profile web --fix` 清掉，重启 DSH |
 | 预设根本没出现 | DSH < 0.1.7，或装错了 profile | 升级 DSH / 用 `--profile` 指对 |
 
 **注意**：预设补丁只定义 agent 侧的插件集合（persona + 工具 + 折叠链路），**不碰**工作区选择器、目录选择器、终端插件这些 GUI 组件。如果装完之后 GUI 出现与本预设无关的异常（例如选不了工作区），把 doctor 的输出和浏览器 Console 的报错一起贴出来——先证明"配置是干净的"，再往外查。
