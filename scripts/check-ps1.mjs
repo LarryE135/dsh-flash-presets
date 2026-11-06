@@ -23,16 +23,16 @@ const allPresetFiles = fs.readdirSync(path.join(repo, 'presets'))
 const VARIANT = /-v\d+-\d+(-[a-z0-9]+)*$/;   // -v3-1 / -v3-1-high / -v3-1-max 都算变体
 const presetFiles = allPresetFiles.filter(f => !VARIANT.test(f));
 const listMatch = (ps1 || '').match(/\$Presets\s*=\s*@\(([^)]*)\)/);
-const listed = listMatch ? listMatch[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).sort() : [];
-// 0.2.5 起安装器默认只装最新预设（对照版本仍在 presets/），这里检查子集 + 含最新
+const presetList = listMatch ? listMatch[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')) : [];
+const listed = presetList.slice().sort();
+// 0.2.7 起 id 与历史对齐（13 条 = flash-lean-ptc-v3，3 条 = -balance），默认装第一个，
+// 因此这里断言「名单是 presets/ 子集」+「默认项是真实预设」+「自检提示指向默认项」。
 const knownFiles = allPresetFiles.slice().sort();   // 子集校验用全集，变体也可以被显式安装
-const newestOfAll = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();
-check(listed.length > 0 && listed.every(id => knownFiles.includes(id)) && listed.includes(newestOfAll),
-      'install.ps1 预设名单是 presets/ 的子集且含最新（' + (listed.join(', ') || '未解析到') + '）');
-
-// 自检提示里的 id 必须是最新那个预设
-const newest = [...presetFiles].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).pop();
-check((ps1 || '').includes('id: preset-' + newest), 'install.ps1 自检 id 指向 ' + newest);
+const defaultPreset = presetList[0] ?? '';
+check(listed.length > 0 && listed.every(id => knownFiles.includes(id)),
+      'install.ps1 预设名单是 presets/ 的子集（' + (listed.join(', ') || '未解析到') + '）');
+check(knownFiles.includes(defaultPreset), 'install.ps1 默认安装 ' + (defaultPreset || '(未解析)') + ' 是真实预设');
+check((ps1 || '').includes('id: preset-' + defaultPreset), 'install.ps1 自检 id 指向默认预设 ' + defaultPreset);
 
 // 旧版目录式：0.2.6 移除 presets/legacy-0.1.5 后，缺目录必须明确报错（exit 3），不能静默跳过
 // 注意：不能写成 [^}]*，因为提示文案里的变量占位符自带一个右花括号

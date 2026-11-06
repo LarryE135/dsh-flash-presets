@@ -2,13 +2,13 @@
 /**
  * 旧会话的预设 id 迁移：把 lean 系列的历史 id 统一替换成现在的 lite 预设。
  *
- * 为什么需要：0.2.6 把 `flash-lean-ptc-v3`（13 条）改名成 `flash-lean-ptc-v3-lite`，并把
- * 旧的 `-lite`（3 条）改名成 `-balance`。会话把预设 id 写进自己的 header
- * （`session.v4.jsonl.zstd` 第一行的 `agentPreset`），恢复时按这个 id 解析：
+ * 为什么需要：0.2.5 之前的 lean 系列还有一批退役 id（`flash-lean-ptc-v1`、`-v2`、`-v3b`），
+ * 0.2.7 起现役的 13 条预设沿用 `flash-lean-ptc-v3`（旧 lean-v3 的 id），所以这类会话本来就能开；
+ * 该脚本只用于把「已退役 id」的会话并到现役预设上（可选、默认 dry-run）：
  *   - 网页端：继续对话会带上记录的 id → 解析不到就报 agent-preset/not-found；
  *   - 一次性 runner：直接拒绝 "runs under agent preset …, which the one-shot runner does not compose"。
- * 结果就是升级后旧对话打不开。这个脚本把 header 里的旧 id 原地改成 `flash-lean-ptc-v3-lite`，
- * 旧对话于是真正跑在新 lite 上，界面里显示的也是 lite。
+ * 这个脚本把 header 里的退役 id 原地改写成 `flash-lean-ptc-v3`（现役 13 条预设），
+ * 旧对话于是能继续跑；不跑也不影响 lean-v3 的历史会话。
  *
  *   node scripts/migrate-legacy-preset-ids.mjs                 # 只报告（默认 dry-run）
  *   node scripts/migrate-legacy-preset-ids.mjs --apply         # 真改（先写清单，可回滚）
@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-const TARGET = 'flash-lean-ptc-v3-lite';
+const TARGET = 'flash-lean-ptc-v3';
 const KEEP = new Set([TARGET, 'flash-lean-ptc-v3-balance']);
 const SKIP_MS = Number(process.env.PRESET_MIGRATE_SKIP_MS ?? 120000);
 const SESSION_FILES = ['session.v4.jsonl.zstd', 'session.v4.jsonl', 'session.jsonl.zstd', 'session.jsonl'];
@@ -43,9 +43,13 @@ const REVERT = val('--revert');
 const HOME = val('--dsh-home') ?? process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh');
 const log = (...a) => { if (!QUIET) console.log(...a); };
 
-/** 历史 id → 现在的 lite。只认同一个包的 lean 系列，别的预设（standard/ptc/自定义）不碰。 */
+/**
+ * 历史 id → 现行 id `flash-lean-ptc-v3`（显示名「轻量PTC-v3 lite」）。lean 系列全部对齐：
+ * `-v3b`、`-v3-lite`（0.2.6 期间用过的 id）、`flash-lean-ptc`、`flash-lean` 都算 ——
+ * 它们本质是同一个精简预设的历代命名。别的预设（standard / ptc / minimal / 用户自定义）一个不碰。
+ */
 function isLegacy(id) {
-  return typeof id === 'string' && id.startsWith('flash-lean-ptc-') && !KEEP.has(id);
+  return typeof id === 'string' && id.startsWith('flash-lean') && !KEEP.has(id);
 }
 
 function isZstd(file) {
@@ -114,11 +118,14 @@ export function listSessionFiles(root) {
 
 async function revert(manifestPath) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  // 清单里记着当轮写入的目标 id；用它判断"这条是否仍是本脚本写的"，而不是当前 TARGET
+  // （版本迭代后 TARGET 会变，旧清单仍必须能回滚）。
+  const written = manifest.target ?? TARGET;
   let done = 0;
   for (const entry of manifest.entries) {
     if (!fs.existsSync(entry.file)) continue;
     const header = parseHeader(await readHeaderLine(entry.file));
-    if (header.agentPreset !== TARGET) continue;
+    if (header.agentPreset !== written) continue;
     rewriteHeader(entry.file, entry.from);
     done++;
   }

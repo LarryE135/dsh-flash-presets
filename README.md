@@ -24,7 +24,7 @@
 
 | 预设 | id | order | 规则条数 | 压缩 | 用途 |
 |---|---|---|---|---|---|
-| 轻量PTC-v3 lite | `flash-lean-ptc-v3-lite` | 27 | 13 | 0.25 / 20k | **默认安装**。效率最高的轻量预设，适用于绝大部分日常工作 |
+| 轻量PTC-v3 lite | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**。效率最高的轻量预设，适用于绝大部分日常工作（id 沿用 0.2.5 的 lean-v3，旧会话不需要迁移） |
 | 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | 约束较弱的预设，适用于需要模型发挥的场景 |
 
 **本版提供两个预设**（0.2.6 起移除 v1/v2、v3.1 变体、v3 max 与 v3 none）：`轻量PTC-v3 lite`（13 条规则，效率最高，默认装）与 `轻量PTC-v3 balance`（3 条规则，约束最弱）。前者适合绝大部分日常工作；后者需要模型自己发挥时选。
@@ -58,7 +58,7 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-> 安装后预设列表里出现 **轻量PTC-v3 lite / 轻量PTC-v3 balance** 两项（id：`flash-lean-ptc-v3-lite` / `flash-lean-ptc-v3-balance`），见上文「预设」。
+> 安装后预设列表里出现 **轻量PTC-v3 lite / 轻量PTC-v3 balance** 两项（id：`flash-lean-ptc-v3` / `flash-lean-ptc-v3-balance`）。13 条版的 id 沿用 0.2.5 的 lean-v3，历史会话按 id 直接解析，不需要迁移。
 
 <img width="413" height="283" alt="屏幕截图 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -89,7 +89,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 node scripts/verify-presets.mjs                  # 结构与取值断言，可用 DSH_HOME / DSH_PROFILE 指向模拟安装
 node scripts/verify-yaml.mjs                     # YAML 与跨平台标签检查
 node scripts/compose-bundle-patch.mjs --check    # 断言 cordis.patch.yml 与 presets/* 一致
-dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'
+dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
 ```
 
 ## 与计划模式插件一起用（可选）
@@ -106,7 +106,7 @@ bash scripts/install.sh --with-plan-mode
 node scripts/doctor.mjs --profile web --all         # [1]–[5] 预设、[6] 插件、[7] 合成配置
 ```
 
-GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3-lite`、`preset-flash-lean-ptc-v3-balance` 两个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
+GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3`、`preset-flash-lean-ptc-v3-balance` 两个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
 
 插件是纯可选项：**没装时预设行为完全不变**，`doctor` 只给一行 `⚠ 未安装（纯可选）`，不计入失败。装了之后入口在输入框左侧，档位 off / light / full 独立于预设设置。
 
@@ -185,7 +185,7 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 
 ## 兼容性
 
-本仓库在 DSH 0.2.1-rc.5（rc.2 亦实测）与 0.2.2-rc.1 上做过安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 `flash-lean-ptc-v3-lite` 与 `flash-lean-ptc-v3-balance` 两行，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留（pnpm 在 profile 的 `pnpm-workspace.yaml` 里留下的 `minimumReleaseAgeExclude` 记录不属于本包，卸载时不会清除，也不影响配置合成）。0.2.2-rc.1 另在 `desktop` profile 上实机验证：`agentPresets/list` 两条预设均无 `broken`。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。`web` profile 为 live reload，desktop、headless、acp 需重启，因为补丁层只在启动时读取。
+本仓库在 DSH 0.2.1-rc.5（rc.2 亦实测）与 0.2.2-rc.1 上做过安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 `flash-lean-ptc-v3` 与 `flash-lean-ptc-v3-balance` 两行，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留。0.2.2-rc.1 另在 `desktop` profile 上实机验证：`agentPresets/list` 两条预设均无 `broken`。`web` profile 为 live reload，desktop、headless、acp 需重启，因为补丁层只在启动时读取。
 
 安装器在 Windows PowerShell、Ubuntu、macOS 上跑过三平台 CI（矩阵见 `.github/workflows/verify.yml`）。macOS 未在真机验证，脚本按 bash 3.2 兼容写，变量后接非 ASCII 字符时用 ${var}。补丁里的 `!!js` 标签由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。
 
@@ -229,7 +229,7 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 6. 预设里的插件行必须能被 DSH 解析：DSH 0.2.2-rc.1 起 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，子路径 `./list-agents` 已移除。自行改预设时再写这一行，整份预设会被判 broken，GUI 卡片显示「加载失败」。
 
-7. 升级会改预设 id：`flash-lean-ptc-v3` 已不存在，`flash-lean-ptc-v3-lite` 的规则数从 3 条变成 13 条。0.2.7 起**旧会话由脚本自动迁移**：`scripts/migrate-legacy-preset-ids.mjs` 把会话 header 里的 lean 系列旧 id 原地改写成 `flash-lean-ptc-v3-lite`（只动首行字段、保留 mtime、先写可回滚清单），安装器装完自动执行 —— 旧对话直接跑在 lite 上，不需要重选。详见 [版本与兼容性](docs/版本与兼容性.md) 的「注意事项」。
+7. 0.2.7 起预设 id 与历史对齐：13 条版用回 `flash-lean-ptc-v3`（旧 lean-v3 的 id），3 条版是 `flash-lean-ptc-v3-balance`。会话记录的是 id，所以**升级不需要迁移历史会话**；仍打不开的只有 `-v1` / `-v2` / `-v3b` 这些已退役 id 的会话，重选预设即可（也可选 `scripts/migrate-legacy-preset-ids.mjs --apply` 手动并到现役预设）。详见 [版本与兼容性](docs/版本与兼容性.md) 的「注意事项」。
 
 8. 装完必须完全退出宿主再启动（desktop / headless / acp），`web` 刷新页面即可。补丁层只在启动时合成，热装不生效。
 
@@ -237,7 +237,7 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 ```
 presets/
-  flash-lean-ptc-v3-lite.patch.yml    默认预设（lean-v3，13 条规则）
+  flash-lean-ptc-v3.patch.yml         默认预设（lean-v3 的 id，13 条规则）
   flash-lean-ptc-v3-balance.patch.yml 弱约束版（3 条规则）
 cordis.patch.yml                  由 presets/* 合成，勿手改，CI 断言一致性
 scripts/
@@ -262,17 +262,17 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ### v0.2.7（2026-11-06）
 
-- **旧会话兼容修复**：0.2.6 改了预设 id，而会话把 id 写进自己的 header（`session.v4.jsonl.zstd` 首行 `agentPreset`），恢复时按 id 解析 —— 旧对话因此解析不到预设（一次性 runner 直接拒绝 `runs under agent preset …, which the one-shot runner does not compose`）。新增 `scripts/migrate-legacy-preset-ids.mjs`：把 `flash-lean-ptc-v3`、`-v3b`、`-v1`、`-v2` 等历史 id 原地改写成 `flash-lean-ptc-v3-lite`，只动首行字段、保留 mtime、跳过 2 分钟内写过的会话，并写 `$DSH_HOME/backups/preset-ids-<时间戳>.json` 供 `--revert` 回滚
+- **预设 id 对齐历史**：13 条版的 id 从 `flash-lean-ptc-v3` 改回 `flash-lean-ptc-v3`（显示名与描述不变，仍叫「轻量PTC-v3 lite」）。两者规则、插件、压缩参数完全相同，只是名字不同，所以改 id 就能让 0.2.5 时代的 lean-v3 会话直接恢复，不需要改写任何会话数据；0.2.7 早期稿的自动迁移脚本降级为可选手动工具
 - 安装器（`install.sh` / `install.ps1`）装完自动执行迁移；`node scripts/doctor.mjs --sessions` 报「仍记着旧 id 的会话数」
 - **不新增预设行**：选择器里仍是 lite 与 balance 两张卡，旧会话指向 lite
 
 ### v0.2.6（2026-11-06）
 
-- 预设收敛为两个：`轻量PTC-v3 lite`（`flash-lean-ptc-v3-lite`，13 条规则，order 27，默认）与 `轻量PTC-v3 balance`（`flash-lean-ptc-v3-balance`，3 条规则，order 26）；旧 id `flash-lean-ptc-v3` 不再存在，v1 / v2 / `v3 max` / `v3 none` 移出发布包
+- 预设收敛为两个：`轻量PTC-v3 lite`（13 条规则，order 27，默认；0.2.6 当时 id 改为 `flash-lean-ptc-v3`，0.2.7 又改回 `flash-lean-ptc-v3`）与 `轻量PTC-v3 balance`（`flash-lean-ptc-v3-balance`，3 条规则，order 26）；v1 / v2 / `v3 max` / `v3 none` 移出发布包
 - 计划模式并回主包，作为同一张卡里的第三个组件（plan-mode v1）；开发期的 0.7.x 编号不再对外发布
 - 运行时调优随包落地：`ptc-runtime: persistent-in-memory`，`run_code` 的固定开销从 108 ms 降到 0，嵌套 bash 从 44 ms 降到 15 ms
 - **兼容性修复（发布前）**：DSH 0.2.2-rc.1 把 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，`./list-agents` 子路径被移除；原先两个预设都声明了这一行，import 失败导致**整份预设** mount 失败、GUI 卡片显示「加载失败」。0.2.6 起不再声明该行，`verify-yaml` 增加断言禁止回归
-- **升级注意**：预设 id 变了（旧会话需重选）、`flash-lean-ptc-v3-lite` 从 3 条规则变为 13 条、desktop / headless / acp 装完必须重启
+- **升级注意**：0.2.6 当时把 13 条的 id 改成了 `flash-lean-ptc-v3`（0.2.7 已改回 `flash-lean-ptc-v3`）、3 条改名为 `flash-lean-ptc-v3-balance`；desktop / headless / acp 装完必须重启
 - 旧版目录式安装入口改为明确拒绝（exit 3），不再静默跳过
 
 ### v0.2.5（2026-10-30）

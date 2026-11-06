@@ -16,15 +16,15 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
-// 0.2.6 起只提供两个预设：v3（默认，基础轻量）与 v3 max（解除预算限制的全量版）。
-// 两者都随包安装，选择器里就这两项。
-const SOURCES = ['presets/flash-lean-ptc-v3-lite.patch.yml', 'presets/flash-lean-ptc-v3-balance.patch.yml'];
+// 0.2.7 起只提供两个预设：轻量PTC-v3 lite（id flash-lean-ptc-v3，13 条，默认）
+// 与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。id 沿用 0.2.5 的身份，旧会话不需要迁移。
+const SOURCES = ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-balance.patch.yml'];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件叠加 v3、v3 max、v3 lite、v3 none 四个预设；装一次，选择器里就有四项。',
-  '# 源文件：presets/flash-lean-ptc-v3-lite{,-lite}.patch.yml。',
-  '#   node scripts/compose-bundle-patch.mjs          # v3 + v3 max + v3 lite + v3 none',
+  '# 本文件叠加两个预设：轻量PTC-v3 lite（id flash-lean-ptc-v3，13 条）与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。',
+  '# 源文件：presets/flash-lean-ptc-v3.patch.yml 与 presets/flash-lean-ptc-v3-balance.patch.yml。',
+  '#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',
 ].join('\n');
