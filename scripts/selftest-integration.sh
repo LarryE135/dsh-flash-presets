@@ -22,7 +22,8 @@ blocks=$(grep -c "dsh-flash-presets: managed block (0.1.7" "$patch" || true)
 [ "$blocks" -eq 1 ] && ok "托管块恰好 1 个" || bad "托管块数量 = ${blocks}（期望 1）"
 grep -q "id: preset-flash-lean-ptc-v3" "$patch" && ok "v3 预设行已写入" || bad "v3 预设行缺失"
 
-grep -q "plan-mode v1 已随本包提供" <<<"$out" && ok "安装器说明计划模式随包提供" || bad "安装器未说明计划模式随包提供"
+# 0.2.6 起安装器如实说明：计划模式组件只有 dsh plugin add 才装，本脚本只写预设行。
+grep -q "计划模式" <<<"$out" && grep -q "dsh plugin add dsh-flash-presets" <<<"$out" && ok "安装器说明计划模式组件只在 dsh plugin add 时装" || bad "安装器未说明计划模式组件的安装方式"
 
 if command -v dsh >/dev/null 2>&1; then
   ok "(dsh 可用：跳过本地路径断言)"

@@ -149,7 +149,7 @@ jobs:
           node-version: '24'   # dsh CLI 在 Node 20 下会静默退出（0 输出 / 退出码 0）
 
       - name: 安装 DSH 与 pnpm
-        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.2   # 锁到 README 声称对齐的版本
+        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.5   # 锁到 engines 声明的下限（>=0.2.1-rc.5）；0.2.2-rc.1 由 canary/integration 的 latest 覆盖
 
       - name: 环境诊断
         run: |
@@ -225,7 +225,7 @@ jobs:
         with:
           node-version: "24"
       - name: 安装 DSH 与 pnpm
-        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.2
+        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.5
       - name: 整体组合自测（有 dsh 分支）
         run: bash scripts/selftest-integration.sh
 
@@ -244,7 +244,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
       # 插件的 peer 依赖 @deepseek-ai/dsh-llm 由 DSH 自带，装一个全局 DSH 即可解析。
       - name: 安装 DSH（提供 @deepseek-ai/dsh-llm）
-        run: npm i -g @deepseek-ai/dsh@0.2.1-rc.2
+        run: npm i -g @deepseek-ai/dsh@0.2.1-rc.5
       - name: 跑插件全量测试
         working-directory: plugins/plan-mode-ui
         run: bash test/run.sh
