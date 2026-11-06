@@ -27,6 +27,8 @@
   - `marketplace/plugin.json` 落后两版：描述、兼容区间、安装命令按 0.2.7 重写。
 - **CI**（P1-11 / N3-7）：`bundle-install` 加 `0.2.1-rc.5` 与 `0.2.2-rc.1` 两档矩阵，断言改为精确 id 比对（原来 `grep flash-lean-ptc-v3` 是子串匹配，等于什么都没断言），步骤名同步；新增 `pack-doctor` job：`npm pack` → 解包 → 在解出来的 38 个文件里跑 `doctor --all` / `tune-runtime` / `verify-presets`，并断言写会话的维护脚本没有随包发布。
 
+- **`install.sh --help` 把正文打了出来**：头部注释改短后 `sed -n '2,19p'` 会把 `set -euo pipefail` 一起打印，改为 `2,16p`。
+  > 这一处是 0.2.7 首发之后补的：`v0.2.7` 因此在发布后约半小时内从 `f414cad` 移到最终提交一次（CI 全绿之后才移），此后冻结。`scripts/publish.sh` 的「同名 tag 禁止复用」硬规则保留，确需移动必须显式 `ALLOW_TAG_MOVE=1`，并在本文件记录。
 - **仍未做**（需要改模型行为，另行排期）：`tool-presentation` → `tool-executor-ptc`（`dsh-tool-executor-ptc` 在 0.2.1 系列里不存在，换它等于放弃 0.2.1 下限）、规则 4 跨平台、两个预设的 description 中性化、并发标记只作用于本包预设（目前对整个 profile 生效，已在文档如实说明）、日志噪音与轮询间隔。
 ## 0.2.6（2026-11-06，发布）
 
