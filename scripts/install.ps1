@@ -47,6 +47,10 @@ if (-not $DshHome) {
   else                      { throw '无法确定 DSH 主目录，请用 -DshHome 指定。' }
 }
 
+# -DshHome 只是脚本参数，子进程（tune-runtime）读的是环境变量 DSH_HOME：这里统一一下。
+# 不统一的话 `-DshHome X -WithRuntime` 会把 ptc-runtime 覆盖写进真实的用户目录（第四轮审计新发现）。
+$env:DSH_HOME = $DshHome
+
 # profile 只能是单层目录名：挡掉 "a/b"、".." 之类，避免把补丁写到预期目录之外
 if ([string]::IsNullOrWhiteSpace($Profile) -or $Profile -in @('.', '..') -or
     $Profile.StartsWith('.') -or $Profile -match '[\\/]') {

@@ -65,6 +65,9 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 - **`doctor` 补 `--help`**（列出参数与退出码口径）；`merge-presets.mjs` 的错误提示不再推荐 0.2.6 就删掉的 `--legacy`。
 - **README / EN 的「重复注册」说法按实测改写**：两条路径都装不会报错（`--dump-config` 仍退出 0），只是每个预设出现两张卡；
   `agent-preset/invalid` 是**预设定义解析失败**的错误码，不是重复注册。
+- **Windows `-DshHome X -WithRuntime` 把运行时覆盖写进真实用户目录**（新 CI 用例一跑就抓到）：`-DshHome` 只是脚本参数，
+  子进程 `tune-runtime` 读的是 `$env:DSH_HOME`，两者不同步时它会去改 `%USERPROFILE%\.dsh`。现在 `install.ps1` 解析完 `-DshHome`
+  就同步到 `$env:DSH_HOME`，`check-ps1` 增加静态断言。
 - **CI**：`verify.yml` 补 `concurrency`（同分支取消旧运行）；Windows 增加 `install.ps1 -WithRuntime` → `-Uninstall` 往返用例
   （此前 `-WithRuntime` 分支从未在 CI 跑过）；`npm-downloads-badge.yml` 的 node 从 20 改 24。
 - **小项**：`scheduleCompatHeal()` 的守卫改成 `!== '1'`（原来只在 `=== '0'` 时返回，直接调用会绕过「默认关闭」）；

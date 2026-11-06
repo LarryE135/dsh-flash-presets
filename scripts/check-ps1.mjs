@@ -45,6 +45,10 @@ check(/Uninstall-Legacy/.test(ps1 || ''), 'install.ps1 保留 legacy 卸载分�
 // 卸载必须撤运行时覆盖（第三轮审计 R2-1：bash 版修了、ps1 只改了文案，静态检查当时没抓到）
 check(/function Revert-Runtime[\s\S]{0,800}?tune-runtime[\s\S]{0,200}?--revert/.test(ps1 || ''),
       'install.ps1 的 Revert-Runtime 会调 tune-runtime --revert');
+// -DshHome 必须同步到 $env:DSH_HOME：tune-runtime 读的是环境变量，不同步就会把
+// ptc-runtime 覆盖写进真实用户目录（第四轮审计发现，CI 的 -WithRuntime 用例抓到）。
+check(/\$env:DSH_HOME\s*=\s*\$DshHome/.test(ps1 || ''),
+      'install.ps1 把 -DshHome 同步到 $env:DSH_HOME（子进程才写对目录）');
 check(/function Uninstall-Modern[\s\S]{0,400}?Revert-Runtime/.test(ps1 || ''),
       'install.ps1 卸载时先撤运行时覆盖再删托管块');
 // R2-2：tune-runtime 只认 --profile，传 PowerShell 的 -Profile 会被静默忽略
