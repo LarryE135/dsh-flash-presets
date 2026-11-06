@@ -16,7 +16,7 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主代码，也不动共享工具注册表。
 
-> 当前版本：v0.2.6（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH ≥ 0.2.1-rc，实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.2.6（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 硬闸，不满足会拒绝安装），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
 > npm 上的最新版仍是 0.2.5，它在 DSH 0.2.2-rc.1 上无法新建会话。0.2.6 发布到 npm 之前，请从 GitHub 或 Release 附件安装（见[安装](#安装)）。
 
@@ -136,13 +136,13 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 插件管理器会装上整张插件卡：两个预设、计划模式组件、常驻 PTC 运行时，以及旧 id 兼容层。
 
 ```console
-# 0.2.6，从 GitHub 安装（跟随 main 分支；npm 跟上之前用这条）
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets
+# 0.2.6，从 GitHub 按 tag 安装（锁死版本；npm 跟上之前用这条）
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6
 ```
 
 > npm 上的 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话（#19），请不要再安装它。0.2.6 发布到 npm 后，这里会换成 `dsh-flash-presets@0.2.6`。
 
-`--profile` 可取 `web`、`desktop`、`headless`、`acp`。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
+`--profile` 通常取 `web` 或 `desktop`（`headless` / `acp` 下预设不会激活，见[已知偏差](#已知偏差)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
 预设直接决定 agent 的行为，需要可复现时请写死版本号。不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.2.x 的最新版。
 

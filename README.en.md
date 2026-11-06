@@ -16,7 +16,7 @@ The idea is simple: compact the context earlier, keep only the head and tail of 
 
 Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and touches neither the host code nor the shared tool registry.
 
-> Current version: 0.2.6 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH ≥ 0.2.1-rc, tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.2.6 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (hard `engines` gate — the install is refused otherwise), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
 > npm still serves 0.2.5, which cannot start a session on DSH 0.2.2-rc.1. Until 0.2.6 lands there, install from GitHub or from the release archive (see [Install](#install)).
 
@@ -136,13 +136,13 @@ The office benchmark includes `OPS + standard` and `OPS + PTC`, but OPS combined
 The plugin manager installs the whole plugin card: both presets, the plan-mode component, the resident PTC runtime, and the legacy-id compatibility layer.
 
 ```console
-# 0.2.6 from GitHub (tracks the main branch; use this until npm catches up)
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets
+# 0.2.6 from GitHub, pinned to the tag (use this until npm catches up)
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6
 ```
 
 > The 0.2.5 build on npm cannot start a new session on DSH 0.2.2-rc.1 (#19), so please don't install it. Once 0.2.6 is on npm, this line becomes `dsh-flash-presets@0.2.6`.
 
-`--profile` takes `web`, `desktop`, `headless`, or `acp`. Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
+`--profile` is normally `web` or `desktop` (presets do not activate under `headless` / `acp` — see [Known deviations](#known-deviations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
 
 Presets directly shape agent behavior, so pin a version when you need reproducible results. Without one, the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x.
 
