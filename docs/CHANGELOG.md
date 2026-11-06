@@ -1,5 +1,17 @@
 # 变更日志
 
+## 0.2.7（2026-11-06，旧会话兼容修复）
+
+- **问题（本机实测复现）**：0.2.6 把 `flash-lean-ptc-v3` 改名为 `flash-lean-ptc-v3-lite`，但会话把预设 id 写在自己的 header（`session.v4.jsonl.zstd` 第一行的 `agentPreset`），恢复会话时按这个 id 解析：
+  - 一次性 runner 直接拒绝：`session "…" runs under agent preset "flash-lean-ptc-v3", which the one-shot runner does not compose`；
+  - 网页端继续对话会把记录里的 id 一起带上（`agent-preset/not-found` 的来源），界面上也仍显示一个已经不存在的预设。
+- **修法（不新增预设行，选择器里还是两张卡）**：新增 `scripts/migrate-legacy-preset-ids.mjs`，把会话 header 里的 lean 系列历史 id（`flash-lean-ptc-v3`、`-v3b`、`-v1`、`-v2` 等）原地改写成 `flash-lean-ptc-v3-lite`：
+  - 只改首行 `agentPreset`，事件流其余字节不动；保留 mtime（否则历史会话会跳到列表最前）；
+  - 最近 2 分钟内写过的会话跳过（可能在跑）；默认 dry-run；`--apply` 先写 `$DSH_HOME/backups/preset-ids-<时间戳>.json`，`--revert <清单>` 可回滚；
+  - `--dsh-home` 可指向另一台宿主（已用它迁移 Windows 桌面端的 `C:\Users\Larry\.dsh`）。
+- **落地**：`install.sh` / `install.ps1` 安装后自动执行迁移；`doctor.mjs` 新增 `--sessions` / `--all` 检查项，报告仍记着旧 id 的会话数。
+- **实测**：WSL `~/.dsh` 迁移 121 个会话（`flash-lean-ptc-v3`×79、`flash-lean-ptc-v2`×42），Windows `~/.dsh` 迁移 273 个（`v3`×254、`v3b`×17、`v2`×2）；迁移后抽样解析首行与末行 JSON 全部通过，mtime 保持不变；`doctor --sessions` 由 121 降到 1（剩余的那个是正在写的当前会话，按设计跳过，下次再跑即可）。
+
 ## 0.2.6（2026-11-06，发布）
 
 - **发布前修正：DSH 0.2.2-rc.1 下两张「Agent 预设」卡片显示「加载失败」**（本机实机复现并修复）

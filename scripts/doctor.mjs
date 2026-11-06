@@ -196,9 +196,28 @@ if (fs.existsSync(stateFile)) {
   } catch { warn('状态文件存在但解析失败：' + stateFile); }
 }
 
-// ── 7. 可选 dump-config ──────────────────────────────────────────────────────
+// ── 7. 旧会话的预设 id ──────────────────────────────────────────────────────
+// 会话把预设 id 写进 header；0.2.6 改了 id，旧会话不迁移就解析不到（一次性 runner 直接拒绝）。
+console.log('[7] 旧会话的预设 id');
+if (!flag('--sessions') && !flag('--all')) {
+  info('跳过（加 --sessions 或 --all 才扫会话；' + path.join(home, 'sessions') + '）');
+} else {
+  const { scanSessions } = await import('./migrate-legacy-preset-ids.mjs');
+  const scan = await scanSessions(home);
+  const pending = [...scan.legacy].map(([id, files]) => [id, files.length]);
+  if (!scan.files) warn('没有会话目录：' + path.join(home, 'sessions'));
+  else if (!pending.length) ok(scan.files + ' 个会话文件，全部指向现役预设');
+  else {
+    const total = pending.reduce((n, [, c]) => n + c, 0);
+    warn(total + '/' + scan.files + ' 个会话仍记着旧 id：' + pending.map(([id, c]) => id + ' ×' + c).join('、'));
+    info('迁移：node scripts/migrate-legacy-preset-ids.mjs --apply（先写可回滚清单）');
+    problems.push('旧会话预设 id 未迁移 ' + total + ' 个');
+  }
+}
+
+// ── 8. 可选 dump-config ──────────────────────────────────────────────────────
 if (flag('--dump') || flag('--all')) {
-  console.log('[7] dsh --dump-config 是否认得这些预设');
+  console.log('[8] dsh --dump-config 是否认得这些预设');
   try {
     const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
     for (const id of PRESETS) {

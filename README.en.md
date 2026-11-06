@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.6 (released 2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot).
+> Current version: v0.2.7 (released 2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot).
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -187,7 +187,7 @@ Note: the preset patch only defines the agent-side plugin set (persona + tools +
 
 6. Every plugin name in a preset must resolve on the target DSH. Since DSH 0.2.2-rc.1, `list_agents` ships inside `@deepseek-ai/dsh-tool-subagent-control`, and the `./list-agents` subpath export is gone; declaring that row marks the whole preset broken (the GUI shows it as failing to load).
 
-7. Upgrading to 0.2.6 changes preset ids: `flash-lean-ptc-v3` no longer exists, and `flash-lean-ptc-v3-lite` went from 3 rules to 13. Sessions restored by id must pick a preset again; see the notes in [version and compatibility](docs/版本与兼容性.md).
+7. Upgrading changes preset ids: `flash-lean-ptc-v3` no longer exists, and `flash-lean-ptc-v3-lite` went from 3 rules to 13. Since 0.2.7 `scripts/migrate-legacy-preset-ids.mjs` rewrites the legacy id stored in each session header (first-line field only, mtime preserved, reversible manifest) to `flash-lean-ptc-v3-lite`, so old sessions keep working without re-picking a preset; see the notes in [version and compatibility](docs/版本与兼容性.md).
 
 8. Restart the host after installing (desktop, headless, acp); the web profile only needs a page refresh, because the patch layer is composed at startup.
 

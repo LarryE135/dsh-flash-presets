@@ -132,6 +132,13 @@ function Install-Modern {
     if (Test-Path "$patch.bak-$stamp") { Copy-Item "$patch.bak-$stamp" $patch -Force }
     throw "YAML 校验未通过，未完成安装。复查：node `"$verifyYaml`" `"$patch`""
   }
+  # 旧会话把预设 id 写在自己的 header 里：0.2.6 改了 id，不迁移就解析不到（一次性 runner 直接拒绝）。
+  $migrate = Join-Path $here 'scripts\migrate-legacy-preset-ids.mjs'
+  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path $migrate)) {
+    $env:DSH_HOME = $DshHome
+    node $migrate --apply --quiet | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Host '旧会话的预设 id 已对齐到 lite（可回滚：node scripts\migrate-legacy-preset-ids.mjs --revert <清单>）' }
+  }
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已安装：轻量PTC-v3 lite / 轻量PTC-v3 balance（选择器里就这两项）'

@@ -97,6 +97,12 @@ install_modern() {
   merge_patch
   echo "已写入托管块：$PATCH"
   validate_patch
+  # 旧会话把预设 id 写在自己的 header 里：0.2.6 改了 id，不迁移就解析不到（一次性 runner 直接拒绝）。
+  if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/migrate-legacy-preset-ids.mjs" ]; then
+    if DSH_HOME="$DSH_DIR" node "$HERE/scripts/migrate-legacy-preset-ids.mjs" --apply --quiet >/dev/null 2>&1; then
+      echo "旧会话的预设 id 已对齐到 lite（回滚：node scripts/migrate-legacy-preset-ids.mjs --revert <清单>）"
+    fi
+  fi
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"

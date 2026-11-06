@@ -15,7 +15,7 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.6（2026-11-06 发布；npm 上一次发布是 0.2.5）。一张插件卡带三个组件：预设 `轻量PTC-v3 lite`（13 条规则，默认）、`轻量PTC-v3 balance`（3 条规则），以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。每个组件可单独开关。已对齐 DSH 0.2.1-rc.5 与 0.2.2-rc.1 实机验证（v41flash 1017 快照）。
+> 当前版本：v0.2.7（2026-11-06 发布；npm 上一次发布是 0.2.5）。一张插件卡带三个组件：预设 `轻量PTC-v3 lite`（13 条规则，默认）、`轻量PTC-v3 balance`（3 条规则），以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。每个组件可单独开关。已对齐 DSH 0.2.1-rc.5 与 0.2.2-rc.1 实机验证（v41flash 1017 快照）。
 > 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出两个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
@@ -229,7 +229,7 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 6. 预设里的插件行必须能被 DSH 解析：DSH 0.2.2-rc.1 起 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，子路径 `./list-agents` 已移除。自行改预设时再写这一行，整份预设会被判 broken，GUI 卡片显示「加载失败」。
 
-7. 升级到 0.2.6 会改预设 id：`flash-lean-ptc-v3` 不再存在，且 `flash-lean-ptc-v3-lite` 的规则数从 3 条变成 13 条；按 id 恢复的旧会话要在选择器里重选，详见 [版本与兼容性](docs/版本与兼容性.md) 的「注意事项」。
+7. 升级会改预设 id：`flash-lean-ptc-v3` 已不存在，`flash-lean-ptc-v3-lite` 的规则数从 3 条变成 13 条。0.2.7 起**旧会话由脚本自动迁移**：`scripts/migrate-legacy-preset-ids.mjs` 把会话 header 里的 lean 系列旧 id 原地改写成 `flash-lean-ptc-v3-lite`（只动首行字段、保留 mtime、先写可回滚清单），安装器装完自动执行 —— 旧对话直接跑在 lite 上，不需要重选。详见 [版本与兼容性](docs/版本与兼容性.md) 的「注意事项」。
 
 8. 装完必须完全退出宿主再启动（desktop / headless / acp），`web` 刷新页面即可。补丁层只在启动时合成，热装不生效。
 
@@ -259,6 +259,12 @@ marketplace/                      插件市场提交材料（不随包发布）
 ```
 
 ## 版本历史
+
+### v0.2.7（2026-11-06）
+
+- **旧会话兼容修复**：0.2.6 改了预设 id，而会话把 id 写进自己的 header（`session.v4.jsonl.zstd` 首行 `agentPreset`），恢复时按 id 解析 —— 旧对话因此解析不到预设（一次性 runner 直接拒绝 `runs under agent preset …, which the one-shot runner does not compose`）。新增 `scripts/migrate-legacy-preset-ids.mjs`：把 `flash-lean-ptc-v3`、`-v3b`、`-v1`、`-v2` 等历史 id 原地改写成 `flash-lean-ptc-v3-lite`，只动首行字段、保留 mtime、跳过 2 分钟内写过的会话，并写 `$DSH_HOME/backups/preset-ids-<时间戳>.json` 供 `--revert` 回滚
+- 安装器（`install.sh` / `install.ps1`）装完自动执行迁移；`node scripts/doctor.mjs --sessions` 报「仍记着旧 id 的会话数」
+- **不新增预设行**：选择器里仍是 lite 与 balance 两张卡，旧会话指向 lite
 
 ### v0.2.6（2026-11-06）
 
