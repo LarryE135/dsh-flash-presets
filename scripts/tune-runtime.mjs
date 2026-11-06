@@ -24,7 +24,9 @@ const only = (() => {
   return i >= 0 ? A[i + 1] : null;
 })();
 
-const ROOT = path.join(os.homedir(), '.dsh', 'profiles');
+// 尊重 DSH_HOME：隔离环境（DSH_HOME=/tmp/x）里跑安装器时不能去改真实的 ~/.dsh。
+  const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
+  const ROOT = path.join(DSH_HOME, 'profiles');
 const FS_PKG = path.join('node_modules', '@deepseek-ai', 'dsh-tool-fs-search', 'lib', 'index.js'); // 旧落点，仅留作历史参考
 
 function semverAtLeast(version, min) {

@@ -24,7 +24,7 @@ PROFILE="web"
 MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# 0.2.6 起只发两个预设：v3（默认）与 v3 max（解除预算限制）
+# 0.2.6 起只发两个预设：lite（13 条，默认）与 balance（3 条）
 PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance)
 # --with-plan-mode：新装模式下无实际作用（计划模式已并入本包），保留参数以兼容旧脚本；
 # 两者互相独立，装失败不影响预设本身。
@@ -100,7 +100,7 @@ install_modern() {
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
-  echo "  计划模式 plan-mode v1 已随本包提供（同一张卡的第三个组件），无需单独安装"
+  echo "  注意：本脚本只写两行预设；计划模式组件与常驻运行时要用 dsh plugin add dsh-flash-presets 才会装上"
   echo "  装成插件卡：dsh plugin --profile $PROFILE add dsh-flash-presets（三个组件都在这张卡里）"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
   echo "  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效"
@@ -109,12 +109,13 @@ install_modern() {
   if [ "$PLAN_MODE" = "1" ]; then install_plan_mode; fi
 }
 
-# 计划模式插件是独立包（dsh-plan-mode-ui）：自带组合包补丁与浏览器半边，与预设包互不依赖。
+# 计划模式（plan-mode v1）与常驻运行时是**插件包**的一部分：只有 dsh plugin add dsh-flash-presets 才会装上；
+# 本脚本只往 profile 补丁层写两行预设，不装插件、不改运行时。
 # 装它等于把这个包加进 profile；升级要先 remove 再 add（插件管理器不接受同名重复安装）。
 install_plan_mode() {
   # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
   echo "-- 计划模式（plan-mode v1）---------------------------"
-  echo "  已随本包安装，无需单独装 dsh-plan-mode-ui。"
+  echo "  只有在 dsh plugin add 安装时才包含；本脚本不装。"
   if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
     if node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" >/dev/null 2>&1; then
       echo "  运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）"

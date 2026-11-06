@@ -1,8 +1,8 @@
 # dsh-flash-presets —— 组合包补丁层（bundle patch）
-# 本文件叠加两个正式预设 + 一个兼容别名：
+# 本文件叠加两个预设：
 #   轻量PTC-v3 lite（flash-lean-ptc-v3-lite，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、
-#   兼容别名（flash-lean-ptc-v3，13 条，内容同 lite，只为让升级前记录的会话按 id 打开）。
-#   node scripts/compose-bundle-patch.mjs          # 三者都进 bundle
+#   旧 id（flash-lean-ptc-v3 等）由 lib/preset-alias.js 运行时映射，不建兼容卡。
+#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle
 # CI 会断言本文件与合成结果一致，请勿手工编辑。
 - insert:
     - id: preset-flash-lean-ptc-v3-lite

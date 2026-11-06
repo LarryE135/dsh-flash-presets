@@ -10,108 +10,73 @@
 
 # dsh-flash-presets
 
-Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a DSH bundle (`dsh.bundle`). After installation, the bundle inserts several `@deepseek-ai/dsh-agent-preset` rows into a profile. It does not modify host code or the shared tool registry.
+Agent presets for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), tuned for DeepSeek V4.1 Flash.
 
-The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
+The idea is simple: compact the context earlier, keep only the head and tail of oversized tool output, leave unused tools out of the system prompt, and fold scattered tool calls into a single `run_code` program. None of this makes the model smarter. It changes how much a session reads, how much it wanders, and when it stops.
 
-> [!IMPORTANT]
-> Current version: v0.2.6 (2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Historical preset ids are resolved at runtime by an alias layer (`presets/legacy-preset-map.json`) that never rewrites session files; the startup self-heal is opt-in (`DSH_FLASH_PRESETS_HEAL=1`). New **composition self-check** (`lib/composition-check.js`): after a plugin hot reload, an already-mounted session can silently lose its preset composition (the `compact`/`plan`/`goal` slash commands vanish and the next turn fails with `tool executor is unavailable`); the plugin now probes every mounted agent read-only every two minutes and logs the remedy, with `DSH_FLASH_PRESETS_SELFCHECK_HEAL=1` for automatic remount. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot). **Alignment audit** `npm run audit:align` reports all four layers at once (generation filename ⇄ header.version ⇄ directory identity, alias coverage, sessions still recording historical ids, and which preset each session will actually run), exiting 1 on any violation.
-> 
-> Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
-> 
-> Not verified: macOS hardware and same-scale comparisons in native mode.
+Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and touches neither the host code nor the shared tool registry.
+
+> Current version: 0.2.6 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH ≥ 0.2.1-rc, tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> See [measured evidence](docs/实测证据.md) and [Known limitations](#known-limitations) for numbers and failure cases.
+> npm still serves 0.2.5, which cannot start a session on DSH 0.2.2-rc.1. Until 0.2.6 lands there, install from GitHub or from the release archive (see [Install](#install)).
 
-## Presets
+## Who it's for, and who it isn't
 
-| Preset | id | order | Rules | Compaction | Intended use |
-|---|---|---:|---:|---|---|
-| lean-ptc-v3 lite | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. Highest-efficiency preset for everyday work (id kept from the 0.2.5 lean-v3 preset, so old sessions resolve without migration) |
-| lean-ptc-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | Weaker-constraint preset for tasks that need room to think |
-| lean-ptc-v3 (lean-v3 compat) | `flash-lean-ptc-v3` | 28 | 13 | 0.25 / 20k | **Compatibility alias**: identical to lite; kept so sessions recorded before 0.2.6 still resolve by id |
+**A good fit for**
 
-**This version ships two presets** (v1/v2, the v3.1 variants, v3 max and v3 none are all gone): `lean-ptc-v3 lite` (13 rules, highest efficiency, installed by default) and `lean-ptc-v3 balance` (3 rules, loosest constraints).
+- Tasks with a clear goal and a way to check the result: changing code, running scripts, cleaning data, producing a file in a fixed format.
+- Long sessions. DSH compacts at 80% of the context window by default, which most sessions never reach. These presets compact at 25%, so long sessions stay within bounds.
+- Anyone who watches their token bill and would rather not repeat the same instructions in every message.
 
-## Install, update, and uninstall
+**Not a good fit for**
 
-### npm (recommended)
+- Problems clearly beyond the model, such as competition-level tasks where the goal is partial credit. Standard mode holds up better there; see [Unfavorable results](#unfavorable-results).
+- Workflows that rely on the current date, installing plugins from inside a conversation, or scheduled tasks. Those capabilities are trimmed out (see [Differences from the official PTC preset](#differences-from-the-official-ptc-preset)).
+- Models other than DeepSeek V4.1 Flash. The rules may still help, but nobody has checked.
+- DSH 0.2.0 and earlier. Use the matching older release instead (see [versions and compatibility](docs/版本与兼容性.md), in Chinese). The directory-style presets for DSH before 0.1.7 are no longer shipped as of 0.2.6.
 
-```console
-npm install -g dsh-flash-presets          # Keep one global copy for any profile
-dsh plugin --profile web add dsh-flash-presets
-```
+## What it does
 
-In the GUI, open **Plugins → Add plugin** and enter `dsh-flash-presets` to get the same result.
+Four mechanisms, each acting at a different point in a session:
 
-> After installation the preset list shows **v3** (`flash-lean-ptc-v3`) only; v1/v2 are reference versions and are not inserted by default.
+| Mechanism | When it acts | Setting | Effect |
+|---|---|---|---|
+| Turn compaction | When the stored context grows too large | `thresholdRatio: 0.25`, `retainTokens: 20000` (DSH default: 0.8) | History is replaced by a summary; only long sessions trigger it |
+| Tool-output trimming | When a tool result enters the context | first 4096 / last 1024 characters | Oversized output keeps only its two ends |
+| Disabled plugins | When the system prompt is assembled | 6 plugins set to `disabled: true` | Their tool schemas never reach the prompt — a fixed saving |
+| Behavioral rules | At every step the model takes | persona rules (13 in lite, 3 in balance) | Nudges the model to read less, batch calls, and edit incrementally |
 
-<img width="413" height="283" alt="Screenshot 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
+Two more things come with the bundle:
 
-Package page: <https://www.npmjs.com/package/dsh-flash-presets>. `dsh plugin add` writes this package into the selected profile's dependencies and loads `cordis.patch.yml`; the preceding `npm install` is only needed when you want an offline copy or want several profiles to share one global installation.
+- Tools are presented through PTC (`tool-presentation: ptc`), and the PTC runtime stays resident for the whole session (`ptc-runtime: persistent-in-memory`). Measured: the fixed startup cost per program dropped from 108 ms to 0, and nested tool calls from 44 ms to 15 ms ([benchmark notes](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md), in Chinese). The gain grows linearly with the number of calls inside a program; a short task that runs a single command will barely notice.
+- The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel (web and desktop profiles only; see [Known limitations](#known-limitations)).
 
-Version strategy: without a version, the manager writes a caret range such as `^0.2.2`, so a later pnpm operation may move it to the newest 0.2.x release. Because presets directly affect agent behavior, pin the version when reproducibility matters:
+For the reasoning behind each setting, with source line references, see the [four mechanisms write-up](docs/技术文档-省token四机制.md) (Chinese).
 
-```console
-dsh plugin --profile web add dsh-flash-presets@0.2.5   # Pin a published release
-```
+## The two presets
 
-### Direct installation from GitHub
+| Preset | id | Rules | Compaction | Use it when |
+|---|---|---:|---|---|
+| 轻量PTC-v3 lite | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
+| 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
 
-```console
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets
-```
+Both share the same compaction, trimming, plugin set, and PTC setup. Only the persona rules differ.
 
-This is useful for an unpublished branch or local changes. The same GitHub spec can be entered through **Plugins → Add plugin**.
+Lite's 13 rules fall into five groups: budget (count turns, not steps; aim for 20 or fewer, and stop to re-plan past roughly 60), sequencing (think briefly, run one cheap probe, and for submission tasks ship the smallest working artifact first), verification (one consolidated acceptance pass, then deliver — no extra random or stress rounds), tools and output (read files with read/glob/grep, batch calls, edit incrementally), and scope (answer in the user's language, stay in scope, keep secrets out of the session, switch approach after two failures).
 
-`--profile` accepts `web`, `desktop`, `headless`, or `acp`. The manager records this package in the profile's `dsh.profile.bundles` and applies the two insert entries from `cordis.patch.yml` (`v3-lite` and `v3-balance`), plus a `ptc-runtime` override that makes the PTC runtime persistent. The `web` profile uses live reload; the other profiles require a restart.
+Balance keeps only the three rules the harness can't enforce on its own: respect the user's language and scope, never put secrets into the session, and after two failed attempts change approach and report the exact command and output.
 
-To update, repeat the same `add` command, or remove and add the package again. To uninstall, remove the package from `dsh.profile.bundles` and the dependency list, then reinstall dependencies. Use `scripts/install.sh --uninstall` to remove the managed block written by the installer.
+Does the number of rules matter? We tested 0, 3, 7, and 13 rules on three task sets (n = 5–15) and found no measurable difference in either quality or tokens ([measured evidence](docs/实测证据.md), "三床 × 四臂"). At that sample size, differences smaller than about 2× are undetectable, so the honest reading is "no difference observed", not "no difference". The savings come mainly from the first three mechanisms above and from PTC, not from the wording of the rules.
 
-### Verification
+> A naming note for the evidence files: in the 2026-11-04 experiments, "v3" means the 13-rule preset (today's lite) and "lite" means the 3-rule preset (today's balance). The rename happened in 0.2.6.
 
-```console
-node scripts/verify-presets.mjs                  # Structure and value assertions
-node scripts/verify-yaml.mjs                     # YAML and cross-platform tag checks
-node scripts/compose-bundle-patch.mjs --check    # Assert cordis.patch.yml matches presets/*
-dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
-```
+## Measurements
 
-Set `DSH_HOME` or `DSH_PROFILE` to point these checks at a simulated installation.
+Every number below comes with its conditions and sample size. The experiments use different setups, so don't compare across tables.
 
-## Behavioral constraints
+### Office benchmark
 
-The v3 persona suffix contains 13 numbered rules in five groups:
-
-1. **Budget (rule 1):** count rounds rather than steps; if a run exceeds roughly 60 rounds, stop and re-plan instead of repeating the same loop.
-2. **Start order (rules 2–3):** make one short judgment and run one inexpensive probe before expanding the design; for answer-producing work, create a minimum viable artifact early.
-3. **Verification (rule 4):** deliver as soon as the acceptance gate passes; add rounds only for a failed check.
-4. **Tools and output (rules 5–9):** use read/glob/grep instead of shell browsing for files; batch independent calls; fold context as needed; control context size; edit incrementally.
-5. **Delivery and scope (rules 10–13):** answer in the user's language, stay within scope, never put secrets into the session, change approach after two failures, and adapt strategy to the route and model.
-
-## Office benchmark suites (benchmarks/office)
-
-Two fictional office-data suites for comparing models on "messy materials → strictly formatted deliverables":
-
-- **Office benchmark v1** (`benchmarks/office/base-v1/`, internal v5.0.0): tasks `O01`–`O08` (8 tasks)
-- **Office addendum v1** (`benchmarks/office/addendum-v1/`, internal v5.5.0): tasks `P01`–`P05` (5 tasks)
-
-```bash
-npm run bench:office       # structure + integrity + prompt/manifest header consistency
-npm run checklist:bench    # pre-release human review (collects evidence, you confirm three items)
-```
-
-Task data is synthetic (contains no real personal information); a three-layer sha256 chain pins every input -- **do not modify `inputs/`**.
-Editing a prompt means rewriting the matching `prompt_sha256`. Details: [benchmarks/office/README.md](https://github.com/LarryE135/dsh-flash-presets/blob/main/benchmarks/office/README.md).
-
-**Scoring rules are public; ground truth is private**: the rules live in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading) (v5 six-dimension weighted score
-vs v5.5 exact cell matching -- the two must not be mixed); ground truth and graders live in a separate **private** repository.
-`npm run guard:bench` keeps this repository clean (hash denylist + name denylist + no tabular files outside `inputs/`) and is wired
-into `npm run verify` and `prepublishOnly`. Benchmark data is not shipped in the npm package.
-
-## Measured results
-
-One full round per suite, averaged per group; **OPS refers to the `dsh-ops` project**; tokens **include cache reads**, in millions.
+Two synthetic suites of everyday office data-processing tasks: [Office benchmark v1](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/base-v1) (8 tasks) and [Office addendum v1](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/addendum-v1) (5 tasks). The table shows the mean tokens per configuration, including cache reads, in millions. OPS refers to [dsh-ops](https://github.com/T-Auto/dsh-ops).
 
 <!-- bench-table:begin（本块由 scripts/render-bench-table.mjs 生成，勿手改）-->
 | Setup | Office benchmark v1 | vs standard | Office addendum v1 | vs standard |
@@ -125,170 +90,194 @@ One full round per suite, averaged per group; **OPS refers to the `dsh-ops` proj
 
 ![Average token consumption on the office benchmark and addendum suites (including cache reads)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
 
-Three caveats: `OPS + PTC` has only 4 valid runs on the v1 benchmark (the chart labels it n=4), all others have 5;
-the two suites contain different tasks and are **not pooled** into a single ranking; this table covers tokens only —
-for quality scoring rules and ground-truth policy see [benchmarks/office/grading/](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading).
+How to read it:
 
-Two disclosures:
+- `lean-v3` is the 13-rule preset as it stood in 0.2.5; its rules are identical to today's lite.
+- "vs standard" also includes the gain from switching to PTC tools. To isolate the preset, compare against PTC mode instead: roughly −59.6% and −69.2% on the two suites (computed from the table).
+- Tokens only. Every run of every configuration was fully correct, so accuracy isn't broken out. Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
+- `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
+- Scoring rules are public in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading); ground truth and graders live in a private repository.
 
-- **Authored and graded by the same model, executed and graded in isolation**: both task authoring and grading used `GPT-6.1-Sol`; execution (the model answering) and scoring (comparing against ground truth) happen in isolated stages -- the answering environment can read neither the ground truth nor the grader.
-- **Correctness is not shown separately**: no significant difference in correctness was observed (every run was fully correct), so this table compares token consumption only and adds no separate accuracy presentation.
+### A controlled algorithm run
 
-## Known deviations (vs the official `preset-ptc`)
+Luogu P15114 (32 MB memory limit), DSH headless + PTC, n = 2:
 
-All three lean presets are trimmed-down versions of the official PTC preset. What we leave out:
+| Preset | Billed (M) | Steps | Wall clock (s) | Correct |
+|---|---:|---:|---:|---|
+| Standard | 7.03 | 66.5 | 719 | 2/2 |
+| v3 (today's lite) | 4.64 | 39.5 | 759 | 2/2 |
 
-| Official has, we do not | Impact | Why |
-|---|---|---|
-| `time-context` | no date or time in the prompt | saves tokens; tasks that need dates must supply them |
-| `tool-schedule` | no scheduled or periodic tools | not needed in the lean surface |
-| `tool-plugin-market` | cannot install plugins from chat | use `dsh plugin` instead |
+With every run correct, v3 billed about 66% of standard, at a slightly longer wall-clock time. Two runs per arm show a direction, not a statistically significant result.
 
-We ship three extras the official preset does not: `tool-subagent-codex`, `tool-subagent-claude-code`, `tool-ralph`.
+### Unfavorable results
 
-This is not a defect, but you should know it: if a task depends on the current date or on installing plugins from chat, the official preset is a better fit.
+These are as much a part of the presets as the savings — they mark where not to use them.
 
-## Compatibility
+- **Vague acceptance criteria hurt.** On P15654 with the original problem statement, v3 scored full marks in only one of three runs; both failures hit the 4 s time limit (4.00 s and 4.01 s). Standard mode scored full marks in both of its runs. Once the statement required a re-runnable verification log that must pass in full, v3 went three for three.
+- **On problems beyond the model, standard mode is the better deal.** USACO 2026 Platinum, two rounds combined: standard mode scored 51.5/80 on 51.4M tokens; the lean PTC preset scored 47.5/80 on 48.0M — about 7% cheaper and about 8% lower. These numbers come from the 0.2.0-era preset (before v3), are recorded in the [0.2.0 README](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/README-0.2.0.md), and have not been re-run with v3.
+- **More rules don't fix correctness.** Two candidates, v4 (an acceptance gate) and v4-b (a budget brake), left quality unchanged item for item across four experiments. v4 used 117% more tokens; v4-b's apparent savings vanished in a 3 × 8-task re-run. Both were rejected.
+- **Asking the model to assess difficulty and question the user first didn't help.** In a controlled comparison, that path scored a median ratio of 1.05–1.06 against 1.02 for simply starting (lower is better). The presets therefore contain no self-assessment step and don't ask questions before starting.
 
-This repository has been regression-tested against DSH 0.2.1-rc.5 (rc.2 was also tested) and 0.2.2-rc.1: a temporary `DSH_HOME` install that composes `flash-lean-ptc-v3` and `flash-lean-ptc-v3-balance`, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers. On 0.2.2-rc.1 the `desktop` profile was also tested live: `agentPresets/list` reports no `broken` diagnostics for either preset. The web profile uses live reload; desktop, headless, and acp require a restart because the patch layer is read at startup.
+Full data, withdrawn claims, and reproduction commands are in [measured evidence](docs/实测证据.md) (Chinese).
 
-The installer runs in Windows PowerShell, Ubuntu, and macOS CI (see the matrix in `.github/workflows/verify.yml`). macOS hardware has not been tested. The scripts are written for bash 3.2 compatibility; variables followed by non-ASCII text use `${var}`. The `!!js` tag in the patch is interpreted by the DSH loader and is rejected by generic YAML parsers.
+## How it relates to dsh-ops
 
-## Known limitations
+They work at different layers and can be installed side by side.
 
-The workflow “ask the model to assess difficulty first, then ask the user” did not help in testing. In the 2026-10-20 comparison, a run with only an acceptance-contract block had a median ratio of 1.05, while a run with the contract plus questions and answers had 1.06; both were worse than the direct-start ratio of 1.02. External grading and feeding failed items back into the next round were effective, so the presets do not include self-assessed difficulty or mandatory pre-start questions.
+- [dsh-ops](https://github.com/T-Auto/dsh-ops) works at the **tool layer**: it adds a set of ops tools and replaces or hides some official ones, so each call returns less.
+- dsh-flash-presets works at the **preset layer**: compaction thresholds, output trimming, which plugins load, and the rules the model follows.
 
-For measurement convenience, development and testing focused on public Luogu tasks and evaluated token usage, completion time, step count, runtime memory, and elapsed time. Those measurements do not cover every production workload; additional domains may require different presets.
+The office benchmark includes `OPS + standard` and `OPS + PTC`, but OPS combined with these presets hasn't been measured yet, so we make no claim about stacking them.
 
-## Troubleshooting: something looks off after installing
+## Install
 
-Start with one command instead of guessing:
+### With the plugin manager (recommended)
 
-```bash
-node scripts/doctor.mjs --profile web      # add --dump to also run dsh --dump-config
+The plugin manager installs the whole plugin card: both presets, the plan-mode component, the resident PTC runtime, and the legacy-id compatibility layer.
+
+```console
+# 0.2.6 from GitHub (tracks the main branch; use this until npm catches up)
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 ```
 
-It answers four things: is the DSH version new enough (plugin-row presets need 0.1.7+), is there exactly one managed block, are there stray legacy rows outside it, and does a standard YAML parser accept the file.
+> The 0.2.5 build on npm cannot start a new session on DSH 0.2.2-rc.1 (#19), so please don't install it. Once 0.2.6 is on npm, this line becomes `dsh-flash-presets@0.2.6`.
+
+`--profile` takes `web`, `desktop`, `headless`, or `acp`. Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
+
+Presets directly shape agent behavior, so pin a version when you need reproducible results. Without one, the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x.
+
+### Offline, or with the install script
+
+Download and unpack the archive from [Releases](https://github.com/LarryE135/dsh-flash-presets/releases), or clone the tag:
+
+```bash
+git clone --depth 1 -b v0.2.6 https://github.com/LarryE135/dsh-flash-presets.git
+cd dsh-flash-presets
+bash scripts/install.sh --profile web                  # Windows: scripts\install.ps1 -Profile web
+```
+
+The script writes a single managed block containing the two preset rows into the profile patch. It backs up the file first, and re-running it never creates a second block. The plan-mode component, the legacy-id layer, and the composition self-check are part of the plugin itself and only load when installed through the plugin manager. With `--with-plan-mode` (`-WithPlanMode` in PowerShell), the script also writes the resident PTC runtime setting into the profile.
+
+### Restart after installing
+
+Presets and runtime settings are read once, at process start.
+
+- `web` profile: reload the page.
+- `desktop`, `headless`, `acp`: quit the host completely and start it again. The classic symptom of skipping this is "the plugin is installed, but the `run_code` speedup isn't there".
+
+### Check the installation
+
+```bash
+dsh --profile web --dump-config | grep -c 'id: preset-'             # 6 (4 built-in + 2 from this package, with no other preset packages)
+dsh --profile web --dump-config | grep -c 'persistent-in-memory'    # 1
+dsh --profile web --dump-config | grep -c 'plan-mode-ui'            # 1
+node scripts/doctor.mjs --profile web                                # version, duplicate rows, !!js, YAML parsing in one pass
+```
+
+### Update and uninstall
+
+To update, run the same `add` again, or `remove` and then `add`.
+
+To uninstall:
+
+```console
+dsh plugin --profile web remove dsh-flash-presets     # if installed with the plugin manager
+bash scripts/install.sh --uninstall --profile web     # if installed with the script (Windows: scripts\install.ps1 -Uninstall)
+```
+
+pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, and `remove` doesn't clear it. It has no effect on the composed configuration.
+
+### Upgrading from 0.2.5
+
+- Preset ids changed: the 13-rule preset moved from `flash-lean-ptc-v3` to `flash-lean-ptc-v3-lite`, and the former 3-rule `flash-lean-ptc-v3-lite` is now `flash-lean-ptc-v3-balance`.
+- Old sessions still open. A runtime compatibility layer resolves 12 historical ids (including `flash-lean-ptc-v3` and `-v2`) to lite. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
+- If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
+- If the profile's `selectedDefault` still points at an old id, new sessions fail with `Unknown agent preset`. Set it to `flash-lean-ptc-v3-lite`.
+
+## Plan mode (optional component)
+
+The same plugin card carries a plan-mode component, plan-mode v1 (1.0.0). Within a single turn, the agent writes a plan, waits for your approval, then executes it, and writes the measured acceptance results back to the card at the end. The two halves divide the work cleanly: the presets govern how each turn spends its budget; plan mode makes the turn think before it acts.
+
+- The control sits to the left of the input box, with off / light / full levels independent of the preset.
+- Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 26% more tokens and about 33% more time ([changelog](docs/CHANGELOG.md), Chinese).
+- If you don't want it, switch the component off on the card. The presets behave exactly the same without it.
+
+## Getting the most out of it
+
+- **State the goal and how success is checked.** The sharper the criteria, the better the result; when the boundaries are fuzzy, pair it with plan or goal mode. The P15654 example above shows how large the difference can be.
+- **Raise the output limit.** 120K or more is recommended, 384K if you can, so long reasoning isn't cut off.
+- **On Windows**, install PowerShell 7 (the MSI build) or Git Bash first.
+- **Give long-thinking models one problem per session.** Handed several at once, a model may lay out every plan in a single response and get cut off upstream before it ever acts ([measured evidence](docs/实测证据.md), "跨模型").
+
+## Troubleshooting
+
+Run the checkup before guessing:
+
+```bash
+node scripts/doctor.mjs --profile web          # add --dump to also run dsh --dump-config
+node scripts/diag-preset-load.mjs --profile desktop   # when a preset card in the GUI shows "failed to load"
+```
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Two or three presets share the same name | legacy bare rows coexist with the new managed block | `node scripts/merge-presets.mjs --patch <path>` claims them automatically |
-| `js-yaml` reports `unknown tag tag:yaml.org,2002:js` | `!!js` is still in the file | `node scripts/doctor.mjs --fix` (backs up first) |
-| Presets never show up | DSH older than 0.1.7, or the wrong profile | upgrade DSH, or point `--profile` at the right one |
+| A preset card shows "failed to load" | A plugin the preset references can't be resolved. Most often a hand-edited preset still lists `.../dsh-tool-subagent-control/list-agents`, a subpath DSH 0.2.2-rc.1 removed | Locate it with `diag-preset-load.mjs` and delete that row |
+| The compact / plan / goal slash commands disappear, and the next message fails with `tool executor is unavailable` | A plugin hot reload released the preset composition of an open session and didn't remount it | Restart DSH. The plugin checks every 2 minutes and logs the remedy; set `DSH_FLASH_PRESETS_SELFCHECK_HEAL=1` to remount automatically |
+| Two or three presets with the same name | Bare rows from an old install sit next to the new managed block | Re-run the install script; it adopts and merges the old rows |
+| `js-yaml` reports `unknown tag` | The file still contains `!!js` tags | `node scripts/doctor.mjs --fix` (back up first) |
+| The presets don't appear at all | DSH is older than 0.1.7, or the wrong profile was targeted | Upgrade DSH, or point `--profile` at the right one |
 
-Note: the preset patch only defines the agent-side plugin set (persona + tools + folding chain). It does not touch the workspace picker, the directory selector, or the terminal plugins.
+The preset patch only defines the agent-side plugin set. It doesn't touch GUI pieces such as the workspace picker, the directory picker, or the terminal. If something unrelated to presets breaks after installing, please open an [issue](https://github.com/LarryE135/dsh-flash-presets/issues) with the doctor output and the browser console errors.
 
-## Notes for people and AI systems
+## Differences from the official PTC preset
 
-1. Set the output limit to at least 120K when using this package; if available, use 384K to avoid truncation during long reasoning sessions.
-2. This package is intended for DeepSeek V4.1 Flash. Other models are not guaranteed to behave the same way.
-3. Give the session a clear goal or acceptance criterion. When the boundary is unclear, plan mode or goal mode can help.
-4. Desktop and Windows users should consider installing MSI PowerShell 7 or Git Bash. This was itself associated with a noticeable improvement in testing. Ask the maintainer if you need installation help.
-5. This package installs preset rows only. It does not ship tools; if the profile lacks the corresponding plugin, these rows have no effect, and the installer does not add missing dependencies.
+| In the official preset, not here | What it means |
+|---|---|
+| `time-context` | The prompt carries no current date or time; state it yourself when a task needs it |
+| `tool-schedule` | No tool for scheduled or recurring tasks |
+| `tool-plugin-market` | No installing plugins from inside a conversation; use `dsh plugin` |
 
-6. Every plugin name in a preset must resolve on the target DSH. Since DSH 0.2.2-rc.1, `list_agents` ships inside `@deepseek-ai/dsh-tool-subagent-control`, and the `./list-agents` subpath export is gone; declaring that row marks the whole preset broken (the GUI shows it as failing to load).
+The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `workflow-ptc`, `tool-workflow`, `tool-ralph`, and the plugin-manager tools, all disabled. If you need any of these, the official preset is the easier choice.
 
-7. Since 0.2.7 the picker shows two real presets plus one compatibility alias: `flash-lean-ptc-v3-lite` (13 rules, default), `flash-lean-ptc-v3-balance` (3 rules), and `flash-lean-ptc-v3` (alias with the same content as lite). **Never rewrite the preset id stored in a session**: DSH keeps `session.v4.jsonl.zstd` as multi-frame zstd, and rewriting the whole file drops the event stream (that is why the 0.2.7 draft migration script no longer writes). Old lean-v3 sessions resolve through the alias; sessions recording `-v1` / `-v2` / `-v3b` still need a new preset choice.
+## Known limitations
 
-8. Restart the host after installing (desktop, headless, acp); the web profile only needs a page refresh, because the patch layer is composed at startup.
+- Under the headless profile on DSH 0.2.2-rc.1, both presets and plan mode stay pending and never take effect (each run reports `3 entries did not activate`). Use the web or desktop profile.
+- macOS hasn't been verified on real hardware. The install script is written for bash 3.2 and runs in CI on all three platforms.
+- The patch contains `!!js` tags that the DSH loader resolves; third-party YAML parsers report an unknown tag. The install script resolves them to plain values before writing to the profile.
+- Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
 
-## Repository layout
+## Development and checks
 
-```text
-presets/
-  flash-lean-ptc-v3-lite.patch.yml     Default preset (13 rules)
-  flash-lean-ptc-v3-alias.patch.yml    Compatibility alias (id flash-lean-ptc-v3, same content)
-  flash-lean-ptc-v3-balance.patch.yml  Weaker-constraint preset (3 rules)
-cordis.patch.yml                  Generated from presets/*; do not edit manually
-scripts/
-  install.sh / install.ps1        Installers, sharing merge-presets.mjs
-  merge-presets.mjs               Managed-block insertion and removal
-  compose-bundle-patch.mjs        Bundle patch composition
-  verify-presets.mjs              Structure and value assertions per preset
-  verify-yaml.mjs                 YAML and platform-tag checks
-  check-ps1.mjs                   Static PowerShell checks
-  check-bash32-cjk.mjs            bash 3.2 multibyte-variable guard
-  selftest.sh                     End-to-end self-test
-  publish.sh / publish.ps1        Push and create a release; version comes from README
-docs/PUBLISHING.md                Maintainer release process (npm, tag, and release cleanup)
-docs/                             Documentation and historical README files
-plugins/plan-rounds/              Experimental session-level plan-round controller; not published with the npm package
-candidates/                       Candidate presets not merged into the main version
-marketplace/                      Plugin marketplace submission material
-.github/workflows/verify.yml      Three-platform installation matrix and bundle assertions
+```console
+npm run verify          # composition, YAML, preset structure, text lint, version consistency, benchmark leak guard, and more
+npm run bench:office    # structure and integrity checks for the office benchmark (repo only; the npm package excludes benchmarks/)
+bash scripts/selftest.sh
 ```
+
+`cordis.patch.yml` is composed from `presets/*.patch.yml`; don't edit it by hand — CI asserts the two match. The measurement table in this README is generated from `docs/bench-office-results.json`. See [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md) for how to contribute.
 
 ## Version history
 
 ### v0.2.6 (2026-11-06)
 
-- Presets narrowed to two: `lean-ptc-v3 lite` (`flash-lean-ptc-v3-lite`, 13 rules, order 27, default) and `lean-ptc-v3 balance` (`flash-lean-ptc-v3-balance`, 3 rules, order 26); v1 / v2 / `v3 max` / `v3 none` leave the published package.
-- Plan mode ships inside the same package as a third component (plan-mode v1); the internal 0.7.x numbering is no longer published.
-- Runtime tuning ships with the package: `ptc-runtime: persistent-in-memory` removes the fixed `run_code` startup cost (108 ms to 0) and nested bash calls drop from 44 ms to 15 ms.
-- **Old-session compatibility without touching data:** preset ids stay `flash-lean-ptc-v3-lite` / `flash-lean-ptc-v3-balance`, and a compatibility alias `flash-lean-ptc-v3` (same content as lite, order 28) lets sessions recorded before 0.2.6 resolve by id. The draft session-migration script no longer writes: rewriting the multi-frame zstd log truncates the event stream.
-- **Upgrade notes:** 0.2.6 no longer used `flash-lean-ptc-v3` as a real preset id (0.2.7 restores it as a compatibility alias) and `flash-lean-ptc-v3-lite` went from 3 rules to 13; desktop / headless / acp require a restart.
-- The legacy directory-style entry point now fails explicitly (exit 3) instead of being skipped.
+- Two presets remain: lite (13 rules, default) and balance (3 rules). v1, v2, and the experimental variants are no longer shipped.
+- Plan mode moved back into the main package as the third component on the same card (plan-mode v1).
+- New runtime compatibility layer: 12 historical preset ids resolve to lite without rewriting session files.
+- New composition self-check, a four-layer alignment audit (`npm run audit:align`), and read-only concurrency marks for `glob` / `grep`.
+- Fixed: preset cards showed "failed to load" after DSH 0.2.2-rc.1 removed the `list-agents` subpath.
 
-### v0.2.5 (2026-10-30)
+Earlier releases: 0.2.5 installed only v3 by default; 0.2.2 made the package installable from npm; 0.2.1 made v3 the main preset; 0.2.0 introduced the bundle format; 0.1.0 was the first release. Details are in the [changelog](docs/CHANGELOG.md) (Chinese) and on the [Releases](https://github.com/LarryE135/dsh-flash-presets/releases) page.
 
-- **Only v3 is installed by default**: the bundle now composes `presets/flash-lean-ptc-v3.patch.yml` alone, so the preset list grows by exactly one entry; v1/v2 become reference versions installed explicitly with `--all` / `--all-presets` / `-AllPresets`
-- Installers: `install.sh` defaults to `PRESETS=(flash-lean-ptc-v3)`; `install.ps1` mirrors it and gains `-AllPresets`; legacy directory installs always use v1
-- Verification: `verify-yaml` now asserts the composed bundle contains v3 and no reference versions; `check-ps1` checks the installer list is a subset of `presets/` that includes the newest
-- **First npm release**: this package is now published to npm; the plan-mode plugin is still outside the npm release scope
+## Documentation (Chinese)
 
-- Installer claims historical leftovers: bare `- id: preset-flash-lean-ptc-vN` rows outside the managed block are removed and folded back in, so reinstalling never duplicates a preset.
-- Platform tags are resolved before writing, so no non-standard `!!js` tag lands in the profile; unknown expressions fail loudly instead of being guessed.
-- New `scripts/doctor.mjs`: one command checks the DSH version, managed-block count, stray rows, `!!js`, and standard YAML parsing; `--fix` repairs in place (with backup).
-- Hardened the verifier (issue #4): v3 now participates in YAML assertions; the generated `cordis.patch.yml` is verified too; installer branches cover v1/v2/v3; missing `js-yaml` exits with code 2 instead of failing open; CRLF profiles no longer produce false installation-layer failures.
-- Aligned documentation: v2/v3 compaction comments now match the actual 0.25 / 20000 values; the version table includes 0.2.2–0.2.5; `marketplace/plugin.json` matches the package version.
-- Changed `candidates/flash-lean-ptc-v4-plan-accept.patch.yml` to the `- insert:` form. Flat `- id:` entries are silently ignored inside the preset package.
-- Added plan mode.
-
-### v0.2.4 (2026-10-24)
-
-- Fixed npm package contents: `presets/legacy-0.1.5/` and `.gitattributes` were previously omitted, so npm installations could not access the old fallback and the bundled `verify-presets.mjs` reported three false failures.
-
-### v0.2.3 (2026-10-24)
-
-- Removed the contradiction between v3 rules 5 and 6, which disabled `head` while requiring `| head -40`; temporary-directory handling now covers PowerShell, cmd, and POSIX shells.
-- Added preset-text auditing and runtime composition assertions; CI now includes minimum-permission checks.
-- Fixed stale 0.2.3 references, tarball file counts, and repository-structure documentation.
-
-### v0.2.2 (2026-10-21)
-
-- Published `dsh-flash-presets` to npm.
-- Fixed two installation-layer false positives in `verify-presets.mjs`: installing only v3 no longer fails because v1/v2 are absent, and preset rows outside the managed block are recognized correctly.
-- Added `--repo-only` and `--all` verification modes.
-- Added a `prepublishOnly` guard that checks composition, YAML, and repository structure before publishing.
-
-### v0.2.1 (2026-10-20)
-
-- Made v3 (`lean-v3`) the main preset: order 27, 13 rules, compaction 0.25 / 20k.
-- Extended installers, composers, and verifiers to support all three presets.
-- Reworked `verify-presets.mjs` to verify each preset slice independently.
-- Completed simulated-install regression testing against DSH 0.2.1-rc.5 (rc.2 was also tested).
-
-### v0.2.0 (2026-09-30)
-
-- Declared the package as a DSH bundle with a single `cordis.patch.yml`, a composition script, and real CI installation checks.
-- Added v2 with step budgeting, fewer exploratory rounds, one combined verification pass, and an early minimum viable artifact.
-
-### v0.1.0 (2026-09-23 to 2026-09-24)
-
-- First release: v1 with compaction 0.3 / 50k, 14 constraints, and the PTC presentation layer.
-- Earlier v1.0.0, v1.0.1, and v1.1.0 tags belong to the same generation and are folded into this version. Those tags were removed when the 0.2.5 tags were rewritten; the remote now only carries `v0.1.0` and `v0.2.0`-`v0.2.5`.
-
-## Documentation
-
-[Measured evidence](docs/实测证据.md), [version and compatibility](docs/版本与兼容性.md), [the 0.2.0 historical README](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/README-0.2.0.md), and the [changelog](docs/CHANGELOG.md).
-
-Implementation notes: [technical reference](docs/技术文档-精简预设实现.md) and [the four token-saving mechanisms](docs/技术文档-省token四机制.md).
-
-Audit records: [full audit](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-全量.md), [re-check](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5-复检.md), and [earlier audit](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-0.2.5.md).
+- [Measured evidence](docs/实测证据.md): every experiment, including the conclusions that didn't hold
+- [Versions and compatibility](docs/版本与兼容性.md): version mapping and install regression
+- [Preset id contract and upgrades](docs/预设-id-契约与升级.md)
+- [The four token-saving mechanisms](docs/技术文档-省token四机制.md), [How the presets are implemented](docs/技术文档-精简预设实现.md)
+- [Changelog](docs/CHANGELOG.md)
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE)
 
 ## Maintainer
 

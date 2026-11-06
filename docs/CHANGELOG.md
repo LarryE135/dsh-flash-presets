@@ -37,6 +37,26 @@
 - **复现**：隔离实例起在 3099（自带 `--patch` 只把模型指向本机 WB Proxy，不改安装内容），用带 token 的入口打开会话发同一句提示词，然后 `node ~/.dsh/scripts/measure-tool-concurrency.mjs --dsh-home <隔离 home>`。测量时看每批的 `⇒ 并行/串行` 结论，别只看脚本末尾那句汇总（只要存在任一并行批它就会打印「并发确实发生」）。
 - 同版本其它校验：`npm run verify` 退出 0（含 `sync-lib --check`、`check-ps1`）；插件测试 25 项通过；四层对齐审计存储层 1622/1622、reject 0、无幽灵目录、`aliased 0 / orphan 0`；实机 DSH 0.2.2-rc.1（WSL）与 0.2.1-rc.5。
 
+### 第三方审计修复（2026-11-06 晚，P0/P1/P2 处理）
+
+审计报告共 36 条（P0 1 / P1 13 / P2 16 / P3 6）。本轮只处理**不改规则文本、不改预设行为**的部分；代码级改动另行排期（见本节末「未做」）。
+
+- **P0-1（npm 上 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话）**：README 明确「npm 上的 0.2.5 不可用；0.2.6 上 npm 之前从 GitHub / Release 附件安装」，安装节首选 `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6`。npm 端仍需 `npm login` 后 `npm deprecate dsh-flash-presets@0.2.5 "DSH 0.2.2-rc.1+ 下预设无法加载，请用 0.2.6+"` 并发布 0.2.6（本机 token 已过期）。
+- **P1-1 DSH 版本闸放错位置**：`engines` 原来嵌在 `dsh` 对象里，而 `dsh-app-boot` 只读**顶层** `fields.engines`（已核对该文件 1098-1102 行），等于没有任何闸。现改为顶层 `engines: { dsh: ">=0.2.1-rc.5 <0.2.3-0", node: ">=22.15" }`，`dsh.engines` 删除。
+- **P1-2 peer 自动安装旧包**：`@deepseek-ai/dsh-llm` 从 `"*"` 收窄到同区间，并加 `peerDependenciesMeta.optional`（与 `plugins/plan-mode-ui/package.json` 一致），避免 `npm i -g` 拉进 2026-08 的 0.0.1-rc.1。
+- **P1-5 预设数量/id 五处打架**：中英文 README、版本表、`cordis.patch.yml` 头注释模板统一为「两个预设：lite（13 条，默认）+ balance（3 条）；旧 id 由运行时 alias 解析，不建兼容卡」；删掉 README 里把 0.2.7–0.2.9 当成已发布版本的段落（改为指向本文件「同日迭代」）；删掉英文版里不存在的 `presets/flash-lean-ptc-v3-alias.patch.yml` 引用。
+- **P1-6 计划模式安装说明三套说法**：统一为「计划模式与常驻运行时只有 `dsh plugin add dsh-flash-presets` 才装；`install.sh` / `install.ps1` 只写两行预设」。删掉不存在的包名 `dsh-plan-mode-ui` 及对应命令，两个安装器的完成文案同步。
+- **P1-7 README 说「不动宿主」不成立**：README 顶部改为如实列出装后对整个 profile 生效的三项（PTC 常驻运行时、glob/grep 并发标记、旧预设 id 映射），并给关闭开关 `DSH_FLASH_PRESETS_CONCURRENCY=0` / `DSH_FLASH_PRESETS_ALIAS=0`。
+- **P1-8 alias 表泄漏本机实验 id**：`presets/legacy-preset-map.json` 只保留本包真实发布过的 5 个 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`），移除 `code` / `win-control` / `codex-contract-v1` / `-v3b` / `-v3-1` / `-v3-max` / `-v3-none` 以及全部 `sessions` 计数与本机备注。个人 id 改用新环境变量 `DSH_FLASH_PRESETS_ALIAS_EXTRA=<json>` 追加，不随包发布。
+- **P1-9 会话改写说法矛盾**：README 只保留「默认关闭，`DSH_FLASH_PRESETS_HEAL=1` 才开」；`files` 移除 `scripts/retarget-session-presets.mjs` 等会写会话的维护脚本（仍留在仓库）。
+- **P2-1 根包缺 `type` / `engines.node`，CI 用 Node 20**：加 `"type": "module"` 与 `engines.node >= 22.15`；CI 的 verify job 从 Node 20 升到 24。
+- **P2-2 / P2-3 包体积数字过期、`files` 过宽**：删掉文档里写死的文件数/体积（以 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize` 为准）；`files` 改为白名单，benchmark / AB / 迁移 / 发布类脚本不再进包。
+- **P2-4 / P2-5 description 自相矛盾**：`package.json` 与 `marketplace/plugin.json` 的中英文描述统一为两预设口径，`marketplace` 的 DSH 兼容区间同步。
+- **P2-8 / P2-15 个人路径与账号页**：`docs/实测证据.md` 的复现命令改用 `$HOME` 并注明「私有脚本，不在仓库」；`PUBLISHING.md` 的 token 页改为通用链接。
+- **P2-10 `tune-runtime.mjs` 忽略 `DSH_HOME`**：ROOT 改为 `(${process.env.DSH_HOME || ~/.dsh})/profiles`，隔离环境里跑安装器不再改真实 `~/.dsh`。
+- **P2-16 上游署名**：新增根目录 `NOTICE`（声明预设 agent 树与 `lib/` 复刻/改编自 deepseek-ai/deepseek-harness，MIT），并加进 `files`。
+
+**未做（需要改行为或改规则文本，留给下一个版本）**：P1-3（`dsh-agent-tool-presentation` → `dsh-tool-executor-ptc`，需先核实该包在 0.2.1-rc.5 是否存在）、P1-10（两个预设 description 的中性化措辞）、P1-11（CI 双版本矩阵 + mount 冒烟测试、canary 改每日）、P1-12（规则 4 的 `/usr/bin/time -v` 跨平台化）、P1-13（两套实测口径的原始数据补齐）、P2-12（启动日志合并、扫描频率下调）。P2-9（先发 Release 后 CI 变绿、tag 被移动）见上一节「发布验证」的记录；本轮 tag 未再移动。
 ### 同日迭代（0.2.7–0.2.14，未发布，已并入 0.2.6）
 
 ### 0.2.14（2026-11-06，A 的实测验收：发现「第一轮赶不上扫描」的竞态，改成决策点即时标记）

@@ -144,7 +144,7 @@ npm token list                          # 记下 id
 npm token revoke <id>                   # 实测 403：CLI 删不掉
 ```
 
-**必须去网页删**：<https://www.npmjs.com/settings/larrye/tokens>。bypass 2FA + 全包读写的 token 是长期凭证，发完即删；下次发版再临时建。
+**必须去网页删**：<https://www.npmjs.com/settings/~/tokens>。bypass 2FA + 全包读写的 token 是长期凭证，发完即删；下次发版再临时建。
 
 删掉后 `npm whoami` 失效是正常的。
 

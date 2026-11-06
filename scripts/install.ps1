@@ -29,7 +29,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# 0.2.5 起默认只装 v3；-AllPresets 装 v1/v2/v3 三份（A/B 对照用）
+# 0.2.6 起只有两个预设：lite（默认）与 balance；-AllPresets 与默认等价，保留以兼容旧脚本
 if ($AllPresets) { $Presets = @('flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance') }
 
 if ($Help) {
@@ -136,7 +136,7 @@ function Install-Modern {
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已安装：轻量PTC-v3 lite / 轻量PTC-v3 balance（选择器里就这两项）'
-  Write-Host '  计划模式是独立包：加 -WithPlanMode（或 dsh plugin add dsh-plan-mode-ui）'
+  Write-Host '  计划模式与常驻运行时只在 dsh plugin add dsh-flash-presets 时装；-WithPlanMode 仅做运行时调优'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-lite'"
   Write-Host '  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效'
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
@@ -149,7 +149,7 @@ function Install-PlanMode {
   # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
   Write-Host ""
   Write-Host "-- 计划模式（plan-mode v1）---------------------"
-  Write-Host "  已随本包安装，无需单独装 dsh-plan-mode-ui。"
+  Write-Host "  只有在 dsh plugin add 安装时才包含；本脚本不装。"
   if (Get-Command node -ErrorAction SilentlyContinue) {
     $tune = Join-Path $here 'scripts\tune-runtime.mjs'
     if (Test-Path $tune) { node $tune --apply --profile $Profile | Out-Null }

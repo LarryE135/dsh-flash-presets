@@ -2,7 +2,8 @@
   "name": "dsh-flash-presets",
   "version": "0.2.6",
   "private": false,
-  "description": "DSH Flash 精简预设：面向 flash 级路由做 token 效率优化的 agent 预设，以 DSH 组合包（dsh.bundle）形式安装到 profile。0.2.6 起只提供 v3（轻量PTC-v3，默认）与 v3 lite 与 v3 balance 两个预设，并把计划模式（plan-mode v1）作为本包的第三个组件一并提供。",
+  "type": "module",
+  "description": "DSH Flash 精简预设：两个 agent 预设（轻量PTC-v3 lite，13 条规则，默认；轻量PTC-v3 balance，3 条规则），以 DSH 组合包（dsh.bundle）形式安装到 profile，并附带计划模式组件（plan-mode v1）。",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -20,6 +21,10 @@
   "homepage": "https://github.com/LarryE135/dsh-flash-presets",
   "bugs": {
     "url": "https://github.com/LarryE135/dsh-flash-presets/issues"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.5 <0.2.3-0",
+    "node": ">=22.15"
   },
   "scripts": {
     "build": "node scripts/compose-bundle-patch.mjs",
@@ -48,24 +53,34 @@
     "lib/",
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v3-lite.patch.yml",
-    "presets/legacy-preset-map.json",
     "presets/flash-lean-ptc-v3-balance.patch.yml",
+    "presets/legacy-preset-map.json",
     "presets/compat-exceptions.json",
     ".gitattributes",
-    "scripts/",
-    "!scripts/publish.sh",
-    "!scripts/publish.ps1",
-    "!scripts/npm-downloads-badge.mjs",
-    "!scripts/lint-allowlist.json",
+    "NOTICE",
+    "scripts/install.sh",
+    "scripts/install.ps1",
+    "scripts/merge-presets.mjs",
+    "scripts/platform-tags.mjs",
+    "scripts/verify-yaml.mjs",
+    "scripts/verify-presets.mjs",
+    "scripts/verify-runtime.mjs",
+    "scripts/check-preset-compat.mjs",
+    "scripts/compose-bundle-patch.mjs",
+    "scripts/doctor.mjs",
+    "scripts/tune-runtime.mjs",
+    "scripts/diag-preset-load.mjs",
+    "scripts/audit-align.mjs",
+    "scripts/audit-compat.mjs",
     "docs/CHANGELOG.md",
     "docs/版本与兼容性.md",
     "docs/技术文档-省token四机制.md",
     "docs/技术文档-精简预设实现.md",
     "docs/实测证据.md",
+    "docs/预设-id-契约与升级.md",
     "README.md",
     "README.en.md",
-    "LICENSE",
-    "docs/预设-id-契约与升级.md"
+    "LICENSE"
   ],
   "main": "./lib/index.js",
   "exports": {
@@ -78,14 +93,16 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-llm": "*"
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.2.3-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    }
   },
   "dsh": {
     "bundle": {
       "patch": "cordis.patch.yml"
-    },
-    "engines": {
-      "dsh": ">=0.2.1-rc"
     },
     "client": {
       "platform": "web",

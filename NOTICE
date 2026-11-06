@@ -1,0 +1,14 @@
+dsh-flash-presets
+
+本包包含从 DeepSeek Harness 上游项目复刻或改编的文本与实现细节：
+
+  - 两个预设（presets/flash-lean-ptc-v3-lite.patch.yml、presets/flash-lean-ptc-v3-balance.patch.yml）
+    的 agent 树结构、plan-mode 提示词与工具清单，取自 @deepseek-ai/dsh-agent-preset 自带的预设；
+  - lib/ 中若干运行时行为（工具并发判定、会话 header 读取、preset 解析）是对上游 dsh-tools /
+    dsh-agent-preset 行为的复刻与最小包装。
+
+上游项目：deepseek-ai/deepseek-harness（MIT License）
+Copyright (c) DeepSeek
+
+上游以 MIT License 发布；本包同样以 MIT License 发布（见 LICENSE）。
+上游许可全文：https://github.com/deepseek-ai/deepseek-harness/blob/main/LICENSE
