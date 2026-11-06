@@ -39,7 +39,7 @@ while [ $# -gt 0 ]; do
     --all-presets) PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance); shift ;;
     --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
-    -h|--help)   sed -n '2,16p' "$0"; exit 0 ;;
+    -h|--help)   sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;
     *) echo "未知参数: $1（用 --help 看用法）" >&2; exit 2 ;;
   esac
 done
@@ -102,7 +102,7 @@ install_modern() {
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
-  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.7"
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.8"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall，否则预设会重复注册。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
@@ -151,19 +151,22 @@ install_legacy() {
 uninstall_modern() {
   [ -f "$PATCH" ] || { echo "缺少 ${PATCH}（无需卸载）" >&2; exit 0; }
   cp "$PATCH" "$PATCH.bak-$STAMP"
-  strip_patch
-  echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
-  # --with-runtime 写的那块在托管块之外：不撤掉的话，卸载后整个 profile 仍被改着。
+  # 顺序要紧：先撤 tune-runtime 块，再 strip 托管块。反过来的话，strip 看到文件里
+  # 还有 tune 块、不会补回 `[]`，撤完块就只剩空行 → 整个 profile 起不来（R1-2）。
+  local runtime_note=''
   if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
     if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
       node "$HERE/scripts/tune-runtime.mjs" --revert --profile "$PROFILE" >/dev/null 2>&1 || true
     fi
     if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
-      echo "⚠ 仍残留 tune-runtime 块，请手动检查 $PATCH" >&2
+      runtime_note="⚠ 仍残留 tune-runtime 块，请手动检查 $PATCH"
     else
-      echo "已一并撤掉 ptc-runtime 常驻运行时覆盖"
+      runtime_note='已一并撤掉 ptc-runtime 常驻运行时覆盖'
     fi
   fi
+  strip_patch
+  echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
+  [ -n "$runtime_note" ] && echo "$runtime_note"
 }
 
 uninstall_legacy() {

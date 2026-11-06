@@ -1,8 +1,8 @@
 {
   "id": "dsh-flash-presets",
   "name": "DSH Flash 精简预设",
-  "version": "0.2.7",
-  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. lite keeps the 13 rules the harness cannot enforce (default); balance keeps three.",
+  "version": "0.2.8",
+  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. lite keeps 13 rules (default); balance keeps only the 3 rules the harness cannot enforce.",
   "descriptionZh": "面向 flash 级路由的 token 效率预设，只发两个：lite（13 条规则，默认）与 balance（3 条规则）。旧 id 由运行时兼容层解析到 lite，不改写任何会话文件。",
   "author": {
     "name": "LarryE135",
@@ -30,9 +30,9 @@
   },
   "install": {
     "target": "npm",
-    "spec": "dsh-flash-presets",
-    "command": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets#v0.2.7",
-    "note": "npm 上的 latest 仍是 0.2.5（在 DSH 0.2.2-rc.1 下无法新建会话）；0.2.7 上 npm 之后可改用 dsh-flash-presets@0.2.7。"
+    "spec": "dsh-flash-presets@0.2.8",
+    "command": "dsh plugin --profile {profile} add dsh-flash-presets@0.2.8",
+    "git": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets#v0.2.8"
   },
   "verified": false,
   "maintainers": [

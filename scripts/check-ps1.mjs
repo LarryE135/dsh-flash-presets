@@ -42,6 +42,15 @@ check(/-not \(Test-Path \$src\)\)[\s\S]{0,300}?exit 3/.test(ps1 || ''),
 // 卸载 / 重复安装路径仍在
 check(/Uninstall-Legacy/.test(ps1 || ''), 'install.ps1 保留 legacy 卸载分支');
 
+// 卸载必须撤运行时覆盖（第三轮审计 R2-1：bash 版修了、ps1 只改了文案，静态检查当时没抓到）
+check(/function Revert-Runtime[\s\S]{0,800}?tune-runtime[\s\S]{0,200}?--revert/.test(ps1 || ''),
+      'install.ps1 的 Revert-Runtime 会调 tune-runtime --revert');
+check(/function Uninstall-Modern[\s\S]{0,400}?Revert-Runtime/.test(ps1 || ''),
+      'install.ps1 卸载时先撤运行时覆盖再删托管块');
+// R2-2：tune-runtime 只认 --profile，传 PowerShell 的 -Profile 会被静默忽略
+check(!/tune-runtime\.mjs\s+--\w+\s+-Profile/.test(ps1 || ''),
+      'install.ps1 没有把 PowerShell 的 -Profile 传给 tune-runtime');
+
 // Windows PowerShell 5.1 对无 BOM 的 .ps1 会按系统 ANSI(GBK) 解码 → 中文全乱码
 for (const f of ['install.ps1', 'publish.ps1']) {
   const buf = fs.readFileSync(path.join(here, f));

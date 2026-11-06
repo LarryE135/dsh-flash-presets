@@ -14,11 +14,11 @@
 
 它做的事情很朴素：上下文更早压缩，过长的工具输出只留头尾，用不上的工具不进系统提示，零碎的工具调用尽量并进一段 `run_code`。模型不会因此变聪明；变的是一次会话读多少、绕多少、何时收尾。
 
-整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。有两项是运行时对整个 profile 生效的，需要时都能关：`glob` / `grep` 的只读并发标记由本包补上（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭），旧 preset id 的解析也由本包接管（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
+整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.2.7（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.2.8（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> npm 上的 latest 仍是 0.2.5，它在 DSH 0.2.2-rc.1 上无法新建会话。0.2.7 上 npm 之前，请按[安装](#安装)从 GitHub tag 或 Release 附件装。
+> 从 npm 安装请写死版本号：`dsh-flash-presets@0.2.8`。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -105,22 +105,22 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 插件管理器会装上整张插件卡：两个预设、计划模式组件、常驻 PTC 运行时，以及旧 id 兼容层。
 
 ```console
-# 0.2.7，从 GitHub 按 tag 安装（锁死版本；npm 跟上之前用这条）
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.7
+# 0.2.8：npm 上按版本号装（锁死版本）
+dsh plugin --profile web add dsh-flash-presets@0.2.8
+# 不想走 npm 时，装同一个 tag
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.8
 ```
-
-> npm 上的 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话（#19），请不要再安装它。0.2.7 上 npm 之后，这里会换成 `dsh-flash-presets@0.2.7`。
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
-预设直接决定 agent 的行为，需要可复现时请写死版本号。用 npm 包名且不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.2.x 的最新版；`github:` 安装写的是 git 引用（`#v0.2.7`），不会自己漂移。
+预设直接决定 agent 的行为，需要可复现时请写死版本号。用 npm 包名且不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.2.x 的最新版；`github:` 安装写的是 git 引用（`#v0.2.8`），不会自己漂移。
 
 ### 离线或用脚本安装
 
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.2.7 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.8 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
@@ -218,7 +218,7 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 - 在 DSH 0.2.2-rc.1 的 headless profile 里，两个预设和计划模式都停在 pending，不会生效（每次运行会提示 `3 entries did not activate`）。请在 web 或 desktop profile 中使用。`acp` 完全没验证过。
 - macOS 没有在真机上验证过。安装脚本按 bash 3.2 兼容写法编写，并在三平台 CI 上运行。
 - 补丁含 `!!js` 标签，由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。安装脚本在写入 profile 前会把它解析成普通值。
-- `glob` / `grep` 的只读并发标记只在插件管理器安装时才有；脚本安装路径没有它（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
+- `glob` / `grep` 的只读并发标记只在插件管理器安装时才有（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）；脚本安装路径本来就没有它。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
 - 开发与测试主要围绕洛谷公开题库和上面的办公基准，其他类型任务的表现缺少数据。
 
 ## 开发与校验
@@ -232,6 +232,13 @@ bash scripts/selftest.sh
 `cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 里的实测表由 `docs/bench-office-results.json` 生成。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
 
 ## 版本历史
+
+### v0.2.8（2026-11-06）
+
+- 第三轮审计修正：修掉「`--with-runtime` 装过再 `--uninstall` 会把补丁写成空文件、profile 起不来」这个回归（卸载顺序改成先撤运行时块，撤块时补回 `[]`）；Windows 的 `-Uninstall` 也会撤运行时覆盖。
+- `tune-runtime` 不再静默忽略不认识的参数（`-Profile` 曾让它把覆盖写到所有 profile）；`doctor` 的第 3 节只判定现役两个预设、第 6 节不再建议装裸包名、发现问题时退出码 1；`install.sh --help` 不再截断末句。
+- `publish.sh` / `publish.ps1` 删掉移动 tag 的逃生阀（查不到远端就拒绝执行，附件改为按 tag 打包）；`verify-versions` 开始检查安装器、marketplace 与两份 README 里写死的版本。
+- npm 跳过 0.2.7 直接发 0.2.8：0.2.7 只存在于 GitHub tag `v0.2.7`。
 
 ### v0.2.7（2026-11-06）
 

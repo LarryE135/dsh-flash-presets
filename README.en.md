@@ -14,11 +14,11 @@ Agent presets for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-har
 
 The idea is simple: compact the context earlier, keep only the head and tail of oversized tool output, leave unused tools out of the system prompt, and fold scattered tool calls into a single `run_code` program. None of this makes the model smarter. It changes how much a session reads, how much it wanders, and when it stops.
 
-Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. Two things do apply to the whole profile at runtime, and both can be switched off: the plugin marks `glob` / `grep` as concurrency-safe (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables it), and it resolves legacy preset ids (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
+Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. **Three things do apply to the whole profile at runtime**: the resident PTC runtime (the `ptc-runtime` override in the patch, which affects **every** preset in that profile — the only way to switch it off is to remove this plugin card), the `glob` / `grep` concurrency marks (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them), and legacy preset-id resolution (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.2.7 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.2.8 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> npm still serves 0.2.5, which cannot start a session on DSH 0.2.2-rc.1. Until 0.2.7 lands there, install from the GitHub tag or the release archive (see [Install](#install)).
+> When installing from npm, pin the version: `dsh-flash-presets@0.2.8`. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 
@@ -105,22 +105,22 @@ How to read it:
 The plugin manager installs the whole plugin card: both presets, the plan-mode component, the resident PTC runtime, and the legacy-id compatibility layer.
 
 ```console
-# 0.2.7 from GitHub, pinned to the tag (use this until npm catches up)
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.7
+# 0.2.8 from npm, pinned to the version
+dsh plugin --profile web add dsh-flash-presets@0.2.8
+# or the same release as a tag, if you'd rather not use npm
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.8
 ```
-
-> The 0.2.5 build on npm cannot start a new session on DSH 0.2.2-rc.1 (#19), so please don't install it. Once 0.2.7 is on npm, this line becomes `dsh-flash-presets@0.2.7`.
 
 `--profile` is normally `web` or `desktop` (presets don't activate under `headless`, and `acp` is untested — see [Known limitations](#known-limitations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
 
-Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x; a `github:` install records a git ref (`#v0.2.7`) instead and won't drift.
+Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x; a `github:` install records a git ref (`#v0.2.8`) instead and won't drift.
 
 ### Offline, or with the install script
 
 Download and unpack the archive from [Releases](https://github.com/LarryE135/dsh-flash-presets/releases), or clone the tag:
 
 ```bash
-git clone --depth 1 -b v0.2.7 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.8 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows: scripts\install.ps1 -Profile web
 ```
@@ -218,7 +218,7 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 - Under the headless profile on DSH 0.2.2-rc.1, both presets and plan mode stay pending and never take effect (each run reports `3 entries did not activate`). Use the web or desktop profile. `acp` is completely unverified.
 - macOS hasn't been verified on real hardware. The install script is written for bash 3.2 and runs in CI on all three platforms.
 - The patch contains `!!js` tags that the DSH loader resolves; third-party YAML parsers report an unknown tag. The install script resolves them to plain values before writing to the profile.
-- The `glob` / `grep` concurrency marks only exist in a plugin-manager install; the script install doesn't have them (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them). Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
+- The `glob` / `grep` concurrency marks only exist in a plugin-manager install (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them); the script install never has them. Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
 - Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
 
 ## Development and checks
@@ -232,6 +232,13 @@ bash scripts/selftest.sh
 `cordis.patch.yml` is composed from `presets/*.patch.yml`; don't edit it by hand — CI asserts the two match. The measurement table in this README is generated from `docs/bench-office-results.json`. See [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md) for how to contribute.
 
 ## Version history
+
+### v0.2.8 (2026-11-06)
+
+- Third-round audit fixes: the regression where `--with-runtime` followed by `--uninstall` left an empty patch file and the profile would not boot (uninstall now reverts the runtime block first, and the revert restores `[]`); Windows `-Uninstall` now removes the runtime override too.
+- `tune-runtime` no longer silently ignores unknown arguments (`-Profile` used to apply the override to every profile); `doctor` checks only the two current presets in section 3, no longer suggests installing the bare package name in section 6, and exits 1 when it finds problems; `install.sh --help` no longer truncates its last line.
+- `publish.sh` / `publish.ps1` drop the move-the-tag escape hatch (they refuse to run when the remote tag can't be queried, and archive by tag); `verify-versions` now checks the versions hard-coded in the installers, the marketplace entry, and both READMEs.
+- npm skips 0.2.7 and goes straight to 0.2.8: 0.2.7 exists only as the GitHub tag `v0.2.7`.
 
 ### v0.2.7 (2026-11-06)
 

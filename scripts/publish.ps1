@@ -32,6 +32,15 @@ try {
   if (-not (git rev-parse -q --verify "refs/tags/$Tag")) {
     throw "本地没有标签 $Tag —— 请先提交并打标签：git tag -a $Tag -m '…'"
   }
+
+  # 与 publish.sh 对齐：远端已有的同名 tag 不得移动（fail-closed，查不到就拒绝）
+  $remoteTags = git ls-remote --tags origin "refs/tags/$Tag" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    throw "无法查询远端标签 $Tag（网络或权限问题）—— 查不到就不敢发"
+  }
+  if ($remoteTags) {
+    throw "远端已存在标签 $Tag —— 版本号一经发布不得复用。请升版本号后重新打标签"
+  }
   Write-Host "目标：$GhUser/$Repo（$Visibility），标签 $Tag"
 
   $existing = git remote get-url origin 2>$null
@@ -60,7 +69,8 @@ try {
     $zip = "dist\dsh-flash-presets-$Tag.zip"
     if (-not (Test-Path -LiteralPath $zip)) {
       New-Item -ItemType Directory -Force -Path dist | Out-Null
-      git archive --format=zip -o $zip HEAD
+      # 打 tag 而不是 HEAD：两者不一致时附件会对不上（第三轮审计 R1-1 之⑤）
+      git archive --format=zip -o $zip $Tag
     }
     gh release create $Tag $zip --title $Tag --notes '见 README 版本历史'
     Write-Host "完成：https://github.com/$GhUser/$Repo"

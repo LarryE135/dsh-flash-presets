@@ -75,10 +75,20 @@ if (existsSync(join(REPO, "dist"))) {
   check(badBundle.length === 0, "dist/ 组合包附件文件名带版本 " + base, badBundle.join(", "));
 }
 
+// ⑦ 安装器 / marketplace / README 里写死的 tag 必须等于当前版本（第三轮审计 R3-4）
+const tagSources = ["scripts/install.sh", "scripts/install.ps1", "marketplace/plugin.json", "README.md", "README.en.md"];
+for (const f of tagSources) {
+  if (!existsSync(join(REPO, f))) continue;
+  const tags = [...read(f).matchAll(/dsh-flash-presets(?:@|#v)(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  const wrong = [...new Set(tags.filter((v) => v !== base))];
+  check(wrong.length === 0, f + " 里写死的版本 = " + base, "出现 " + wrong.join(", "));
+}
+
 if (problems.length > 0) {
   console.error("✖ 版本号不一致（" + problems.length + " 处）：");
   for (const p of problems) console.error("  - " + p);
-  console.error("  改法：只改 package.json / plugins/plan-mode-ui/package.json，其余由 npm run sync:versions 同步。");
+  console.error("  改法：以 package.json（及 plugins/plan-mode-ui/package.json）为真源，逐处手改；");
+  console.error("        已发布版本的引用（npm 安装命令、marketplace 的 spec）用 node scripts/sync-published-version.mjs 同步。");
   process.exit(1);
 }
 console.log("✓ 版本号一致（主包 " + base + " · 插件 " + plugin + "）");

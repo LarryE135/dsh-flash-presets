@@ -1,6 +1,6 @@
 {
   "name": "dsh-flash-presets",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": false,
   "type": "module",
   "description": "DSH Flash 精简预设：两个 agent 预设（轻量PTC-v3 lite，13 条规则，默认；轻量PTC-v3 balance，3 条规则），以 DSH 组合包（dsh.bundle）形式安装到 profile，并附带计划模式组件（plan-mode v1）。",

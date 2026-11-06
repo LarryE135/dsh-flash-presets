@@ -54,6 +54,37 @@ roundtrip() { # $1=名字
   cmp -s "$TMP/$1.orig" "$home/profiles/web/cordis.patch.yml" && ok "${name}：卸载后逐字节还原" || bad "${name}：卸载后与原始不一致"
 }
 
+# --with-runtime → --uninstall 往返（第三轮审计 R1-2）：撤块时不能把末行 `[]` 一起带走，
+# 否则标准 profile 卸载后只剩注释，DSH 报 must be a top-level YAML array，整个 profile 起不来。
+runtime_roundtrip() { # $1=名字 $2=初始内容
+  local name="$1" home="$TMP/rt-$1"
+  mkdir -p "$home/profiles/web"; printf '%b' "$2" > "$home/profiles/web/cordis.patch.yml"
+  DSH_HOME="$home" bash scripts/install.sh --profile web --with-runtime >"$TMP/rt-$1.install.log" 2>&1 \
+    || { bad "${name}：--with-runtime 安装退出码非 0"; return; }
+  grep -q 'persistent-in-memory' "$home/profiles/web/cordis.patch.yml" \
+    && ok "${name}：--with-runtime 写入了常驻运行时" || bad "${name}：--with-runtime 没写入"
+  DSH_HOME="$home" bash scripts/install.sh --profile web --uninstall >"$TMP/rt-$1.uninstall.log" 2>&1 \
+    || { bad "${name}：卸载退出码非 0"; return; }
+  grep -q 'tune-runtime' "$home/profiles/web/cordis.patch.yml" \
+    && bad "${name}：卸载后仍残留 tune-runtime 块" || ok "${name}：卸载撤掉了运行时覆盖"
+  node -e '
+    const fs = require("fs");
+    const t = fs.readFileSync(process.argv[1], "utf8");
+    const body = t.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).join("\n").trim();
+    if (!(body === "[]" || /^-\s/m.test(body))) { console.error("不是顶层数组：" + JSON.stringify(body)); process.exit(1); }
+  ' "$home/profiles/web/cordis.patch.yml" >/dev/null 2>&1 \
+    && ok "${name}：卸载后仍是合法顶层数组" || bad "${name}：卸载后不是合法数组（profile 会起不来）"
+  if command -v dsh >/dev/null 2>&1; then
+    DSH_HOME="$home" dsh --profile web --dump-config >/dev/null 2>&1 \
+      && ok "${name}：卸载后 --dump-config 正常" || bad "${name}：卸载后 --dump-config 失败"
+  fi
+}
+
+step "--with-runtime 往返（标准补丁 / 空数组 / 只有注释）"
+runtime_roundtrip standard '# 注释头\n[]\n'
+runtime_roundtrip emptyarr '[]\n'
+runtime_roundtrip comments '# 只有注释\n'
+
 step "缺 profile 补丁层时的行为（按设计应当明确报错）"
 mkdir -p "$TMP/absent/profiles/web"
 if DSH_HOME="$TMP/absent" bash scripts/install.sh --profile web >"$TMP/absent.log" 2>&1; then

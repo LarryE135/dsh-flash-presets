@@ -35,7 +35,10 @@ const flag = n => argv.includes(n);
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const PRESETS = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3'];
+// 现役两个预设由补丁层/组合包提供；历史 id 只由运行时兼容层解析，不写入补丁（R3-9）。
+const CURRENT = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
+const LEGACY_IDS = ['flash-lean-ptc-v3'];
+const PRESETS = [...CURRENT, ...LEGACY_IDS];
 
 const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = opt('--profile', 'web');
@@ -114,13 +117,18 @@ const strayRows = PRESETS.filter(id => new RegExp('^-\\s*id:\\s*' + id + '\\s*$'
 // (?![\w-]) 而不是 \\b：`id: flash-lean-ptc-v3` 是 `-v3-lite` / `-v3-balance` 的子串，
 // 用 \\b 会把三个预设算成一个。
 const insideCount = id => (insideBlock.match(new RegExp('id: ' + id + '(?![\\w-])', 'g')) || []).length;
-for (const id of PRESETS) {
+for (const id of CURRENT) {
   const n = insideCount(id) + (strayRows.includes(id) ? 1 : 0);
   if (strayRows.includes(id)) warn(id + '：块内 ' + insideCount(id) + ' 份 + 块外残留 1 份 → 预设列表会重复');
   else if (n === 0 && bundleInstalled) ok(id + '：由组合包 dsh-flash-presets 提供');
   else if (n === 0) info(id + '：未安装');
   else if (n > 1) warn(id + '：出现 ' + n + ' 份（重复）');
   else ok(id + '：1 份');
+}
+// 历史 id 不写入补丁层（组合包里也没有这一行），出现才提示（R3-9）。
+for (const id of LEGACY_IDS) {
+  const n = insideCount(id) + (strayRows.includes(id) ? 1 : 0);
+  if (n > 0) warn(id + '：历史 id 不该写进补丁层（由兼容层解析），请删掉这 ' + n + ' 行');
 }
 if (strayRows.length > 0) problems.push('块外残留 ' + strayRows.length + ' 行（重装即可自动认领）');
 
@@ -164,6 +172,15 @@ if (!yaml) {
 // ── 6. 计划模式插件（可选组件）──────────────────────────────────────────────
 console.log('[6] 计划模式组件（plan-mode v1，随 dsh-flash-presets 提供）');
 const PLUGIN = 'dsh-flash-presets';
+// 安装命令一律钉版本：裸包名在 npm 上可能是旧版本（R2-3）。版本号从本包的 package.json 读，不写死。
+const pinnedSpec = () => {
+  try {
+    const pj = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8'));
+    return 'github:LarryE135/dsh-flash-presets#v' + pj.version;
+  } catch {
+    return 'github:LarryE135/dsh-flash-presets#v<本包版本>';
+  }
+};
 const profileDir = path.join(home, 'profiles', profile);
 const pluginDir = path.join(profileDir, 'node_modules', PLUGIN);
 if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
@@ -187,7 +204,15 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
     warn('profile 依赖里有 ' + PLUGIN + '@' + dep + '，但 node_modules 里没有 —— 重装一次：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
     problems.push('插件声明存在但未落盘');
   } else {
-    warn('本包未安装：dsh plugin --profile ' + profile + ' add ' + PLUGIN + '（计划模式组件随包提供）');
+    if (blocks > 0) {
+      // 脚本安装的 profile：不能照「add <裸包名>」装第二遍 —— 会和托管块里的两行叠成重复注册（R2-3）。
+      warn('本包未装成插件卡（当前是脚本安装：托管块里是两个预设行）');
+      info('计划模式组件、旧 id 兼容层、glob/grep 只读并发只随插件卡提供。要换插件卡，先卸掉脚本写的行：');
+      info('  bash scripts/install.sh --profile ' + profile + ' --uninstall');
+      info('  dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
+    } else {
+      warn('本包未安装：dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
+    }
   }
 }
 const stateFile = path.join(home, 'plan-mode-ui', 'state.json');
@@ -272,3 +297,6 @@ if (problems.length === 0) {
   console.log('      再跑：node scripts/doctor.mjs --profile ' + profile + (tagLines.length ? ' --fix' : ''));
   console.log('      仍不对：cp "' + patchPath + '.bak-*" "' + patchPath + '"  回滚到安装前');
 }
+// 有 problems 时退出码 1：CI 与「体检」才能真正失败（第三轮审计 R3-8）。
+// --warn-only 保留旧的「只看输出、不影响退出码」用法。
+if (problems.length > 0 && !flag('--warn-only')) process.exitCode = 1;

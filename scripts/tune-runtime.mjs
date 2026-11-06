@@ -19,6 +19,21 @@ import { execFileSync } from 'node:child_process';
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
 const REVERT = A.includes('--revert');
+// 不认识的参数直接报错退出：`-Profile web`（PowerShell 写法）曾被静默忽略，
+// 于是 --apply 落到了每一个 profile 上（第三轮审计 R2-2）。
+{
+  const KNOWN = new Set(['--apply', '--revert', '--profile']);
+  const stray = [];
+  for (let i = 0; i < A.length; i++) {
+    if (A[i] === '--profile') { i++; continue; }
+    if (!KNOWN.has(A[i])) stray.push(A[i]);
+  }
+  if (stray.length) {
+    console.error('不认识的参数：' + stray.join(' ') + String.fromCharCode(10)
+      + '用法：node scripts/tune-runtime.mjs [--check] [--apply | --revert] [--profile <名称>]');
+    process.exit(2);
+  }
+}
 // 只有显式 --profile 才收窄；环境里的 DSH_PROFILE 不参与，否则默认只查一个 profile 很坑。
 const only = (() => {
   const i = A.indexOf('--profile');
@@ -111,7 +126,11 @@ function revertB(dir, st) {
   if (at < 0) return 'nothing';
   const nl = text.indexOf(String.fromCharCode(10), at);
   const end = nl < 0 ? text.length : nl + 1;
-  const next = text.slice(0, start) + text.slice(end);
+  let next = text.slice(0, start) + text.slice(end);
+  // 撤块之后如果只剩注释/空行，补回 `[]`：DSH 要求补丁文件是顶层数组，
+  // 注释-only 会被解析成 undefined，整个 profile 起不来（第三轮审计 R1-2）。
+  const hasEntry = next.split(String.fromCharCode(10)).some((l) => l.trim() && !l.trim().startsWith('#'));
+  if (!hasEntry) next = next.replace(/\s+$/, '') + (next.trim() ? String.fromCharCode(10) : '') + '[]' + String.fromCharCode(10);
   const bak = backup(st.file);
   fs.writeFileSync(st.file, next);
   const left = fs.readFileSync(st.file, 'utf8');

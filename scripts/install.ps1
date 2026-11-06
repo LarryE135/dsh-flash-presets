@@ -137,7 +137,7 @@ function Install-Modern {
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已写入：两行预设 —— 轻量PTC-v3 lite / 轻量PTC-v3 balance。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
-  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.2.7"
+  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.2.8"
   Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall，否则预设会重复注册。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-lite'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
@@ -161,13 +161,28 @@ function Install-Runtime {
     Write-Host "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
     Write-Host "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
   } else {
-    Write-Host "  ⚠ 未能写入常驻运行时；两个预设不受影响，可手动跑 node scripts\tune-runtime.mjs --apply -Profile $Profile"
+    Write-Host "  ⚠ 未能写入常驻运行时；两个预设不受影响，可手动跑 node scripts\tune-runtime.mjs --apply --profile $Profile"
+  }
+}
+
+# -Uninstall：先撤 tune-runtime 块，再删托管块（顺序同 bash 版，否则 `[]` 会丢，见 R1-2）。
+function Revert-Runtime {
+  if (-not (Select-String -Path $patch -Pattern '# >>> tune-runtime' -Quiet -ErrorAction SilentlyContinue)) { return }
+  $tune = Join-Path $here 'scripts\tune-runtime.mjs'
+  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path $tune)) {
+    node $tune --revert --profile $Profile | Out-Null
+  }
+  if (Select-String -Path $patch -Pattern '# >>> tune-runtime' -Quiet -ErrorAction SilentlyContinue) {
+    Write-Host "  ⚠ 仍残留 tune-runtime 块，请手动检查 $patch"
+  } else {
+    Write-Host '  已一并撤掉 ptc-runtime 常驻运行时覆盖'
   }
 }
 
 function Uninstall-Modern {
   if (-not (Test-Path $patch)) { Write-Host "缺少 ${patch}（无需卸载）"; return }
   Copy-Item $patch "$patch.bak-$stamp"
+  Revert-Runtime
   Invoke-Merge @('--remove')
   Write-Host "已移除托管块（备份 cordis.patch.yml.bak-${stamp}）"
 }

@@ -22,14 +22,18 @@ git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
 # 硬规则：远端已有的同名 tag 不得移动。
 # 第二轮审计 N1-1：v0.2.6 一晚被移过 5 次，同一个版本号对应了 6 个提交，按 tag 安装的用户
 # 锁文件各不相同，却都叫 0.2.6。要重发请升版本号，不要 force-push 标签。
-if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG" 2>/dev/null || true)" ]; then
-  if [ "${ALLOW_TAG_MOVE:-0}" != "1" ]; then
-    echo "✖ 远端已存在标签 $TAG —— 版本号一经发布不得复用。" >&2
-    echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑本脚本。" >&2
-    echo "  确属误发、必须在同号上补一处修正时：ALLOW_TAG_MOVE=1 重跑，并在 CHANGELOG 里如实记录移动过。" >&2
-    exit 1
-  fi
-  echo "⚠ ALLOW_TAG_MOVE=1：允许移动已存在的标签 ${TAG}（请在 CHANGELOG 里记录这次移动）。"
+# 第三轮审计 R1-1：原来的 ALLOW_TAG_MOVE 逃生阀没有任何约束力（脚本的 push 不带 -f，开了阀也推不上去），
+# 真正能拦住移动的是 GitHub 的 tag 规则集。这里改成 fail-closed：查不到远端就拒绝执行。
+if ! remote_tags="$(git ls-remote --tags origin "refs/tags/$TAG" 2>/dev/null)"; then
+  echo "✖ 无法查询远端标签 ${TAG}（网络或权限问题）—— 查不到就不敢发，避免覆盖已发布的版本。" >&2
+  exit 1
+fi
+if [ -n "$remote_tags" ]; then
+  echo "✖ 远端已存在标签 $TAG —— 版本号一经发布不得复用。" >&2
+  echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑本脚本。" >&2
+  echo "  真的需要同号补一处修正：在 GitHub 上临时放宽 tag 规则集 → 手工 git tag -f + git push -f →" >&2
+  echo "  在 CHANGELOG 与 Release 里如实记录移动路径 → 立刻恢复规则集。本脚本不提供这个入口。" >&2
+  exit 1
 fi
 
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -38,7 +42,8 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   git push -u origin main
   git push origin "$TAG"
   mkdir -p dist
-  [ -f "dist/dsh-flash-presets-$TAG.zip" ] || git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" HEAD
+  # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
+  [ -f "dist/dsh-flash-presets-$TAG.zip" ] || git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
   gh release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
   echo "完成：https://github.com/$GH_USER/$REPO"
 else

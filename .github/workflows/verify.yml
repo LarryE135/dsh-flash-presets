@@ -269,15 +269,32 @@ jobs:
           mkdir -p /tmp/pkg && npm pack --ignore-scripts --pack-destination /tmp/pkg
           mkdir -p /tmp/pkg/x && tar xzf /tmp/pkg/*.tgz -C /tmp/pkg/x
           ls /tmp/pkg/x/package
-      - name: 从解包目录跑用户侧脚本（doctor --all / tune-runtime / verify-presets）
+      - name: 从解包目录跑用户侧脚本（doctor / tune-runtime / verify-presets）
         run: |
           export DSH_HOME=/tmp/pkg-home
           mkdir -p "$DSH_HOME/profiles/web"
           printf -- '- id: placeholder\n' > "$DSH_HOME/profiles/web/cordis.patch.yml"
           P=/tmp/pkg/x/package/scripts
-          node "$P/doctor.mjs" --profile web --all
-          node "$P/tune-runtime.mjs" --profile web || true
-          node "$P/verify-presets.mjs" --repo-only || true
+          # 这个环境里 doctor 必然有 problems（没装 dsh，dump-config 跑不起来），退出码应为非 0（R3-8）
+          if node "$P/doctor.mjs" --profile web --all > /tmp/doctor.out 2>&1; then
+            echo "::error::doctor 有 problems 却退出 0"; cat /tmp/doctor.out; exit 1
+          fi
+          if ! node "$P/doctor.mjs" --profile web --all --warn-only > /tmp/doctor2.out 2>&1; then
+            echo "::error::doctor --warn-only 不应退出非 0"; cat /tmp/doctor2.out; exit 1
+          fi
+          if ! grep -q '旧 id 由运行时兼容层解析' /tmp/doctor.out; then
+            echo "::error::doctor 第 7 节没有兼容层说明"; cat /tmp/doctor.out; exit 1
+          fi
+          # 打包件里 tune-runtime 要能真写进去、再撤干净（R1-2 那道回归的防线）
+          node "$P/tune-runtime.mjs" --apply --profile web
+          if ! grep -q 'persistent-in-memory' "$DSH_HOME/profiles/web/cordis.patch.yml"; then
+            echo "::error::tune-runtime --apply 没写入"; exit 1
+          fi
+          node "$P/tune-runtime.mjs" --revert --profile web
+          if grep -q 'tune-runtime' "$DSH_HOME/profiles/web/cordis.patch.yml"; then
+            echo "::error::tune-runtime --revert 没撤干净"; exit 1
+          fi
+          node "$P/verify-presets.mjs" --repo-only
       - name: 断言包内不含写会话的维护脚本
         run: |
           for f in migrate-legacy-preset-ids.mjs retarget-session-presets.mjs; do
