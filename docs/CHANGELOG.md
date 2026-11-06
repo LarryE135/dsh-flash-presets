@@ -8,6 +8,8 @@
 
 第三轮第三方审计（对象 `ad5ea0c` / `9c5117e`）的修正版。**npm 跳过 0.2.7 直接发 0.2.8**：0.2.7 有一个卸载回归，
 装上它再用 `--uninstall` 会让 profile 起不来（见第一条）。本版**不改预设规则文本、不改模型行为**。
+发布后按作者要求做了一次标签移动（`801d49a` → 第四轮审计的修正提交），GitHub 上的 `v0.2.8` 与 npm 上的 0.2.8
+是同一份代码，Release 附件已同步重打；移动的做法与原因写在该 Release 的说明里。
 
 ### 修掉的
 
@@ -48,12 +50,35 @@
 - 本文件：同日迭代的 `0.2.14 … 0.2.7` 改名为 `0.2.6-iter14 … 0.2.6-iter7`（历史上同一天存在第二个「0.2.7」）；
   并订正 0.2.7 一节里 3 处与实际不符的说法。
 
+### 第四轮全量审计（2026-11-06，并入同一版）
+
+作者自审（1 P1 / 7 P2 / 13 P3）后合并修复，仍以 0.2.8 发布：`v0.2.8` 标签从 `801d49a` 移到本节所在提交，
+Release 说明里记了这次移动，zip 附件也按新标签重新打包覆盖（文件名不变，sha256 变了）。
+
+- **P1 · `lib/compat-heal.js` 的帧切分改成按 zstd 帧头逐块走**（等价上游 `scanZstdFrames`）。原来靠扫 magic 字节：
+  压缩数据里出现同样的 4 个字节就会切错帧，改写后 DSH 读会话会报 `corrupt Zstandard session log: invalid frame magic`。
+  校验也从「比切片字节」（用的是同一套偏移，切错了自己也跟着错，属于自证）改成**逐帧解压比文本** + 首帧必须是改写后的 header；
+  末尾帧不完整就整份不动。拿 6 个真实会话实测：首帧改写成功、其余帧文本完全一致、二次运行 healed=0。
+- **`lib/index.js` 写 `sessions.json` 原来没有锁**：与 `state.json` 共用一套跨进程锁（`withLock`），临时文件名带 pid。
+- **`lib/tool-concurrency.js` 的 500ms 兜底扫描改成前 60 秒快扫、之后 5 秒一次**（新会话有 `agent/created` 事件即时补标，
+  不必永久全量扫）；定时器句柄换成 `Set`，卸载时清空。
+- **`doctor` 补 `--help`**（列出参数与退出码口径）；`merge-presets.mjs` 的错误提示不再推荐 0.2.6 就删掉的 `--legacy`。
+- **README / EN 的「重复注册」说法按实测改写**：两条路径都装不会报错（`--dump-config` 仍退出 0），只是每个预设出现两张卡；
+  `agent-preset/invalid` 是**预设定义解析失败**的错误码，不是重复注册。
+- **CI**：`verify.yml` 补 `concurrency`（同分支取消旧运行）；Windows 增加 `install.ps1 -WithRuntime` → `-Uninstall` 往返用例
+  （此前 `-WithRuntime` 分支从未在 CI 跑过）；`npm-downloads-badge.yml` 的 node 从 20 改 24。
+- **小项**：`scheduleCompatHeal()` 的守卫改成 `!== '1'`（原来只在 `=== '0'` 时返回，直接调用会绕过「默认关闭」）；
+  `tune-runtime` 新增 `--no-backup`，两个安装器调用它时都传（原来每装一次多两个 `.bak-tune-*`），
+  并在装卸结束时把这两类备份裁到最近 10 个；`--all-presets` 写进 `install.sh --help`；`package.json` 补 `author`；
+  README 补 `DSH_PLAN_TODO_SYNC` / `DSH_PLAN_LAG_TURNS` 两个环境变量。
+
 ### 仍未做
 
 - 需要改模型行为的：`tool-presentation` → `tool-executor-ptc`、规则 4 跨平台写法、两个预设的 description 中性化、
   并发标记与 runtime 覆盖收窄到本包预设、日志噪音与轮询间隔（进 0.3.0）。
 - 锚点检查对 `docs/` 内部链接、重名标题、代码块里的 `#` 仍有盲区（现状实测没有失效链接）。
 - 主基准出处两套口径（README 写 n=5 / 8 题，技术文档写 n=3 / 12 题）待作者确认哪一份对。
+- 非标准结尾的补丁文件（末尾多空行、或缺末行换行）卸载后仍不保证逐字节还原；标准注释头 + `[]`、纯 `[]`、纯注释、CRLF 都能还原。
 
 ## 0.2.7（2026-11-06，发布）
 

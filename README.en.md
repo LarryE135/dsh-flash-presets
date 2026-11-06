@@ -127,7 +127,7 @@ bash scripts/install.sh --profile web                  # Windows: scripts\instal
 
 The script writes a single managed block containing the two preset rows into the profile patch. It backs up the file first, and re-running it never creates a second block. The plan-mode component, the legacy-id layer, and the composition self-check are part of the plugin itself and only load when installed through the plugin manager. The plan-mode component, the legacy-id layer, the composition self-check and the `glob`/`grep` concurrency marks are all part of the plugin, so only a plugin-manager install brings them. With `--with-runtime` (formerly `--with-plan-mode`; `-WithRuntime` in PowerShell) the script also writes a profile-level `ptc-runtime: persistent-in-memory` — that one applies to **every** preset in the profile, and `--uninstall` removes it too.
 
-The two paths are either/or: if the script already wrote the preset rows and you want the plugin card instead, run `--uninstall` first, or the presets get registered twice (`agent-preset/invalid`).
+The two paths are either/or: if the script already wrote the preset rows and you want the plugin card instead, run `--uninstall` first. Having both does not error out (`--dump-config` still exits 0), but every preset shows up twice in the picker (8 preset rows measured in the patch). `agent-preset/invalid` is the error code for a **preset definition that fails to parse**, not for duplicates.
 
 ### Restart after installing
 
@@ -219,6 +219,7 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 - macOS hasn't been verified on real hardware. The install script is written for bash 3.2 and runs in CI on all three platforms.
 - The patch contains `!!js` tags that the DSH loader resolves; third-party YAML parsers report an unknown tag. The install script resolves them to plain values before writing to the profile.
 - The `glob` / `grep` concurrency marks only exist in a plugin-manager install (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them); the script install never has them. Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
+- The plan-mode component also reads two environment variables: `DSH_PLAN_TODO_SYNC=off|remind|strict` (default `remind`) controls whether todo writes are reminded or required, and `DSH_PLAN_LAG_TURNS=<n>` (default 2) is how many turns behind the run may fall before a nudge; they mirror the `todoSync` / `lagTurns` plugin config keys.
 - Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
 
 ## Development and checks

@@ -127,7 +127,7 @@ bash scripts/install.sh --profile web                  # Windows：scripts\insta
 
 脚本只向 profile 补丁写入一个托管块，里面是两个预设行；写入前会备份原文件，重复运行不会产生第二份。计划模式组件、旧 id 兼容层、组合自检与 `glob`/`grep` 并发标记属于插件本体，只有通过插件管理器安装才会加载。加 `--with-runtime`（旧名 `--with-plan-mode`；PowerShell 为 `-WithRuntime`）时，脚本会额外把 profile 级的 `ptc-runtime: persistent-in-memory` 写进该 profile —— 这一项对该 profile 的**所有**预设生效，`--uninstall` 会一并撤掉。
 
-两条路径**二选一**：已经用脚本写过预设，要改装插件卡，请先 `--uninstall`，否则预设会重复注册（`agent-preset/invalid`）。
+两条路径**二选一**：已经用脚本写过预设，要改装插件卡，请先 `--uninstall`。两条都装不会报错（`--dump-config` 仍退出 0），但选择器里每个预设会出现两张卡（实测补丁里 8 行预设）。`agent-preset/invalid` 是**预设定义解析失败**时的错误码，不是重复注册。
 
 ### 装完要重启
 
@@ -219,6 +219,7 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 - macOS 没有在真机上验证过。安装脚本按 bash 3.2 兼容写法编写，并在三平台 CI 上运行。
 - 补丁含 `!!js` 标签，由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。安装脚本在写入 profile 前会把它解析成普通值。
 - `glob` / `grep` 的只读并发标记只在插件管理器安装时才有（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）；脚本安装路径本来就没有它。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
+- 计划模式组件的两个开关也可以从环境变量给：`DSH_PLAN_TODO_SYNC=off|remind|strict`（默认 `remind`）控制是否提醒/强制写 todo，`DSH_PLAN_LAG_TURNS=<n>`（默认 2）是进度落后几回合才提示；等价于插件配置里的 `todoSync` / `lagTurns`。
 - 开发与测试主要围绕洛谷公开题库和上面的办公基准，其他类型任务的表现缺少数据。
 
 ## 开发与校验

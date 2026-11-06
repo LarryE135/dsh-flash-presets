@@ -170,7 +170,7 @@ function Revert-Runtime {
   if (-not (Select-String -Path $patch -Pattern '# >>> tune-runtime' -Quiet -ErrorAction SilentlyContinue)) { return }
   $tune = Join-Path $here 'scripts\tune-runtime.mjs'
   if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path $tune)) {
-    node $tune --revert --profile $Profile | Out-Null
+    node $tune --revert --profile $Profile --no-backup | Out-Null
   }
   if (Select-String -Path $patch -Pattern '# >>> tune-runtime' -Quiet -ErrorAction SilentlyContinue) {
     Write-Host "  ⚠ 仍残留 tune-runtime 块，请手动检查 $patch"

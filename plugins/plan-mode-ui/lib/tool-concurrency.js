@@ -28,6 +28,11 @@ const DEFAULT_TARGETS = ["glob", "grep"];
 // （2026-11-06 实测：会话 18:53:12.79 挂载，三个 grep 在 18:53:17.88 就发完了，扫描没赶上）。
 const DEFAULT_SWEEP_MS = 500;
 const WARMUP_MS = 1200;
+// 前 60 秒按 sweepMs（默认 500ms）扫：会话挂载到第一轮工具调用只有几秒，慢不得。
+// 之后退到 SLOW_SWEEP_MS：新会话有 agent/created 事件即时补标，兜底扫描没必要一直 500ms
+// （第四轮审计 P2-4：原来每 500ms 永久全量扫，每次 O(agents × targets)）。
+const FAST_WINDOW_MS = 60000;
+const SLOW_SWEEP_MS = 5000;
 // 只读工具的探测参数：只为确认“分类函数返回 true”，不会真的执行
 const PROBE = { pattern: "*" };
 
@@ -156,7 +161,7 @@ export function installToolConcurrency(ctx, options) {
   const sweepMs = Number.isFinite(Number(opts.sweepMs)) && Number(opts.sweepMs) >= 1000 ? Math.floor(Number(opts.sweepMs)) : DEFAULT_SWEEP_MS;
   const targetSet = new Set(targets);
   // lazy：决策点勾子上“顺手”标上的定义（不在扫描列表里），卸载时也要撤
-  const state = { tools: null, marked: new Map(), loggedScopes: 0, timers: [], hook: null, lazy: new Set() };
+  const state = { tools: null, marked: new Map(), loggedScopes: 0, timers: new Set(), hook: null, lazy: new Set() };
 
   const remember = (key, names, scope) => {
     if (names.length === 0) return;
@@ -222,7 +227,20 @@ export function installToolConcurrency(ctx, options) {
           }
         } catch (error) {}
       }, WARMUP_MS);
-      const timer = setInterval(() => { try { sweep(child, false); } catch (error) {} }, sweepMs);
+      // 自续期定时器：快扫 60s → 慢扫兜底。用 Set 记录存活句柄，卸载时统一清掉。
+      const fastUntil = Date.now() + FAST_WINDOW_MS;
+      let delayMs = sweepMs;
+      const chain = () => {
+        const handle = setTimeout(() => {
+          state.timers.delete(handle);
+          if (Date.now() > fastUntil) delayMs = Math.max(sweepMs, SLOW_SWEEP_MS);
+          try { sweep(child, false); } catch (error) {}
+          chain();
+        }, delayMs);
+        try { if (typeof handle.unref === "function") handle.unref(); } catch (error) {}
+        state.timers.add(handle);
+      };
+      chain();
       // 新会话挂载时立刻补标记（扫描只是兜底）
       try {
         child.on("agent/created", (payload) => {
@@ -237,7 +255,8 @@ export function installToolConcurrency(ctx, options) {
           } catch (error) {}
         });
       } catch (error) {}
-      for (const t of [warmup, timer]) { try { if (typeof t.unref === "function") t.unref(); } catch (error) {} state.timers.push(t); }
+      try { if (typeof warmup.unref === "function") warmup.unref(); } catch (error) {}
+      state.timers.add(warmup);
       try { sweep(child, false); } catch (error) { say("error", TAG + " 首扫失败（已忽略）:" + msgOf(error)); }
     });
   } catch (error) {
@@ -248,6 +267,7 @@ export function installToolConcurrency(ctx, options) {
     if (typeof ctx.effect === "function") {
       ctx.effect(() => () => {
         for (const timer of state.timers) { try { clearTimeout(timer); clearInterval(timer); } catch (error) {} }
+        state.timers.clear();
         if (typeof state.hook === "function") { try { state.hook(); } catch (error) {} }
         for (const entry of state.lazy) { try { if (typeof entry.def.isConcurrencySafe === "function") delete entry.def.isConcurrencySafe; } catch (error) {} }
         if (state.tools !== null) {

@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# 同一分支的连续推送取消前一次运行：省 CI 额度，也不会让旧提交的红灯盖住新提交的绿灯。
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: verify (${{ matrix.os }})
@@ -47,6 +52,20 @@ jobs:
       - name: Install presets (PowerShell)
         if: runner.os == 'Windows'
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome "$env:RUNNER_TEMP/dsh"
+
+      # 之前 Windows 只测过默认安装，-WithRuntime 分支（写 ptc-runtime 再撤掉）从没在 CI 里跑过。
+      - name: PowerShell -WithRuntime roundtrip
+        if: runner.os == 'Windows'
+        run: |
+          $h = "$env:RUNNER_TEMP/dsh-runtime"
+          New-Item -ItemType Directory -Force -Path "$h/profiles/web" | Out-Null
+          pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome $h -WithRuntime
+          $p = "$h/profiles/web/cordis.patch.yml"
+          if (-not (Select-String -Path $p -Pattern 'ptc-runtime: persistent-in-memory' -Quiet)) { throw "-WithRuntime 没有写入 ptc-runtime" }
+          pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome $h -Uninstall
+          if (Select-String -Path $p -Pattern 'ptc-runtime: persistent-in-memory' -Quiet) { throw "-Uninstall 没有撤掉 ptc-runtime" }
+          if (-not (Select-String -Path $p -Pattern '^\[\]$' -Quiet)) { throw "卸载后补丁不是空数组" }
+          Write-Host "  -WithRuntime 往返 ok"
 
       - name: Re-install to prove idempotence
         shell: bash

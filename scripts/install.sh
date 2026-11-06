@@ -10,6 +10,7 @@
 #   bash scripts/install.sh                        # profile "web" (autodetect)
 #   bash scripts/install.sh --profile desktop      # another profile
 #   bash scripts/install.sh --with-runtime         # 额外写入 profile 级 PTC 常驻运行时
+#   bash scripts/install.sh --all-presets          # 与默认等价（两个预设都写），保留以兼容
 #   bash scripts/install.sh --uninstall            # remove the managed block（含运行时覆盖）
 #   DSH_HOME=/tmp/dsh bash scripts/install.sh       # custom DSH home
 #
@@ -118,7 +119,8 @@ install_runtime() {
     echo "  未找到 node 或 tune-runtime.mjs，已跳过（不影响两个预设）。"
     return 0
   fi
-  node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" >/dev/null 2>&1 || true
+  # --no-backup：install_modern 开头已经整份备份过，不必再留一份 .bak-tune-*
+  node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" --no-backup >/dev/null 2>&1 || true
   if grep -q 'executionMode: persistent-in-memory' "$PATCH" 2>/dev/null; then
     echo "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
     echo "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
@@ -148,6 +150,26 @@ install_legacy() {
   echo "安装完成（旧版机制）。重启 DSH 后在预设列表选择「Flash 精简·PTC v1」。"
 }
 
+# 我们自己的备份文件会随每次安装/卸载累积（.bak-<时间戳> 与 .bak-tune-<时间戳>）。
+# 只保留最近 10 个、且只动这两类命名，避免把用户自己的备份删掉。
+prune_backups() {
+  local dir keep=10 patterns=( "cordis.patch.yml.bak-[0-9]*-[0-9]*" "cordis.patch.yml.bak-tune-[0-9]*" )
+  dir="$(dirname "$PATCH")"
+  local f list=()
+  for f in "$dir"/cordis.patch.yml.bak-[0-9]*-[0-9]* "$dir"/cordis.patch.yml.bak-tune-[0-9]*; do
+    [ -e "$f" ] || continue
+    list+=("$f")
+  done
+  [ "${#list[@]}" -le "$keep" ] && return 0
+  # 按修改时间从新到旧，删掉第 keep+1 个之后的
+  local i=0
+  while IFS= read -r f; do
+    i=$((i+1))
+    [ "$i" -gt "$keep" ] || continue
+    rm -f "$f"
+  done < <(ls -1t "${list[@]}" 2>/dev/null)
+}
+
 uninstall_modern() {
   [ -f "$PATCH" ] || { echo "缺少 ${PATCH}（无需卸载）" >&2; exit 0; }
   cp "$PATCH" "$PATCH.bak-$STAMP"
@@ -156,7 +178,8 @@ uninstall_modern() {
   local runtime_note=''
   if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
     if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
-      node "$HERE/scripts/tune-runtime.mjs" --revert --profile "$PROFILE" >/dev/null 2>&1 || true
+      # --no-backup：下面已经有整份 .bak-${STAMP}，不必再留一份 .bak-tune-*
+      node "$HERE/scripts/tune-runtime.mjs" --revert --profile "$PROFILE" --no-backup >/dev/null 2>&1 || true
     fi
     if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
       runtime_note="⚠ 仍残留 tune-runtime 块，请手动检查 $PATCH"
@@ -168,6 +191,7 @@ uninstall_modern() {
   echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
   # 不能写成 `[ -n "$x" ] && echo`：$x 为空时这一行整体返回 1，set -e 会让卸载直接失败（CI 抓到过）。
   if [ -n "$runtime_note" ]; then echo "$runtime_note"; fi
+  prune_backups
 }
 
 uninstall_legacy() {

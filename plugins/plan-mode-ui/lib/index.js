@@ -197,11 +197,15 @@ function loadPlanned() {
 function savePlanned() {
   try {
     mkdirSync(join(dshHome(), "plan-mode-ui"), { recursive: true });
-    const tmp = SESSIONS_PATH() + ".tmp";
-    const planned = {};
-    for (const [key, ts] of plannedSessions) planned[key] = ts;
-    writeFileSync(tmp, JSON.stringify({ version: 1, planned }, null, 2));
-    renameSync(tmp, SESSIONS_PATH());
+    // 同一 $DSH_HOME 可能同时跑多个实例（桌面端 + CLI）：和 state.json 一样加跨进程锁，
+    // 临时文件名带 pid，避免两个进程抢同一个 .tmp（第四轮审计 P2-5）。
+    withLock(SESSIONS_PATH() + ".lock", () => {
+      const tmp = SESSIONS_PATH() + "." + process.pid + ".tmp";
+      const planned = {};
+      for (const [key, ts] of plannedSessions) planned[key] = ts;
+      writeFileSync(tmp, JSON.stringify({ version: 1, planned }, null, 2));
+      renameSync(tmp, SESSIONS_PATH());
+    });
   } catch (error) {
     console.error("[plan-mode-ui] persist sessions failed:", error);
   }
@@ -835,7 +839,7 @@ function save() {
   }
   try {
     mkdirSync(join(dshHome(), "plan-mode-ui"), { recursive: true });
-    const tmp = storePath() + ".tmp";
+    const tmp = storePath() + "." + process.pid + ".tmp";
     writeFileSync(tmp, JSON.stringify(state, null, 2));
     renameSync(tmp, storePath());
   } catch (error) {
@@ -849,9 +853,8 @@ function sleepSync(ms) {
 
 // 跨进程写锁：同一 $DSH_HOME 上可能同时跑多个实例（桌面端 + CLI），
 // 单纯 rename 覆盖会让最后写入者把别人的改动抹掉。加锁 + 写前以磁盘为准重载。
-function withStateLock(fn) {
+function withLock(lock, fn) {
   const dir = join(dshHome(), "plan-mode-ui");
-  const lock = storePath() + ".lock";
   let fd = null;
   try { mkdirSync(dir, { recursive: true }); } catch (error) {}
   for (let i = 0; i < 120 && fd === null; i++) {
@@ -872,6 +875,11 @@ function withStateLock(fn) {
       try { unlinkSync(lock); } catch (error) {}
     }
   }
+}
+
+// state.json 的锁沿用同一实现（原来这两处是各自一份代码，savePlanned 那份根本没有锁）。
+function withStateLock(fn) {
+  return withLock(storePath() + ".lock", fn);
 }
 
 function sendJson(res, status, body) {

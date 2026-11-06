@@ -161,7 +161,7 @@ try {
       out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol);
     } else {
       console.error('✖ 该补丁文件不是「块状数组」形式（可能是 [{...}] 之类的流式写法）。');
-      console.error('  请先改成块状数组，或用 --legacy 安装旧式目录预设。');
+      console.error('  请先把这个文件改回块状数组（形如 `[]` 或 `- ...` 开头），再跑一次。');
       process.exit(3);
     }
   }

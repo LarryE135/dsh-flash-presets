@@ -40,6 +40,26 @@ const CURRENT = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
 const LEGACY_IDS = ['flash-lean-ptc-v3'];
 const PRESETS = [...CURRENT, ...LEGACY_IDS];
 
+if (argv.includes('--help') || argv.includes('-h')) {
+  console.log([
+    'dsh-flash-presets doctor —— 体检这套预设的安装状态（只读；除 --fix 外不改文件）',
+    '',
+    '  node scripts/doctor.mjs [选项]',
+    '',
+    '  --profile <名称>   profile 名，默认 web',
+    '  --patch <路径>     直接指定补丁文件（默认 $DSH_HOME/profiles/<profile>/cordis.patch.yml）',
+    '  --all              全部检查（含 --sessions 与 --dump）',
+    '  --dump             顺带跑 dsh --dump-config，确认合成配置认得这些预设',
+    '  --sessions         检查旧会话的 preset id（只读扫描，不改写任何会话文件）',
+    '  --fix              把 !!js 平台标签解析成普通值后写回（写前备份）',
+    '  --warn-only        发现问题也退出 0（默认退出码 1）',
+    '  -h, --help         打印本帮助',
+    '',
+    '退出码：0 干净（或 --warn-only）· 1 发现 problems · 2 参数/环境错误',
+  ].join('\n'));
+  process.exit(0);
+}
+
 const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = opt('--profile', 'web');
 const patchPath = path.resolve(opt('--patch', path.join(home, 'profiles', profile, 'cordis.patch.yml')));

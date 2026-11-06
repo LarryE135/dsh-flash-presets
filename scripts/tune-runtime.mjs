@@ -19,10 +19,13 @@ import { execFileSync } from 'node:child_process';
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
 const REVERT = A.includes('--revert');
+// --no-backup：安装器卸载时已经整份备份过补丁文件，撤块不必再留一份 .bak-tune-*
+// （否则每装一次就多两个备份文件，永久累积）。
+const NO_BACKUP = A.includes('--no-backup');
 // 不认识的参数直接报错退出：`-Profile web`（PowerShell 写法）曾被静默忽略，
 // 于是 --apply 落到了每一个 profile 上（第三轮审计 R2-2）。
 {
-  const KNOWN = new Set(['--apply', '--revert', '--profile']);
+  const KNOWN = new Set(['--apply', '--revert', '--profile', '--no-backup']);
   const stray = [];
   for (let i = 0; i < A.length; i++) {
     if (A[i] === '--profile') { i++; continue; }
@@ -65,6 +68,7 @@ ${MARK}
 `;
 
 function backup(file) {
+  if (NO_BACKUP) return '(未备份)';
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const dst = `${file}.bak-tune-${stamp}`;
   fs.copyFileSync(file, dst);
