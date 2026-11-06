@@ -3,8 +3,8 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v3-balance
-        name: "轻量PTC-v3 balance"
-        description: "约束较弱的预设，适用于需要模型发挥的场景。"
+        name: "精简·PTC balance"
+        description: "约束较弱的预设，适用于需要模型发挥的场景；id 固定为 flash-lean-ptc-v3-balance。"
         order: 26
         plugins:
           - id: persona

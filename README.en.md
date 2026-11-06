@@ -57,12 +57,12 @@ For the reasoning behind each setting, with source line references, see the [fou
 
 | Preset | id | Rules | Compaction | Use it when |
 |---|---|---:|---|---|
-| 轻量PTC-v3 (Lean PTC-v3; formerly lean-v3) | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | Default. Covers most day-to-day work; the id is fixed and never renamed again |
-| 轻量PTC-v3 balance (Lean PTC-v3 balance) | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
-| 兼容·PTC v1 (compat card) | `flash-lean-ptc-v1` | 14 | 0.3 / 50k | **Compatibility card**: the 0.2.5 rules kept verbatim so sessions created then resolve to their own preset |
-| 兼容·PTC v2 (compat card) | `flash-lean-ptc-v2` | 12 | 0.25 / 20k | **Compatibility card**: same idea, v2's rules kept verbatim |
+| 精简·PTC v3 (lean-v3) | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | Default. The original lean-v3 identity; the id is fixed and never renamed again |
+| 精简·PTC balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
+| Flash 精简·PTC v1 | `flash-lean-ptc-v1` | 14 | 0.3 / 50k | The 0.2.5 v1 rules kept verbatim; serves sessions created back then |
+| Flash 精简·PTC v2 | `flash-lean-ptc-v2` | 12 | 0.25 / 20k | The 0.2.5 v2 rules kept verbatim; same purpose |
 
-All four share the same compaction/trimming framework and plugin set; only the persona rule text differs. The two compatibility cards are **verbatim copies of the 0.2.5 rules** (the only edit is dropping the upstream-removed `dsh-tool-subagent-control/list-agents` subpath), so they are exempt from the writing-standard checks applied to current presets. They sit at the end of the picker (order 91/92); pick one of the two current presets for new sessions.
+All four share the same compaction/trimming framework and plugin set; only the persona rule text differs. v1 and v2 are **verbatim copies of the 0.2.5 rules** (the only edit is dropping the upstream-removed `dsh-tool-subagent-control/list-agents` subpath), so they are exempt from the writing-standard checks applied to current presets; they keep their 0.2.5 order (21/22). Pick one of the first two for new sessions. The `-lite` name that 0.2.7–0.2.8 used was just a rename of v3 with identical rules — it now exists only as a historical id resolved by the compatibility layer, not as a card.
 
 v1's 14 rules and v2's 12 rules are frozen history and no longer evolve; the two paragraphs below describe only the current presets.
 

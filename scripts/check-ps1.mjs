@@ -80,7 +80,10 @@ check(/\*\.ps1[^\n]*eol=lf/.test(ga), '.gitattributes 把 *.ps1 钉为 LF（声�
 
 // 两个安装器的完成文案必须逐字提到同一批预设（防单侧漂移）
 const sh = read(path.join(here, 'install.sh')) || '';
-const listOf = s => (s.match(/轻量PTC-v[0-9]+(?:\s*max)?/g) || []).map(x => x.replace(/\s+/g, ' '));
+// 显示名口径随 0.2.9 改为「精简·PTC v3（lean-v3）」/「精简·PTC balance」；正则按「精简·PTC」前缀取，
+// 兼容旧文案里的「轻量PTC-v3」，避免包名改名后这条一致性断言静默失效。
+const listOf = s => (s.match(/(?:精简·PTC|轻量PTC)[^「」，、/\n]*/g) || [])
+  .map(x => x.trim().replace(/[。，、'"”’\s]+$/, ''));
 const shNames = listOf(sh);
 const psNames = listOf(ps1 || '');
 const uniq = a => [...new Set(a)].sort();

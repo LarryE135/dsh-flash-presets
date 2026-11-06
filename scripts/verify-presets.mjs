@@ -41,8 +41,8 @@ const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
   // 兼容卡：0.2.5 的原规则原样注册，只为让那时的会话解析到自己
-  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 91, legacy: false, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 92, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: false, thr: '0.3', retain: '50000' },
+  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
 };

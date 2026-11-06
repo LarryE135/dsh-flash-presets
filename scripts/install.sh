@@ -100,7 +100,7 @@ install_modern() {
   validate_patch
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
-  echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
+  echo "「精简·PTC v3（lean-v3）」与「精简·PTC balance」。"
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
   echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.9"

@@ -5,8 +5,8 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v3
-        name: "轻量PTC-v3"
-        description: "13 条硬约束的默认预设，适用于绝大部分日常工作；id 稳定，旧会话可直接打开。"
+        name: "精简·PTC v3（lean-v3）"
+        description: "lean-v3：13 条硬约束的默认预设，适用于绝大部分日常工作。id 一直是 flash-lean-ptc-v3，不再改名，旧会话可直接打开。"
         order: 27
         plugins:
           - id: persona

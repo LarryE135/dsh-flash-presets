@@ -16,12 +16,15 @@
 ### 改动
 
 - **lite 的 id 回到 `flash-lean-ptc-v3`**：`presets/flash-lean-ptc-v3.patch.yml`（原 `-lite.patch.yml`）里条目 id 与
-  `config.id` 都是 `flash-lean-ptc-v3`，`name` 简化为「轻量PTC-v3」，`description` 注明 id 稳定、旧会话可直接打开。
+  `config.id` 都是 `flash-lean-ptc-v3`，`name` 用回 lean-v3 的叫法「精简·PTC v3（lean-v3）」，`description` 注明
+  id 稳定、旧会话可直接打开。0.2.7–0.2.8 那个 `-lite` 只是 v3 的一次改名，规则与 v3 完全相同，**不再做成卡片**，
+  只作为历史 id 交给兼容层解析。
   规则文本一字未动（仍是 13 条），order 仍为 27。
 - **v1/v2 变成真实兼容卡，不再被映射**：`presets/flash-lean-ptc-v1.patch.yml`、`-v2.patch.yml` 从 tag `v0.2.5`
   原样取回（14 条 / 12 条规则、压缩 0.3·50k / 0.25·20k 全部不变），唯一改动是删掉上游已移除的
-  `dsh-tool-subagent-control/list-agents` 子路径；显示名改成「兼容·PTC v1/v2（历史 id）」，order 移到 91/92，
-  description 注明只服务旧会话。这样 0.2.5 及更早创建的会话解析到的是**它们自己的预设**，规则不进任何跨 id 对齐。
+  `dsh-tool-subagent-control/list-agents` 子路径。显示名与 order 都按 v0.2.5 原样（`Flash 精简·PTC v1/v2`、21/22），
+  description 里注明只服务旧会话。这样 0.2.5 及更早创建的会话解析到的是**它们自己的预设**，规则不进任何跨 id 对齐，
+  选择器里的位置也与 0.2.5 一致。
   两张卡的文本按「冻结」处理：`lint-presets` 对它们豁免「规则自相矛盾」「POSIX 路径」两项写作规范检查（当年
   的文本就是那样），其余检查照做。
 - **兼容层收敛到 3 个别名**：`presets/legacy-preset-map.json` 的 canonical 仍是 `flash-lean-ptc-v3`，别名表只留

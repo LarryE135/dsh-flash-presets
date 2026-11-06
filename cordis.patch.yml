@@ -1,6 +1,6 @@
 # dsh-flash-presets —— 组合包补丁层（bundle patch）
 # 本文件叠加四个预设行：两个现役 + 两张历史 id 兼容卡。
-#   轻量PTC-v3（flash-lean-ptc-v3，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、
+#   精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条，默认）、精简·PTC balance（flash-lean-ptc-v3-balance，3 条）、
 #   兼容卡：PTC v1（flash-lean-ptc-v1，14 条）、PTC v2（flash-lean-ptc-v2，规则文本原样保留），
 #   只为让 0.2.5 及更早的会话解析到自己的预设，不被映射到别的 id；
 #   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；
@@ -14,9 +14,9 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v1
-        name: "兼容·PTC v1（历史 id）"
-        description: "0.2.5 及更早版本的 14 条硬约束原样保留，只用于解析那时创建的会话；新建会话请选「轻量PTC-v3」。压缩阈值 0.3 / 保留 50k。"
-        order: 91
+        name: "Flash 精简·PTC v1（v4.1-flash）"
+        description: "0.2.5 及更早版本的 14 条硬约束原样保留，只用于解析那时创建的会话；新建会话请选「精简·PTC v3（lean-v3）」。压缩阈值 0.3 / 保留 50k。"
+        order: 21
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
@@ -221,9 +221,9 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v2
-        name: "兼容·PTC v2（历史 id）"
-        description: "0.2.5 及更早版本的规则原样保留，只用于解析那时创建的会话；新建会话请选「轻量PTC-v3」。压缩阈值 0.25 / 保留 20k。"
-        order: 92
+        name: "Flash 精简·PTC v2（v4.1-flash）"
+        description: "0.2.5 及更早版本的 12 条规则原样保留，只用于解析那时创建的会话；新建会话请选「精简·PTC v3（lean-v3）」。压缩阈值 0.25 / 保留 20k。"
+        order: 22
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
@@ -417,8 +417,8 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v3
-        name: "轻量PTC-v3"
-        description: "13 条硬约束的默认预设，适用于绝大部分日常工作；id 稳定，旧会话可直接打开。"
+        name: "精简·PTC v3（lean-v3）"
+        description: "lean-v3：13 条硬约束的默认预设，适用于绝大部分日常工作。id 一直是 flash-lean-ptc-v3，不再改名，旧会话可直接打开。"
         order: 27
         plugins:
           - id: persona
@@ -618,8 +618,8 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v3-balance
-        name: "轻量PTC-v3 balance"
-        description: "约束较弱的预设，适用于需要模型发挥的场景。"
+        name: "精简·PTC balance"
+        description: "约束较弱的预设，适用于需要模型发挥的场景；id 固定为 flash-lean-ptc-v3-balance。"
         order: 26
         plugins:
           - id: persona

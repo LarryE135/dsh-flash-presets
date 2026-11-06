@@ -16,8 +16,8 @@ import { execFileSync } from 'node:child_process';
 
 const EXPECT = {
   // 0.2.9 起：两个现役（lite 的 id 稳定为 flash-lean-ptc-v3）+ 两张历史 id 兼容卡（v1/v2，原规则）
-  'flash-lean-ptc-v1': { order: 91, rules: 14, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v2': { order: 92, rules: 12, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v1': { order: 21, rules: 14, thr: '0.3', retain: '50000' },
+  'flash-lean-ptc-v2': { order: 22, rules: 12, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { order: 26, rules: 3, thr: '0.25', retain: '20000' },
 };

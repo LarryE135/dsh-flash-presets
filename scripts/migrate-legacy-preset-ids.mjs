@@ -50,7 +50,7 @@ const HOME = val('--dsh-home') ?? process.env.DSH_HOME ?? path.join(os.homedir()
 const log = (...a) => { if (!QUIET) console.log(...a); };
 
 /**
- * 历史 id → 现行 id `flash-lean-ptc-v3`（显示名「轻量PTC-v3 lite」）。lean 系列全部对齐：
+ * 历史 id → 现行 id `flash-lean-ptc-v3`（显示名「精简·PTC v3（lean-v3）」）。lean 系列全部对齐：
  * `-v3b`、`-v3-lite`（0.2.6 期间用过的 id）、`flash-lean-ptc`、`flash-lean` 都算 ——
  * 它们本质是同一个精简预设的历代命名。别的预设（standard / ptc / minimal / 用户自定义）一个不碰。
  */

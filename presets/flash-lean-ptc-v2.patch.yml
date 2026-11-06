@@ -5,9 +5,9 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: flash-lean-ptc-v2
-        name: "兼容·PTC v2（历史 id）"
-        description: "0.2.5 及更早版本的规则原样保留，只用于解析那时创建的会话；新建会话请选「轻量PTC-v3」。压缩阈值 0.25 / 保留 20k。"
-        order: 92
+        name: "Flash 精简·PTC v2（v4.1-flash）"
+        description: "0.2.5 及更早版本的 12 条规则原样保留，只用于解析那时创建的会话；新建会话请选「精简·PTC v3（lean-v3）」。压缩阈值 0.25 / 保留 20k。"
+        order: 22
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'

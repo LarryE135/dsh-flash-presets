@@ -78,11 +78,11 @@ console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
   'flash-lean-ptc-v1.patch.yml': {
-    preset: 'flash-lean-ptc-v1', order: 91, rules: 14, ptcRow: true,
+    preset: 'flash-lean-ptc-v1', order: 21, rules: 14, ptcRow: true,
     thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2,
   },
   'flash-lean-ptc-v2.patch.yml': {
-    preset: 'flash-lean-ptc-v2', order: 92, rules: 12, ptcRow: true,
+    preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
     thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
   },
   'flash-lean-ptc-v3.patch.yml': {
