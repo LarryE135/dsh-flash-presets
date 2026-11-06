@@ -4,9 +4,27 @@
 
 ## 0. 前置
 
-- 在 **WSL (Ubuntu)** 里执行，仓库在 `~/Common/dsh-flash-presets`。Windows 侧没有意义：npm 凭据在 `~/.npmrc`，profile 在 `~/.dsh`。
+- 仓库在 WSL 的 `~/Common/dsh-flash-presets`；**npm 发布只能在 WSL 做**（凭据在 `~/.npmrc`，profile 在 `~/.dsh`），
+  **GitHub 推送 / Release 只能在 Windows 侧做**（凭据在 Windows 钥匙串，见下一条）。两半各在各的地方，别指望一条命令跑完。
 - Node ≥ 20、npm ≥ 10（当前实测 node 24.19 / npm 11.17）。
-- 推 GitHub 用系统凭据助手（本机是 Windows GCM，`git config credential.helper` 指向它），**不要把 token 写进仓库或贴在聊天里**。
+- 推 GitHub / 建 Release 的**凭据只存在于 Windows 侧**：`C:\Users\<你>\.gitconfig` 里写着
+  `credential.helper = !'C:\Program Files\GitHub CLI\gh.exe' auth git-credential`，走 Windows 钥匙串。
+  **本机实测**：WSL 里没装 `gh`，git 也没有可用凭据 —— 在 WSL 内直接 `git push` 或跑 `scripts/publish.sh` 会卡在认证。
+  可行路径是把仓库（**要带 `.git`**）复制到 Windows 临时目录，再用 `git.exe` / `gh.exe`：
+
+  ```bash
+  DEST=/mnt/c/Users/<你>/AppData/Local/Temp/dshpush
+  rm -rf "$DEST" && mkdir -p "$DEST"
+  tar -cf - --exclude=node_modules . | tar -xf - -C "$DEST"
+  "/mnt/c/Program Files/Git/cmd/git.exe" -C C:/Users/<你>/AppData/Local/Temp/dshpush push origin HEAD:refs/heads/main
+  "/mnt/c/Program Files/Git/cmd/git.exe" -C C:/Users/<你>/AppData/Local/Temp/dshpush push origin refs/tags/vX.Y.Z
+  "/mnt/c/Program Files/GitHub CLI/gh.exe" release create vX.Y.Z "C:/.../dsh-flash-presets-vX.Y.Z.zip" \
+    --verify-tag --latest --notes-file "C:/.../notes.md"
+  ```
+
+  实测（0.2.9）：`main` 推到 `77a3dbe`、tag `v0.2.9` 推送成功、Release 附件 1856659 B 与本地 `sha256` 一致。
+
+  **不要把 token 写进仓库或贴在聊天里**。
 
 ## 1. 改预设并重新合成
 
