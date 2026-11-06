@@ -166,7 +166,8 @@ uninstall_modern() {
   fi
   strip_patch
   echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
-  [ -n "$runtime_note" ] && echo "$runtime_note"
+  # 不能写成 `[ -n "$x" ] && echo`：$x 为空时这一行整体返回 1，set -e 会让卸载直接失败（CI 抓到过）。
+  if [ -n "$runtime_note" ]; then echo "$runtime_note"; fi
 }
 
 uninstall_legacy() {

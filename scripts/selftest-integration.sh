@@ -79,7 +79,8 @@ if command -v dsh >/dev/null 2>&1; then
   grep -q "干净的" <<<"$cons" && ok "doctor 结论为干净" || bad "doctor 结论异常：$cons"
 else
   # 没有 dsh 时 doctor 必然报「dsh 不在 PATH / dump 失败」，这里只要求它没把插件算成失败
-  grep -q "本包未安装" <<<"$dout" && ok "无 dsh 时只报本包未安装" || bad "无 dsh 时提示不对"
+  # 脚本安装的 profile 现在这么说：「本包未装成插件卡（当前是脚本安装…）」；无托管块时才是「本包未安装」。
+  grep -qE "本包未安装|本包未装成插件卡" <<<"$dout" && ok "无 dsh 时如实说明本包未装成插件卡" || bad "无 dsh 时提示不对"
 fi
 
 echo "通过 ${pass}，失败 ${fail}"
