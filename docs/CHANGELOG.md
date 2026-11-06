@@ -1,10 +1,10 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本；已推 GitHub `main`、已发 `v0.2.9` Release，**npm 仍未发**）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本；已推 GitHub `main`、已发 `v0.2.9` Release，**npm 待发：`npm publish --dry-run` 已通过，只差 OTP**）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 
-## 0.2.9（2026-11-07，GitHub Release `v0.2.9`；npm 未发）
+## 0.2.9（2026-11-07，GitHub Release `v0.2.9`；npm 待发）
 
 **把预设 id 改回稳定值，并让「旧会话能不能打开」不再是运气。** 桌面端装上新版 0.2.8 后旧会话直接打不开 —— 根因是
 0.2.7 把 13 条规则版的 id 从 `flash-lean-ptc-v3` 改名成 `flash-lean-ptc-v3-lite`。DSH 把 preset id 持久化在会话日志里，
@@ -54,6 +54,9 @@
 - **`selftest.sh` 增 8 项升级路径断言**（47 项）：只有自加行的补丁要过 `verify-yaml`、旧 `-lite` 补丁升级后必须是
   3 行且 `order: 99`、全新安装只能 2 行、插件卡已装时脚本必须 `exit 4` 而 `--force` 可叠加。
 - **审计索引随包发布**：`docs/审计索引-0.2.9.md` 进 `files`（`npm pack` 实测 39 个文件）。
+- **npm 发布准备**：`npm publish --dry-run` 通过（39 个文件；体积与 shasum 以该命令输出为准，文档不抄死，`prepublishOnly` 的
+  `verify` + `selftest` 全跑），发布后需补 `node scripts/sync-published-version.mjs`（`publishedVersion` 0.2.8 → 0.2.9，
+  它是 `lint-presets.mjs` 的「可引用已发布版本」白名单）。
 - 校验与文档口径同步：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、`compose-bundle-patch`
   的注释、安装器默认预设、CI 的 id 断言都跟着改；版本号统一到 0.2.9（`package.json`、`package-lock.json`、
   `marketplace/plugin.json`、两个安装器的自检提示、两份 README）。

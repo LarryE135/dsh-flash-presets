@@ -26,6 +26,26 @@
 
   **不要把 token 写进仓库或贴在聊天里**。
 
+## 0.5 0.2.9 的发布状态（2026-11-07）
+
+| 通道 | 状态 | 证据（可复跑） |
+|---|---|---|
+| GitHub `main` | 已推 | `gh api repos/LarryE135/dsh-flash-presets/commits/main --jq .sha` → `5174d57` |
+| GitHub tag | 已推 | `v0.2.9` → `77a3dbe`（`git rev-parse --short v0.2.9`） |
+| GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.2.9.zip` 1856659 B，下载后 sha256 与 `git archive v0.2.9` 一致（`e379b080…`） |
+| npm | **待发** | `npm whoami` → `larrye`；`npm view dsh-flash-presets version` → 0.2.8；`npm publish --dry-run` 通过（39 个文件；体积与 shasum 现查，别抄） |
+
+剩下三步，按顺序（`--dry-run` 已在本机跑通，它会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
+
+```bash
+npm publish --dry-run                        # 只打包不发布；确认 total files: 39
+npm publish --otp=<6 位码>                    # 走 bypass token 时可直接 npm publish
+node scripts/sync-published-version.mjs      # publishedVersion: 0.2.8 → 0.2.9
+```
+
+最后一步别省：`publishedVersion` 不跟进，文档里把版本锁回旧号也不会被 `lint-presets.mjs` 拦（白名单还是 0.2.8）。
+发完按 §8 复核，再把 CHANGELOG / 审计索引里的「npm 待发」改成已发（附 `npm view` 的实测输出）。
+
 ## 1. 改预设并重新合成
 
 `presets/*.patch.yml` 是源，`cordis.patch.yml` 是合成产物（bundle 实际加载的是后者）。
@@ -82,11 +102,15 @@ npm whoami          # 应打印你的 npm 用户名
 
 ## 4. 发布
 
+先跑一次试发布（不改 registry，但会执行 `prepublishOnly` 整条链）：
+
 ```bash
-npm publish
+npm publish --dry-run        # 期望末行：+ dsh-flash-presets@X.Y.Z；再看 total files 与 shasum
+npm publish --otp=<6 位码>    # 真发；token 勾了 Bypass 2FA 时直接 npm publish 即可
 ```
 
-成功标志：`+ dsh-flash-presets@X.Y.Z`。
+成功标志：`+ dsh-flash-presets@X.Y.Z`。**发布不可逆**（72 小时内可 unpublish），所以 `--dry-run` 那一步不要跳。
+`--dry-run` 打出来的 `total files` / `package size` / `shasum` 就是 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize dist.shasum` 该对上的值。
 
 **发完立刻同步已发布版本号**（否则 lint 的"允许引用版本"白名单还停在上一版，文档锁旧版不会被拦）：
 
@@ -201,13 +225,18 @@ npm run verify:release && npm run verify:versions
 # a) registry 侧
 curl -s https://registry.npmjs.org/dsh-flash-presets/latest | python3 -c "import sys,json;print(json.load(sys.stdin)['version'])"
 
-# b) 真装一遍（临时 profile，用完删）
-dsh plugin --profile npmverify add dsh-flash-presets@X.Y.Z
-dsh --profile npmverify --dump-config | grep -E 'id: preset-flash-lean-ptc-v[123]'
-rm -rf ~/.dsh/profiles/npmverify
+# b) 真装一遍（临时 home，用完删）
+dsh plugin --profile web add dsh-flash-presets@X.Y.Z
+dsh --profile web --dump-config | grep -c 'id: preset-'        # 干净 profile = 6（两张卡 + 4 个内置）
+dsh --profile web --dump-config | grep -c 'flash-presets-alias' # 必须是 1，否则旧会话打不开
+rm -rf ~/.dsh/profiles/web
+
+# b2) 与试发布时记下的数字对齐（0.2.9 的 dry-run：39 个文件；体积与 shasum 以当次输出为准）
+npm view dsh-flash-presets dist.fileCount dist.unpackedSize dist.shasum
+node scripts/sync-published-version.mjs      # publishedVersion 忘了跟进，lint 就拦不住旧版本号
 ```
 
-预期：三行预设 id 齐全。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块，不是 npm bundle 形态，别拿它去校验临时 profile。
+预期：6 行预设、1 行 `flash-presets-alias`。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块，不是 npm bundle 形态，别拿它去校验临时 profile。
 
 ```bash
 # c) npm 页面内容（README 只在 publish 时刷新，必须单独核对）
