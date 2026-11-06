@@ -19,9 +19,18 @@ REMOTE="${REMOTE:-https://github.com/$GH_USER/$REPO.git}"
 echo "目标：${GH_USER}/${REPO}（${VISIBILITY}），标签 ${TAG}"
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
 
+# 硬规则：远端已有的同名 tag 不得移动。
+# 第二轮审计 N1-1：v0.2.6 一晚被移过 5 次，同一个版本号对应了 6 个提交，按 tag 安装的用户
+# 锁文件各不相同，却都叫 0.2.6。要重发请升版本号，不要 force-push 标签。
+if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG" 2>/dev/null || true)" ]; then
+  echo "✖ 远端已存在标签 $TAG —— 版本号一经发布不得复用。" >&2
+  echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑本脚本。" >&2
+  exit 1
+fi
+
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
-    gh repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)"
+    gh repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (lite 13 rules / balance 3 rules)"
   git push -u origin main
   git push origin "$TAG"
   mkdir -p dist

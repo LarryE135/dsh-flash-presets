@@ -23,6 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { resolvePlatformTags, hasPlatformTags } from './platform-tags.mjs';
+import { loadAliasMap } from '../lib/preset-alias.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -202,16 +203,23 @@ console.log('[7] 旧会话的预设 id');
 if (!flag('--sessions') && !flag('--all')) {
   info('跳过（加 --sessions 或 --all 才扫会话；' + path.join(home, 'sessions') + '）');
 } else {
-  const { scanSessions } = await import('./migrate-legacy-preset-ids.mjs');
-  const scan = await scanSessions(home);
-  const pending = [...scan.legacy].map(([id, files]) => [id, files.length]);
-  if (!scan.files) warn('没有会话目录：' + path.join(home, 'sessions'));
-  else if (!pending.length) ok(scan.files + ' 个会话文件，全部指向现役预设');
-  else {
-    const total = pending.reduce((n, [, c]) => n + c, 0);
-    warn(total + '/' + scan.files + ' 个会话仍记着旧 id：' + pending.map(([id, c]) => id + ' ×' + c).join('、'));
-    info('迁移：node scripts/migrate-legacy-preset-ids.mjs --apply（先写可回滚清单）');
-    problems.push('旧会话预设 id 未迁移 ' + total + ' 个');
+  // 扫描器只在仓库里存在（会写会话的迁移脚本不随包发布）：import 失败不能把 doctor 带崩。
+  let scanSessions = null;
+  try { ({ scanSessions } = await import('./migrate-legacy-preset-ids.mjs')); } catch { scanSessions = null; }
+  if (typeof scanSessions !== 'function') {
+    const ids = (() => { try { return Object.keys(loadAliasMap().aliases); } catch { return []; } })();
+    info('本份安装没有带旧会话扫描器（随包只发布只读组件）');
+    info('旧 id 由运行时兼容层解析，会话无需迁移：' + (ids.length ? ids.join('、') : '见 presets/legacy-preset-map.json'));
+  } else {
+    const scan = await scanSessions(home);
+    const pending = [...scan.legacy].map(([id, files]) => [id, files.length]);
+    if (!scan.files) warn('没有会话目录：' + path.join(home, 'sessions'));
+    else if (!pending.length) ok(scan.files + ' 个会话文件，全部指向现役预设');
+    else {
+      const total = pending.reduce((n, [, c]) => n + c, 0);
+      info(total + '/' + scan.files + ' 个会话仍记着旧 id：' + pending.map(([id, c]) => id + ' ×' + c).join('、'));
+      ok('无需处理：这些 id 由运行时兼容层解析（presets/legacy-preset-map.json），不改写任何会话文件');
+    }
   }
 }
 

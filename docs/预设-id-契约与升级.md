@@ -56,7 +56,7 @@ const agentPresetProjectionDefinition = {
 2. **alias 层兜底**（`lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。
 3. **审计按 DSH 语义**（`npm run audit:sessions`）：有效 preset = header + 最后一条 selection；roster 取 `dsh --profile web --dump-config`。发现孤儿 id 就 `exit 1`。
 4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id。
-5. **可选的一次性迁移**（`npm run retarget:sessions`，默认 dry-run）：想把兼容层彻底清掉时用。约束见脚本头注释：只改决定解析结果的那一处、帧级改写、整份备份、写前写后双校验、清投影缓存、可回滚、幂等。
+5. **可选的一次性迁移**（`npm run retarget:sessions`，默认 dry-run）：想把兼容层彻底清掉时用。**这两个脚本只在仓库里，不随 npm 包发布**（它们会改写会话文件，属于维护者工具）。约束见脚本头注释：只改决定解析结果的那一处、帧级改写、整份备份、写前写后双校验、清投影缓存、可回滚、幂等。
 
 ## 4.1 已知限制（复查时确认、暂不修）
 
@@ -81,7 +81,7 @@ node scripts/audit-compat.mjs --dsh-home /mnt/c/Users/<you>/.dsh   # Windows 侧
 5. 以上都正常 → 看 `~/.dsh/logs/`、`journalctl -u dsh-web`，以及 `agentPresets/list` 里该预设是否 `broken`（插件行引用了上游已移除的子路径就会这样）。
 ## 7. “看起来没对齐”怎么查：四层与 `audit-align`
 
-`audit-compat` 回答的是“能不能打开”。它会因为 `none` 桶而误导——`none`（没有记录 preset）的会话绝大多数是**自动化/实验跑批**留下的（`~/Work/exp/…`、`~/Work/wbval/…`、`~/Codex-Sub`、`/tmp`），它们的组合由调用方的 profile 决定，**不受 web profile 的 `selectedDefault` 支配**；改默认值只影响新建会话，不能用来“修”这些老会话。
+`audit-compat` 回答的是“能不能打开”。它会因为 `none` 桶而误导——`none`（没有记录 preset）的会话绝大多数是**自动化/实验跑批**留下的（本机私有的试验目录与 `/tmp` 一类临时目录，不随包发布），它们的组合由调用方的 profile 决定，**不受 web profile 的 `selectedDefault` 支配**；改默认值只影响新建会话，不能用来“修”这些老会话。
 
 “看起来没对齐”要按四层分开看（`npm run audit:align`，即 `scripts/audit-align.mjs`）：
 
@@ -89,7 +89,7 @@ node scripts/audit-compat.mjs --dsh-home /mnt/c/Users/<you>/.dsh   # Windows 侧
 |---|---|---|---|
 | ① 存储 | 同一会话目录只认世代号最大的日志；`header.version` ⇄ 世代文件名 ⇄ `encodeSegment(id)`/`projectKey(cwd)` 路径 | 上游 `listArtifacts` 对**任一**目录抛错会中断整张列表 → 侧栏空/会话打不开 | 按代际重写或从备份恢复；`audit-align` 会点名 |
 | ② 解析 | 有效 preset ∈ roster ∪ alias 表 | resume 抛 `agent-preset/not-found` | 加 alias（不改数据） |
-| ③ 记录 | 记录的是否还是历史 id | 解析没问题，但头部标签按 roster 查名字，查不到就显示原始 id（`flash-lean-ptc` 这类） | `retarget-session-presets --apply`（需停服务） |
+| ③ 记录 | 记录的是否还是历史 id | 解析没问题，但头部标签按 roster 查名字，查不到就显示原始 id（`flash-lean-ptc` 这类） | 一般无需处理（alias 只管解析、标题显示原始 id 是预期）；要彻底改写用仓库内的 `retarget-session-presets --apply`（不随包发布，需停服务） |
 | ④ 组合 | 挂载后 `commands.list` 里有 `compact`、`tools.selectExecutor` 不抛 | 斜杠菜单缺「压缩/计划/目标」，下一句报 `tool executor is unavailable` | 重启 dsh；`composition-check` 每 2 分钟自检 |
 
 本机 2026-11-06 的基线（1622 个会话）：① 1622/1622 通过；② orphan 0（162 条走 alias）；③ 162 条仍写历史 id（48 条在侧栏）；④ 0 条失效。另：274 份历史世代日志（182.6 MB）按选取规则被忽略，属正常残留。

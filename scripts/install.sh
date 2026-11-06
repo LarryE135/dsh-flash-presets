@@ -4,14 +4,13 @@
 # DSH 0.1.7-rc.1 changed how presets are declared: the old per-preset directory
 # ($DSH_HOME/.agent-presets/<id>/) is no longer read; a preset is now a plugin row
 # (`@deepseek-ai/dsh-agent-preset`) inserted into a profile's user patch layer.
-# This script writes a managed block into the profile patch file, and falls back
-# to the legacy directory install for older DSH versions.
+# This script writes a managed block (two preset rows) into the profile patch file.
+# 0.2.6 removed the pre-0.1.7 directory layout: --legacy now exits 3.
 #
-#   bash scripts/install.sh                       # profile "web" (autodetect)
-#   bash scripts/install.sh --profile headless     # another profile
-#   bash scripts/install.sh --legacy               # force the 0.1.5 directory layout
-#   bash scripts/install.sh --with-plan-mode       # 兼容旧参数：计划模式已随包提供
-#   bash scripts/install.sh --uninstall            # remove the managed block
+#   bash scripts/install.sh                        # profile "web" (autodetect)
+#   bash scripts/install.sh --profile desktop      # another profile
+#   bash scripts/install.sh --with-runtime         # 额外写入 profile 级 PTC 常驻运行时
+#   bash scripts/install.sh --uninstall            # remove the managed block（含运行时覆盖）
 #   DSH_HOME=/tmp/dsh bash scripts/install.sh       # custom DSH home
 #
 # Safe to run repeatedly: the managed block is replaced in place and the patch
@@ -26,9 +25,10 @@ ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # 0.2.6 起只发两个预设：lite（13 条，默认）与 balance（3 条）
 PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance)
-# --with-plan-mode：新装模式下无实际作用（计划模式已并入本包），保留参数以兼容旧脚本；
-# 两者互相独立，装失败不影响预设本身。
-PLAN_MODE=0
+# --with-runtime（旧名 --with-plan-mode，保留为别名）：额外往 profile 补丁层追加
+# ptc-runtime: persistent-in-memory。这是 profile 级覆盖，对该 profile 的所有预设生效，
+# --uninstall 会一并撤掉。计划模式组件不在脚本路径里，它只随插件管理器安装。
+WITH_RUNTIME=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
     --all-presets) PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance); shift ;;
-    --with-plan-mode) PLAN_MODE=1; shift ;;
+    --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help)   sed -n '2,19p' "$0"; exit 0 ;;
     *) echo "未知参数: $1（用 --help 看用法）" >&2; exit 2 ;;
@@ -100,26 +100,30 @@ install_modern() {
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
-  echo "  注意：本脚本只写两行预设；计划模式组件与常驻运行时要用 dsh plugin add dsh-flash-presets 才会装上"
-  echo "  装成插件卡：dsh plugin --profile $PROFILE add dsh-flash-presets（三个组件都在这张卡里）"
+  echo "  已写入：两行预设（lite / balance）。"
+  echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.7"
+  echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall，否则预设会重复注册。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
-  echo "  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
-  if [ "$PLAN_MODE" = "1" ]; then install_plan_mode; fi
+  if [ "$WITH_RUNTIME" = "1" ]; then install_runtime; fi
 }
 
-# 计划模式（plan-mode v1）与常驻运行时是**插件包**的一部分：只有 dsh plugin add dsh-flash-presets 才会装上；
-# 本脚本只往 profile 补丁层写两行预设，不装插件、不改运行时。
-# 装它等于把这个包加进 profile；升级要先 remove 再 add（插件管理器不接受同名重复安装）。
-install_plan_mode() {
-  # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
-  echo "-- 计划模式（plan-mode v1）---------------------------"
-  echo "  只有在 dsh plugin add 安装时才包含；本脚本不装。"
-  if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
-    if node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" >/dev/null 2>&1; then
-      echo "  运行时调优已就位（常驻 PTC + glob/grep 并发；改过配置需重启 dsh）"
-    fi
+# --with-runtime：只写 profile 级的 ptc-runtime 覆盖（plan-mode 组件不在脚本路径里）。
+# 这块内容落在托管块之外，卸载时要单独撤掉（见 uninstall_modern）。
+install_runtime() {
+  echo "-- PTC 常驻运行时（profile 级）-----------------------"
+  if ! command -v node >/dev/null 2>&1 || [ ! -f "$HERE/scripts/tune-runtime.mjs" ]; then
+    echo "  未找到 node 或 tune-runtime.mjs，已跳过（不影响两个预设）。"
+    return 0
+  fi
+  node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" >/dev/null 2>&1 || true
+  if grep -q 'executionMode: persistent-in-memory' "$PATCH" 2>/dev/null; then
+    echo "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
+    echo "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
+  else
+    echo "  ⚠ 未能写入常驻运行时；两个预设不受影响，可手动跑 node scripts/tune-runtime.mjs --apply --profile $PROFILE"
   fi
 }
 
@@ -149,6 +153,17 @@ uninstall_modern() {
   cp "$PATCH" "$PATCH.bak-$STAMP"
   strip_patch
   echo "已移除托管块（备份 $(basename "$PATCH").bak-${STAMP}）"
+  # --with-runtime 写的那块在托管块之外：不撤掉的话，卸载后整个 profile 仍被改着。
+  if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
+    if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/tune-runtime.mjs" ]; then
+      node "$HERE/scripts/tune-runtime.mjs" --revert --profile "$PROFILE" >/dev/null 2>&1 || true
+    fi
+    if grep -q '# >>> tune-runtime' "$PATCH" 2>/dev/null; then
+      echo "⚠ 仍残留 tune-runtime 块，请手动检查 $PATCH" >&2
+    else
+      echo "已一并撤掉 ptc-runtime 常驻运行时覆盖"
+    fi
+  fi
 }
 
 uninstall_legacy() {

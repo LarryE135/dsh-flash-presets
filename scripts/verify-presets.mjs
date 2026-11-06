@@ -202,22 +202,48 @@ walkRepo(repo);
 check(lfViolations.length === 0, 'eol=lf 的文件无 CRLF' + (lfViolations.length ? '（' + lfViolations.slice(0, 3).join(', ') + '）' : ''));
 check(crlfViolations.length === 0, 'eol=crlf 的文件确实是 CRLF' + (crlfViolations.length ? '（' + crlfViolations.slice(0, 3).join(', ') + '）' : ''));
 
-const mdFiles = ['README.md', 'CONTRIBUTING.md',
+const mdFiles = ['README.md', 'README.en.md', 'CONTRIBUTING.md',
   ...fs.readdirSync(path.join(repo, 'docs')).filter((f) => f.endsWith('.md')).map((f) => 'docs/' + f)];
+// GitHub 的锚点规则：小写、去掉除连字符以外的标点（保留中日韩字符）、空格转连字符。
+const slug = (s) => s.trim().toLowerCase()
+  .replace(/[`*_~]/g, '')
+  .replace(/[^\w\-\u3400-\u9fff ]/g, '')
+  .replace(/ /g, '-');
+const anchorsOf = (rel) => {
+  const full = path.join(repo, rel);
+  if (!fs.existsSync(full)) return new Set();
+  const out = new Set();
+  for (const line of fs.readFileSync(full, 'utf8').split('\n')) {
+    const m = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (m) out.add(slug(m[2]));
+  }
+  return out;
+};
 const brokenLinks = [];
+const brokenAnchors = [];
 for (const rel of mdFiles) {
   const full = path.join(repo, rel);
   if (!fs.existsSync(full)) continue;
   const body = fs.readFileSync(full, 'utf8');
+  const own = anchorsOf(rel);
   for (const m of body.matchAll(/\]\(([^)\s]+)\)/g)) {
     const target = m[1];
-    if (/^(https?:|mailto:|#)/.test(target)) continue;
-    const clean = target.split('#')[0];
+    if (/^(https?:|mailto:)/.test(target)) continue;
+    if (target.startsWith('#')) {
+      const want = target.slice(1);
+      if (want && !own.has(want)) brokenAnchors.push(rel + ' -> ' + target);
+      continue;
+    }
+    const [clean, hash] = target.split('#');
     if (!clean) continue;
-    if (!fs.existsSync(path.resolve(path.dirname(full), clean))) brokenLinks.push(rel + ' -> ' + target);
+    if (!fs.existsSync(path.resolve(path.dirname(full), clean))) { brokenLinks.push(rel + ' -> ' + target); continue; }
+    if (hash && /^(README(\.en)?\.md|CONTRIBUTING\.md|docs\/.*\.md)$/.test(clean)) {
+      if (!anchorsOf(clean).has(hash)) brokenAnchors.push(rel + ' -> ' + target);
+    }
   }
 }
 check(brokenLinks.length === 0, '文档内相对链接都指向存在的文件' + (brokenLinks.length ? '（' + brokenLinks.slice(0, 3).join('; ') + '）' : ''));
+check(brokenAnchors.length === 0, '文档内 #锚点 都指向存在的标题（含 README.en.md）' + (brokenAnchors.length ? '（' + brokenAnchors.slice(0, 3).join('; ') + '）' : ''));
 
 // ── B. 安装层（--repo-only 时整段跳过）────────────────────────────────────────
 if (!repoOnly) {

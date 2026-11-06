@@ -142,6 +142,10 @@ jobs:
   bundle-install:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh: ["0.2.1-rc.5", "0.2.2-rc.1"]   # 声明的下限 + npm latest（用户实际装到的版本）
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -149,7 +153,7 @@ jobs:
           node-version: '24'   # dsh CLI 在 Node 20 下会静默退出（0 输出 / 退出码 0）
 
       - name: 安装 DSH 与 pnpm
-        run: npm i -g pnpm @deepseek-ai/dsh@0.2.1-rc.5   # 锁到 engines 声明的下限（>=0.2.1-rc.5）；0.2.2-rc.1 由 canary/integration 的 latest 覆盖
+        run: npm i -g pnpm @deepseek-ai/dsh@${{ matrix.dsh }}   # 矩阵覆盖 engines 下限与 npm latest；canary 走脚本路径，不加载插件，不能替代这里
 
       - name: 环境诊断
         run: |
@@ -167,24 +171,25 @@ jobs:
           echo "--- profile 清单 ---"
           cat "$HOME/.dsh/profiles/ci/package.json" 2>/dev/null || { echo "profile 未创建，目录树："; find "$HOME/.dsh" -maxdepth 3 2>/dev/null | head -20; }
 
-      - name: 断言只装 v3（v1/v2 不进组合配置）
+      - name: 断言两个预设进组合配置（旧 id 不进）
         run: |
           # 注意：dump-config 是旗标（--dump-config），当子命令跑会挂起且 stdout 为空
           dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt" 2> "$RUNNER_TEMP/dump.err" || echo "dump 退出码非 0"
           echo "dump 大小: $(wc -c < "$RUNNER_TEMP/dump.txt") B；stderr 尾部："
           tail -5 "$RUNNER_TEMP/dump.err" || true
           echo "dump 前 5 行："; head -5 "$RUNNER_TEMP/dump.txt" || true
-          # 0.2.5 起 bundle 默认只装 v3；v1/v2 是对照版本，源文件仍在 presets/，但不进组合配置
-          for id in flash-lean-ptc-v3; do
-            n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
-            grep -m2 -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
+          # 0.2.6 起只发两个预设：lite 与 balance。id 必须精确比对——`flash-lean-ptc-v3`
+          # 是 `-v3-lite` / `-v3-balance` 的子串，用 grep 子串匹配等于什么都没断言。
+          for id in flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance; do
+            n=$(grep -cE -- "$id([^-]|$)" "$RUNNER_TEMP/dump.txt" || true)
+            grep -m2 -E -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
           done
-          for id in flash-lean-ptc-v1 flash-lean-ptc-v2; do
-            n=$(grep -c -- "$id" "$RUNNER_TEMP/dump.txt" || true)
+          for id in flash-lean-ptc-v3 flash-lean-ptc-v2 flash-lean-ptc-v1; do
+            n=$(grep -cE -- "$id([^-]|$)" "$RUNNER_TEMP/dump.txt" || true)
             echo "$id: $n（期望 0）"
-            [ "$n" -eq 0 ] || { echo "::error::$id 不应进入组合配置（默认只装 v3，用 --all-presets 才装）"; exit 1; }
+            [ "$n" -eq 0 ] || { echo "::error::$id 是历史 id，不应进组合配置"; exit 1; }
           done
 
       # 只断言"id 出现过"还不够：order / 阈值 / 规则条数 / PTC 才是预设真正的行为参数
@@ -248,3 +253,34 @@ jobs:
       - name: 跑插件全量测试
         working-directory: plugins/plan-mode-ui
         run: bash test/run.sh
+
+  # 用户侧回归：装的是 npm 包内容，不是仓库目录。在只发出去的那些文件里跑一遍用户真会跑的命令，
+  # 才能发现「白名单把 doctor 依赖的脚本排掉了」这类只有安装后才炸的问题（第二轮审计 N2-1 / N3-7）。
+  pack-doctor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: 打包并解包
+        run: |
+          mkdir -p /tmp/pkg && npm pack --ignore-scripts --pack-destination /tmp/pkg
+          mkdir -p /tmp/pkg/x && tar xzf /tmp/pkg/*.tgz -C /tmp/pkg/x
+          ls /tmp/pkg/x/package
+      - name: 从解包目录跑用户侧脚本（doctor --all / tune-runtime / verify-presets）
+        run: |
+          export DSH_HOME=/tmp/pkg-home
+          mkdir -p "$DSH_HOME/profiles/web"
+          printf -- '- id: placeholder\n' > "$DSH_HOME/profiles/web/cordis.patch.yml"
+          P=/tmp/pkg/x/package/scripts
+          node "$P/doctor.mjs" --profile web --all
+          node "$P/tune-runtime.mjs" --profile web || true
+          node "$P/verify-presets.mjs" --repo-only || true
+      - name: 断言包内不含写会话的维护脚本
+        run: |
+          for f in migrate-legacy-preset-ids.mjs retarget-session-presets.mjs; do
+            [ ! -e "/tmp/pkg/x/package/scripts/$f" ] || { echo "::error::$f 不应随包发布"; exit 1; }
+          done
+          test -f /tmp/pkg/x/package/NOTICE || { echo "::error::NOTICE 未随包发布"; exit 1; }

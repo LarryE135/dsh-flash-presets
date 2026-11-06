@@ -14,11 +14,11 @@
 
 它做的事情很朴素：上下文更早压缩，过长的工具输出只留头尾，用不上的工具不进系统提示，零碎的工具调用尽量并进一段 `run_code`。模型不会因此变聪明；变的是一次会话读多少、绕多少、何时收尾。
 
-整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主代码，也不动共享工具注册表。
+整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。有两项是运行时对整个 profile 生效的，需要时都能关：`glob` / `grep` 的只读并发标记由本包补上（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭），旧 preset id 的解析也由本包接管（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.2.6（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 硬闸，不满足会拒绝安装），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.2.7（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> npm 上的最新版仍是 0.2.5，它在 DSH 0.2.2-rc.1 上无法新建会话。0.2.6 发布到 npm 之前，请从 GitHub 或 Release 附件安装（见[安装](#安装)）。
+> npm 上的 latest 仍是 0.2.5，它在 DSH 0.2.2-rc.1 上无法新建会话。0.2.7 上 npm 之前，请按[安装](#安装)从 GitHub tag 或 Release 附件装。
 
 ## 适合谁，不适合什么
 
@@ -33,7 +33,7 @@
 - 明显超出模型能力的难题，比如竞赛级、以拿部分分为目标的题目。这类任务上标准模式更稳，数据见[实测证据](docs/实测证据.md)。
 - 依赖当前日期、对话内安装插件或定时任务的工作流：这几项能力在预设里被裁掉了（见[与官方 PTC 预设的差异](#与官方-ptc-预设的差异)）。
 - DeepSeek V4.1 Flash 以外的模型。规则可能仍然有用，但没有验证过。
-- DSH 0.2.0 及更早版本。请改用对应的旧版本（见[版本与兼容性](docs/版本与兼容性.md)）；DSH 0.1.7 以前的目录式预设，0.2.6 已不再提供。
+- DSH 低于 0.2.1-rc.5 的版本（含 0.2.1-rc.2～rc.4）。旧版本请用对应的旧版包（见[版本与兼容性](docs/版本与兼容性.md)）；DSH 0.1.7 以前的目录式预设，0.2.6 起不再提供。
 
 ## 它做了什么
 
@@ -48,8 +48,8 @@
 
 另外两项随包生效：
 
-- 工具面使用 PTC（`tool-presentation: ptc`），PTC 运行时改为会话内常驻（`ptc-runtime: persistent-in-memory`）。实测每个 program 的固定启动成本从 108 ms 降到 0，嵌套工具调用从 44 ms 降到 15 ms（[压测记录](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md)）。收益随单个 program 内的调用次数线性增长，只跑一条命令的短任务几乎无感。
-- 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行（仅 web / desktop profile，见[已知限制](#已知限制)）。
+- 工具面使用 PTC（`tool-presentation: ptc`），PTC 运行时改为会话内常驻（`ptc-runtime: persistent-in-memory`）。实测每个 program 的固定启动成本从 108 ms 降到约 0（按收益模型计），嵌套工具调用从 44 ms 降到 15 ms（[压测记录](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md)）。收益随单个 program 内的调用次数线性增长，只跑一条命令的短任务几乎无感。
+- 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行（仅插件管理器安装的 web / desktop profile；脚本安装没有这一项，`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）。
 
 逐项原理与源码行号见[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)。
 
@@ -57,7 +57,7 @@
 
 | 预设 | id | 规则 | 压缩 | 何时用 |
 |---|---|---:|---|---|
-| 轻量PTC-v3 lite（原lean-v3） | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | 默认。适合绝大多数日常工作 |
+| 轻量PTC-v3 lite（原 lean-v3） | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | 默认。适合绝大多数日常工作 |
 | 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 规则更少，留给模型更多发挥空间 |
 
 两者共享同一套压缩、裁剪、插件与 PTC 配置，区别只在 persona 规则。
@@ -66,7 +66,7 @@ lite 的 13 条规则分五组：预算（按轮而不是按步计，目标 20 �
 
 balance 只保留引擎替代不了的三条：守住语言与范围、不写密钥、连败两次就换路子并报告确切的命令和输出。
 
-规则条数该怎么选，我们测过：在三组任务上对比 0、3、7、13 条规则，n = 5–15，质量和 token 都没有测出可区分的差异（[实测证据](docs/实测证据.md)「三床 × 四臂」）。这个规模测不出小于约 2 倍的差异，所以结论是「没有观察到差异」，不是「没有差异」。省下的 token 主要来自上表里前三个机制和 PTC，而不是规则文本。
+规则条数该怎么选，我们测过：三组任务上最多对比 0、3、7、13 条规则（算法床四臂齐全，另两床只有 0/3/13 与 3/13），n = 5–15，质量和 token 都没有测出可区分的差异（[实测证据](docs/实测证据.md)「三床 × 四臂」）。这个规模测不出小于约 2 倍的差异，所以结论是「没有观察到差异」，不是「没有差异」。省下的 token 主要来自上表里前三个机制和 PTC，而不是规则文本。
 
 > 读实测记录时注意命名：2026-11-04 的那批实验里，「v3」指 13 条规则的版本（即现在的 lite），「lite」指 3 条规则的版本（即现在的 balance）。0.2.6 发布时做了这次改名。
 
@@ -94,7 +94,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 
 - `lean-v3` 是 0.2.5 时期的 13 条规则版，与现在的 lite 规则相同。
 - 「相对标准模式」同时包含了 PTC 工具面的收益。只看预设本身，应与 PTC 模式比：两个套件上分别约为 −59.6% 与 −69.2%（由表中数字算出）。
-- 表里只有 token。各配置在正确性上没有差异（全部运行均全对），因此不单列正确率。出题与评分使用同一个模型（`GPT-6.1-Sol`），但答题环节读不到真值与评分器。
+- 表里只有 token。运行记录里每一轮都判为全对，因此不单列正确率（逐题分数不在本仓库）。出题与评分使用同一个模型（`GPT-6.1-Sol`），但答题环节读不到真值与评分器。
 - `OPS + PTC` 在办公基准 v1 上只有 4 次有效运行。两个套件任务不同，不合并排名。
 - 评分规则公开在 [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading)，真值与评分器放在私有仓库。
 
@@ -105,34 +105,37 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 插件管理器会装上整张插件卡：两个预设、计划模式组件、常驻 PTC 运行时，以及旧 id 兼容层。
 
 ```console
-# 0.2.6，从 GitHub 按 tag 安装（锁死版本；npm 跟上之前用这条）
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6
+# 0.2.7，从 GitHub 按 tag 安装（锁死版本；npm 跟上之前用这条）
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.7
 ```
 
-> npm 上的 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话（#19），请不要再安装它。0.2.6 发布到 npm 后，这里会换成 `dsh-flash-presets@0.2.6`。
+> npm 上的 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话（#19），请不要再安装它。0.2.7 上 npm 之后，这里会换成 `dsh-flash-presets@0.2.7`。
 
-`--profile` 通常取 `web` 或 `desktop`（`headless` / `acp` 下预设不会激活，见[已知偏差](#已知偏差)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
+`--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
-预设直接决定 agent 的行为，需要可复现时请写死版本号。不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.2.x 的最新版。
+预设直接决定 agent 的行为，需要可复现时请写死版本号。用 npm 包名且不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.2.x 的最新版；`github:` 安装写的是 git 引用（`#v0.2.7`），不会自己漂移。
 
 ### 离线或用脚本安装
 
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.2.6 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.7 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
 
-脚本只向 profile 补丁写入一个托管块，里面是两个预设行；写入前会备份原文件，重复运行不会产生第二份。计划模式组件、旧 id 兼容层和组合自检属于插件本体，只有通过插件管理器安装才会加载。加 `--with-plan-mode`（PowerShell 为 `-WithPlanMode`）时，脚本会额外把常驻 PTC 运行时写进该 profile。
+脚本只向 profile 补丁写入一个托管块，里面是两个预设行；写入前会备份原文件，重复运行不会产生第二份。计划模式组件、旧 id 兼容层、组合自检与 `glob`/`grep` 并发标记属于插件本体，只有通过插件管理器安装才会加载。加 `--with-runtime`（旧名 `--with-plan-mode`；PowerShell 为 `-WithRuntime`）时，脚本会额外把 profile 级的 `ptc-runtime: persistent-in-memory` 写进该 profile —— 这一项对该 profile 的**所有**预设生效，`--uninstall` 会一并撤掉。
+
+两条路径**二选一**：已经用脚本写过预设，要改装插件卡，请先 `--uninstall`，否则预设会重复注册（`agent-preset/invalid`）。
 
 ### 装完要重启
 
 预设和运行时配置都在进程启动时读取一次。
 
 - `web` profile：刷新页面即可。
-- `desktop`、`headless`、`acp`：完全退出宿主后再启动。不重启的典型表现是「插件已装，但 `run_code` 优化没有生效」。
+- `desktop`：完全退出宿主后再启动。不重启的典型表现是「插件已装，但 `run_code` 优化没有生效」。
+- `headless` / `acp`：预设本来就不激活（headless 实测；acp 未验证），不涉及重启。
 
 ### 确认装好了
 
@@ -142,6 +145,8 @@ dsh --profile web --dump-config | grep -c 'persistent-in-memory'    # 1
 dsh --profile web --dump-config | grep -c 'plan-mode-ui'            # 1
 node scripts/doctor.mjs --profile web                                # 版本、重复行、!!js、YAML 解析一次查完
 ```
+
+这几条 `node scripts/...` 假设你在仓库（或解压后的 Release 附件）里。用插件管理器装的话，脚本在 profile 里：`node ~/.dsh/profiles/web/node_modules/dsh-flash-presets/scripts/doctor.mjs --profile web`。
 
 ### 更新与卸载
 
@@ -159,7 +164,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 ### 从 0.2.5 升级
 
 - 预设 id 变了：13 条规则版由 `flash-lean-ptc-v3` 改为 `flash-lean-ptc-v3-lite`，原来 3 条规则的 `flash-lean-ptc-v3-lite` 改名为 `flash-lean-ptc-v3-balance`。
-- 旧会话照常打开：运行时兼容层把 12 个历史 id（包括 `flash-lean-ptc-v3`、`-v2` 等）解析到 lite。它只在解析失败时介入，不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
+- 旧会话照常打开：运行时兼容层把 5 个本包发布过的历史 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`）解析到 lite；本机实验用的 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。它只在解析失败时介入，不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 还指向旧 id，新建会话会报 `Unknown agent preset`，改成 `flash-lean-ptc-v3-lite` 即可。
 
@@ -168,12 +173,12 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 同一张插件卡里还有计划模式组件 plan-mode v1（1.0.0）：同一个回合里先写计划，经你批准后再执行，结束时把实测的验收数字写回卡片。它与预设各管一件事：预设管每一轮怎么花，计划模式管这个回合先想清楚再动手。
 
 - 入口在输入框左侧，档位为 off / light / full，与预设设置相互独立。
-- 默认推荐 light。在 n = 3、7 项验收的对比中，两档都是 3/3 全过，full 的 token 多约 26%、耗时多约 33%（[变更日志](docs/CHANGELOG.md)）。
+- 默认推荐 light。在 n = 3、7 项验收的对比中，两档都是 3/3 全过，full 的 token 多约 17%（中位 40.2 k vs 34.3 k）、耗时多约 33%（196 s vs 147 s，[变更日志](docs/CHANGELOG.md)）。
 - 不用时在卡片里关掉这个组件即可，预设行为不受影响。
 
 ## 用好它
 
-- **先给目标和验收标准。** 标准越明确，效果越好；边界不清时配合 plan 或 goal 模式。上面 P15654 的例子说明了差别有多大。
+- **先给目标和验收标准。** 标准越明确，效果越好；边界不清时配合 plan 或 goal 模式（P15654 的对照见[实测证据](docs/实测证据.md)）。
 - **把输出上限调高。** 建议 120K 以上，条件允许就设到 384K，避免长时间推理被截断。
 - **Windows 用户**建议先装好 PowerShell 7（MSI 版）或 Git Bash。
 - **长思考模型一题一会话。** 一次塞多道题，模型可能把全部计划铺进同一个响应，在动手之前就被上游断流（[实测证据](docs/实测证据.md)「跨模型」）。
@@ -193,7 +198,8 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 | 斜杠菜单里「压缩 / 计划 / 目标」消失，下一句报 `tool executor is unavailable` | 插件热重载后，已打开会话的预设组合被释放，没有自动重挂 | 重启 DSH。插件每 2 分钟自检一次并在日志里写明处置；设置 `DSH_FLASH_PRESETS_SELFCHECK_HEAL=1` 可自动重挂 |
 | 预设列表里出现两三个同名项 | 旧安装方式留下的裸行与新托管块并存 | 重新运行安装脚本，它会认领并合并旧行 |
 | `js-yaml` 报 `unknown tag` | 文件里还有 `!!js` 标签 | `node scripts/doctor.mjs --fix`（先备份） |
-| 预设根本没出现 | DSH 低于 0.1.7，或装错了 profile | 升级 DSH，或用 `--profile` 指对 |
+| 预设根本没出现 | DSH 低于 0.2.1-rc.5，或装错了 profile | 升级 DSH，或用 `--profile` 指对 |
+| 升级 DSH 后预设突然消失 | DSH 已超出 `engines` 上限 `<0.2.3-0`，插件在加载时被跳过 | 升级本包；确需强行加载可用 `dsh plugin allow-version` 自担风险放行 |
 
 预设补丁只定义 agent 侧的插件集合，不碰工作区选择器、目录选择器、终端这类 GUI 组件。如果装完后出现与预设无关的界面异常，请把 doctor 输出和浏览器控制台报错一起贴到 [issue](https://github.com/LarryE135/dsh-flash-presets/issues)。
 
@@ -209,9 +215,10 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 
 ## 已知限制
 
-- 在 DSH 0.2.2-rc.1 的 headless profile 里，两个预设和计划模式都停在 pending，不会生效（每次运行会提示 `3 entries did not activate`）。请在 web 或 desktop profile 中使用。
+- 在 DSH 0.2.2-rc.1 的 headless profile 里，两个预设和计划模式都停在 pending，不会生效（每次运行会提示 `3 entries did not activate`）。请在 web 或 desktop profile 中使用。`acp` 完全没验证过。
 - macOS 没有在真机上验证过。安装脚本按 bash 3.2 兼容写法编写，并在三平台 CI 上运行。
 - 补丁含 `!!js` 标签，由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。安装脚本在写入 profile 前会把它解析成普通值。
+- `glob` / `grep` 的只读并发标记只在插件管理器安装时才有；脚本安装路径没有它（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
 - 开发与测试主要围绕洛谷公开题库和上面的办公基准，其他类型任务的表现缺少数据。
 
 ## 开发与校验
@@ -226,11 +233,16 @@ bash scripts/selftest.sh
 
 ## 版本历史
 
+### v0.2.7（2026-11-06）
+
+- 第二轮审计修正：安装器文案与 `--with-runtime` 更名、`--uninstall` 撤掉运行时覆盖、`doctor --sessions` 不再崩溃、alias 表移除 `$comment`、peer 范围补上 0.2.2-rc.1、`NOTICE` 附上游 MIT 全文。
+- 文档口径与实现对齐：README 顶部如实写出对整个 profile 生效的两项与关闭开关；「12 个历史 id」改为 5 个；修掉失效锚点与悬空引用；计划模式「贵 26%」按中位数订正为 17%。
+- CI 加了 `0.2.2-rc.1` 的安装矩阵与「打包→解包→跑用户侧脚本」的 job，`bundle-install` 的断言从子串匹配改为精确 id。
 ### v0.2.6（2026-11-06）
 
 - 预设收敛为两个：lite（13 条，默认）与 balance（3 条）；v1、v2 与实验变体移出发布包。
-- 计划模式并回主包，成为同一张插件卡的第三个组件（plan-mode v1）。
-- 新增运行时兼容层：12 个历史 preset id 解析到 lite，不改写会话文件。
+- 计划模式并回主包（plan-mode v1），与两个预设同在一张插件卡里。
+- 新增运行时兼容层：5 个本包发布过的历史 preset id 解析到 lite，不改写会话文件。
 - 新增组合自检、四层对齐审计（`npm run audit:align`）与 `glob` / `grep` 只读并发标记。
 - 修复：DSH 0.2.2-rc.1 移除 `list-agents` 子路径后，预设卡片显示「加载失败」。
 

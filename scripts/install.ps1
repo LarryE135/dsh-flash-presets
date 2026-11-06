@@ -3,13 +3,13 @@
 # DSH 0.1.7-rc.1 changed how presets are declared: the old per-preset directory
 # ($DshHome\.agent-presets\<id>\) is no longer read; a preset is now a plugin row
 # (`@deepseek-ai/dsh-agent-preset`) inserted into a profile's user patch layer.
-# This script writes a managed block into the profile patch file, and falls back
-# to the legacy directory install for older DSH versions.
+# This script writes a managed block (two preset rows) into the profile patch file.
+# 0.2.6 removed the pre-0.1.7 directory layout: -Legacy now exits 3.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-#   ... -Profile headless      # another profile
-#   ... -Legacy                # force the 0.1.5 directory layout
-#   ... -Uninstall             # remove the managed block
+#   ... -Profile desktop       # another profile
+#   ... -WithRuntime           # also write the profile-level PTC resident runtime
+#   ... -Uninstall             # remove the managed block (and the runtime override)
 #   ... -DshHome "D:\dsh"      # custom DSH home (default: $env:DSH_HOME or ~\.dsh)
 #   ... -Help                  # show this help
 #
@@ -23,7 +23,7 @@ param(
   [switch]   $Help,
   [switch]   $Legacy,
   [switch]   $Uninstall,
-  [switch]   $WithPlanMode,
+  [Alias('WithPlanMode')][switch] $WithRuntime,
   [switch]   $AllPresets
 )
 
@@ -135,24 +135,33 @@ function Install-Modern {
   # 旧会话的预设 id 由 0.2.7 起「预设 id 对齐 lean-v3」保证，不需要改会话数据。
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
-  Write-Host '  已安装：轻量PTC-v3 lite / 轻量PTC-v3 balance（选择器里就这两项）'
-  Write-Host '  计划模式与常驻运行时只在 dsh plugin add dsh-flash-presets 时装；-WithPlanMode 仅做运行时调优'
+  Write-Host '  已写入：两行预设 —— 轻量PTC-v3 lite / 轻量PTC-v3 balance。'
+  Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
+  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.2.7"
+  Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall，否则预设会重复注册。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-lite'"
-  Write-Host '  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效'
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
-  if ($WithPlanMode) { Install-PlanMode }
+  if ($WithRuntime) { Install-Runtime }
 }
 
-# 计划模式插件（可选组件）：dist/ 里现成的 tgz → 现打一个 → 目录。没有 dsh 时只打印命令。
-function Install-PlanMode {
-  # plan-mode v1 已并入 dsh-flash-presets：作为同一张卡里的第三个组件随包提供。
+# -WithRuntime：只写 profile 级的 ptc-runtime 覆盖（plan-mode 组件不在脚本路径里）。
+# 这块内容落在托管块之外，卸载时要单独撤掉（见 Uninstall-Modern）。
+function Install-Runtime {
   Write-Host ""
-  Write-Host "-- 计划模式（plan-mode v1）---------------------"
-  Write-Host "  只有在 dsh plugin add 安装时才包含；本脚本不装。"
-  if (Get-Command node -ErrorAction SilentlyContinue) {
-    $tune = Join-Path $here 'scripts\tune-runtime.mjs'
-    if (Test-Path $tune) { node $tune --apply --profile $Profile | Out-Null }
+  Write-Host "-- PTC 常驻运行时（profile 级）-----------------------"
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "  未找到 node，已跳过（不影响两个预设）。"
+    return
+  }
+  $tune = Join-Path $here 'scripts\tune-runtime.mjs'
+  if (-not (Test-Path $tune)) { Write-Host "  未找到 tune-runtime.mjs，已跳过（不影响两个预设）。"; return }
+  node $tune --apply --profile $Profile | Out-Null
+  if ((Test-Path $patch) -and (Select-String -Path $patch -Pattern 'executionMode: persistent-in-memory' -Quiet)) {
+    Write-Host "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
+    Write-Host "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
+  } else {
+    Write-Host "  ⚠ 未能写入常驻运行时；两个预设不受影响，可手动跑 node scripts\tune-runtime.mjs --apply -Profile $Profile"
   }
 }
 

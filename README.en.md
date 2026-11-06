@@ -14,11 +14,11 @@ Agent presets for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-har
 
 The idea is simple: compact the context earlier, keep only the head and tail of oversized tool output, leave unused tools out of the system prompt, and fold scattered tool calls into a single `run_code` program. None of this makes the model smarter. It changes how much a session reads, how much it wanders, and when it stops.
 
-Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and touches neither the host code nor the shared tool registry.
+Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. Two things do apply to the whole profile at runtime, and both can be switched off: the plugin marks `glob` / `grep` as concurrency-safe (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables it), and it resolves legacy preset ids (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.2.6 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (hard `engines` gate — the install is refused otherwise), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.2.7 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> npm still serves 0.2.5, which cannot start a session on DSH 0.2.2-rc.1. Until 0.2.6 lands there, install from GitHub or from the release archive (see [Install](#install)).
+> npm still serves 0.2.5, which cannot start a session on DSH 0.2.2-rc.1. Until 0.2.7 lands there, install from the GitHub tag or the release archive (see [Install](#install)).
 
 ## Who it's for, and who it isn't
 
@@ -33,7 +33,7 @@ Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a p
 - Problems clearly beyond the model, such as competition-level tasks where the goal is partial credit. Standard mode holds up better there; see [measured evidence](docs/实测证据.md).
 - Workflows that rely on the current date, installing plugins from inside a conversation, or scheduled tasks. Those capabilities are trimmed out (see [Differences from the official PTC preset](#differences-from-the-official-ptc-preset)).
 - Models other than DeepSeek V4.1 Flash. The rules may still help, but nobody has checked.
-- DSH 0.2.0 and earlier. Use the matching older release instead (see [versions and compatibility](docs/版本与兼容性.md), in Chinese). The directory-style presets for DSH before 0.1.7 are no longer shipped as of 0.2.6.
+- DSH below 0.2.1-rc.5 (including 0.2.1-rc.2 through rc.4). Use the matching older release instead (see [versions and compatibility](docs/版本与兼容性.md), in Chinese). The directory-style presets for DSH before 0.1.7 are no longer shipped as of 0.2.6.
 
 ## What it does
 
@@ -48,8 +48,8 @@ Four mechanisms, each acting at a different point in a session:
 
 Two more things come with the bundle:
 
-- Tools are presented through PTC (`tool-presentation: ptc`), and the PTC runtime stays resident for the whole session (`ptc-runtime: persistent-in-memory`). Measured: the fixed startup cost per program dropped from 108 ms to 0, and nested tool calls from 44 ms to 15 ms ([benchmark notes](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md), in Chinese). The gain grows linearly with the number of calls inside a program; a short task that runs a single command will barely notice.
-- The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel (web and desktop profiles only; see [Known limitations](#known-limitations)).
+- Tools are presented through PTC (`tool-presentation: ptc`), and the PTC runtime stays resident for the whole session (`ptc-runtime: persistent-in-memory`). Measured: the fixed startup cost per program dropped from 108 ms to about 0 (per the cost model), and nested tool calls from 44 ms to 15 ms ([benchmark notes](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md), in Chinese). The gain grows linearly with the number of calls inside a program; a short task that runs a single command will barely notice.
+- The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel (plugin-manager installs of web / desktop only; the script install doesn't have it; `DSH_FLASH_PRESETS_CONCURRENCY=0` disables it).
 
 For the reasoning behind each setting, with source line references, see the [four mechanisms write-up](docs/技术文档-省token四机制.md) (Chinese).
 
@@ -57,8 +57,8 @@ For the reasoning behind each setting, with source line references, see the [fou
 
 | Preset | id | Rules | Compaction | Use it when |
 |---|---|---:|---|---|
-| Lean PTC-v3 lite (formerly lean-v3) | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
-| 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
+| 轻量PTC-v3 lite (Lean PTC-v3 lite; formerly lean-v3) | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
+| 轻量PTC-v3 balance (Lean PTC-v3 balance) | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
 
 Both share the same compaction, trimming, plugin set, and PTC setup. Only the persona rules differ.
 
@@ -66,7 +66,7 @@ Lite's 13 rules fall into five groups: budget (count turns, not steps; aim for 2
 
 Balance keeps only the three rules the harness can't enforce on its own: respect the user's language and scope, never put secrets into the session, and after two failed attempts change approach and report the exact command and output.
 
-Does the number of rules matter? We tested 0, 3, 7, and 13 rules on three task sets (n = 5–15) and found no measurable difference in either quality or tokens ([measured evidence](docs/实测证据.md), "三床 × 四臂"). At that sample size, differences smaller than about 2× are undetectable, so the honest reading is "no difference observed", not "no difference". The savings come mainly from the first three mechanisms above and from PTC, not from the wording of the rules.
+Does the number of rules matter? Across three task sets we tested up to four arms — 0, 3, 7 and 13 rules (all four on the algorithm bed; 0/3/13 and 3/13 on the other two), n = 5–15 — and found no measurable difference in either quality or tokens ([measured evidence](docs/实测证据.md), "三床 × 四臂"). At that sample size, differences smaller than about 2× are undetectable, so the honest reading is "no difference observed", not "no difference". The savings come mainly from the first three mechanisms above and from PTC, not from the wording of the rules.
 
 > A naming note for the evidence files: in the 2026-11-04 experiments, "v3" means the 13-rule preset (today's lite) and "lite" means the 3-rule preset (today's balance). The rename happened in 0.2.6.
 
@@ -94,7 +94,7 @@ How to read it:
 
 - `lean-v3` is the 13-rule preset as it stood in 0.2.5; its rules are identical to today's lite.
 - "vs standard" also includes the gain from switching to PTC tools. To isolate the preset, compare against PTC mode instead: roughly −59.6% and −69.2% on the two suites (computed from the table).
-- Tokens only. Every run of every configuration was fully correct, so accuracy isn't broken out. Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
+- Tokens only. The run records mark every run as fully correct, so accuracy isn't broken out (per-task scores aren't in this repository). Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
 - `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
 - Scoring rules are public in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading); ground truth and graders live in a private repository.
 
@@ -105,34 +105,37 @@ How to read it:
 The plugin manager installs the whole plugin card: both presets, the plan-mode component, the resident PTC runtime, and the legacy-id compatibility layer.
 
 ```console
-# 0.2.6 from GitHub, pinned to the tag (use this until npm catches up)
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6
+# 0.2.7 from GitHub, pinned to the tag (use this until npm catches up)
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.7
 ```
 
-> The 0.2.5 build on npm cannot start a new session on DSH 0.2.2-rc.1 (#19), so please don't install it. Once 0.2.6 is on npm, this line becomes `dsh-flash-presets@0.2.6`.
+> The 0.2.5 build on npm cannot start a new session on DSH 0.2.2-rc.1 (#19), so please don't install it. Once 0.2.7 is on npm, this line becomes `dsh-flash-presets@0.2.7`.
 
-`--profile` is normally `web` or `desktop` (presets do not activate under `headless` / `acp` — see [Known deviations](#known-deviations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
+`--profile` is normally `web` or `desktop` (presets don't activate under `headless`, and `acp` is untested — see [Known limitations](#known-limitations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
 
-Presets directly shape agent behavior, so pin a version when you need reproducible results. Without one, the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x.
+Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x; a `github:` install records a git ref (`#v0.2.7`) instead and won't drift.
 
 ### Offline, or with the install script
 
 Download and unpack the archive from [Releases](https://github.com/LarryE135/dsh-flash-presets/releases), or clone the tag:
 
 ```bash
-git clone --depth 1 -b v0.2.6 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.7 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows: scripts\install.ps1 -Profile web
 ```
 
-The script writes a single managed block containing the two preset rows into the profile patch. It backs up the file first, and re-running it never creates a second block. The plan-mode component, the legacy-id layer, and the composition self-check are part of the plugin itself and only load when installed through the plugin manager. With `--with-plan-mode` (`-WithPlanMode` in PowerShell), the script also writes the resident PTC runtime setting into the profile.
+The script writes a single managed block containing the two preset rows into the profile patch. It backs up the file first, and re-running it never creates a second block. The plan-mode component, the legacy-id layer, and the composition self-check are part of the plugin itself and only load when installed through the plugin manager. The plan-mode component, the legacy-id layer, the composition self-check and the `glob`/`grep` concurrency marks are all part of the plugin, so only a plugin-manager install brings them. With `--with-runtime` (formerly `--with-plan-mode`; `-WithRuntime` in PowerShell) the script also writes a profile-level `ptc-runtime: persistent-in-memory` — that one applies to **every** preset in the profile, and `--uninstall` removes it too.
+
+The two paths are either/or: if the script already wrote the preset rows and you want the plugin card instead, run `--uninstall` first, or the presets get registered twice (`agent-preset/invalid`).
 
 ### Restart after installing
 
 Presets and runtime settings are read once, at process start.
 
 - `web` profile: reload the page.
-- `desktop`, `headless`, `acp`: quit the host completely and start it again. The classic symptom of skipping this is "the plugin is installed, but the `run_code` speedup isn't there".
+- `desktop`: quit the host completely and start it again. The classic symptom of skipping this is "the plugin is installed, but the `run_code` speedup isn't there".
+- `headless` / `acp`: presets don't activate there anyway (`headless` measured, `acp` untested), so there is nothing to restart.
 
 ### Check the installation
 
@@ -142,6 +145,8 @@ dsh --profile web --dump-config | grep -c 'persistent-in-memory'    # 1
 dsh --profile web --dump-config | grep -c 'plan-mode-ui'            # 1
 node scripts/doctor.mjs --profile web                                # version, duplicate rows, !!js, YAML parsing in one pass
 ```
+
+Those `node scripts/...` paths assume you're in the repository (or the unpacked release archive). With a plugin-manager install the scripts live inside the profile: `node ~/.dsh/profiles/web/node_modules/dsh-flash-presets/scripts/doctor.mjs --profile web`.
 
 ### Update and uninstall
 
@@ -159,7 +164,7 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 ### Upgrading from 0.2.5
 
 - Preset ids changed: the 13-rule preset moved from `flash-lean-ptc-v3` to `flash-lean-ptc-v3-lite`, and the former 3-rule `flash-lean-ptc-v3-lite` is now `flash-lean-ptc-v3-balance`.
-- Old sessions still open. A runtime compatibility layer resolves 12 historical ids (including `flash-lean-ptc-v3` and `-v2`) to lite. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
+- Old sessions still open. A runtime compatibility layer resolves the 5 ids this package ever published (`flash-lean`, `flash-lean-ptc`, `-v1`, `-v2`, `-v3`) to lite; ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
 - If the profile's `selectedDefault` still points at an old id, new sessions fail with `Unknown agent preset`. Set it to `flash-lean-ptc-v3-lite`.
 
@@ -168,12 +173,12 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 The same plugin card carries a plan-mode component, plan-mode v1 (1.0.0). Within a single turn, the agent writes a plan, waits for your approval, then executes it, and writes the measured acceptance results back to the card at the end. The two halves divide the work cleanly: the presets govern how each turn spends its budget; plan mode makes the turn think before it acts.
 
 - The control sits to the left of the input box, with off / light / full levels independent of the preset.
-- Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 26% more tokens and about 33% more time ([changelog](docs/CHANGELOG.md), Chinese).
+- Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 17% more tokens (median 40.2k vs 34.3k) and about 33% more time (196 s vs 147 s) ([changelog](docs/CHANGELOG.md), Chinese).
 - If you don't want it, switch the component off on the card. The presets behave exactly the same without it.
 
 ## Getting the most out of it
 
-- **State the goal and how success is checked.** The sharper the criteria, the better the result; when the boundaries are fuzzy, pair it with plan or goal mode. The P15654 example above shows how large the difference can be.
+- **State the goal and how success is checked.** The sharper the criteria, the better the result; when the boundaries are fuzzy, pair it with plan or goal mode. The P15654 comparison is in [measured evidence](docs/实测证据.md).
 - **Raise the output limit.** 120K or more is recommended, 384K if you can, so long reasoning isn't cut off.
 - **On Windows**, install PowerShell 7 (the MSI build) or Git Bash first.
 - **Give long-thinking models one problem per session.** Handed several at once, a model may lay out every plan in a single response and get cut off upstream before it ever acts ([measured evidence](docs/实测证据.md), "跨模型").
@@ -193,7 +198,8 @@ node scripts/diag-preset-load.mjs --profile desktop   # when a preset card in th
 | The compact / plan / goal slash commands disappear, and the next message fails with `tool executor is unavailable` | A plugin hot reload released the preset composition of an open session and didn't remount it | Restart DSH. The plugin checks every 2 minutes and logs the remedy; set `DSH_FLASH_PRESETS_SELFCHECK_HEAL=1` to remount automatically |
 | Two or three presets with the same name | Bare rows from an old install sit next to the new managed block | Re-run the install script; it adopts and merges the old rows |
 | `js-yaml` reports `unknown tag` | The file still contains `!!js` tags | `node scripts/doctor.mjs --fix` (back up first) |
-| The presets don't appear at all | DSH is older than 0.1.7, or the wrong profile was targeted | Upgrade DSH, or point `--profile` at the right one |
+| The presets don't appear at all | DSH is older than 0.2.1-rc.5, or the wrong profile was targeted | Upgrade DSH, or point `--profile` at the right one |
+| The presets vanish after a DSH upgrade | DSH went past the `engines` ceiling `<0.2.3-0`, so the plugin is skipped at load time | Upgrade this package; `dsh plugin allow-version` can force it at your own risk |
 
 The preset patch only defines the agent-side plugin set. It doesn't touch GUI pieces such as the workspace picker, the directory picker, or the terminal. If something unrelated to presets breaks after installing, please open an [issue](https://github.com/LarryE135/dsh-flash-presets/issues) with the doctor output and the browser console errors.
 
@@ -209,9 +215,10 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 
 ## Known limitations
 
-- Under the headless profile on DSH 0.2.2-rc.1, both presets and plan mode stay pending and never take effect (each run reports `3 entries did not activate`). Use the web or desktop profile.
+- Under the headless profile on DSH 0.2.2-rc.1, both presets and plan mode stay pending and never take effect (each run reports `3 entries did not activate`). Use the web or desktop profile. `acp` is completely unverified.
 - macOS hasn't been verified on real hardware. The install script is written for bash 3.2 and runs in CI on all three platforms.
 - The patch contains `!!js` tags that the DSH loader resolves; third-party YAML parsers report an unknown tag. The install script resolves them to plain values before writing to the profile.
+- The `glob` / `grep` concurrency marks only exist in a plugin-manager install; the script install doesn't have them (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them). Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
 - Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
 
 ## Development and checks
@@ -226,11 +233,16 @@ bash scripts/selftest.sh
 
 ## Version history
 
+### v0.2.7 (2026-11-06)
+
+- Second-round audit fixes: installer wording and the `--with-runtime` rename, `--uninstall` now removes the runtime override, `doctor --sessions` no longer crashes, the alias table no longer carries `$comment`, the peer range covers 0.2.2-rc.1, and `NOTICE` carries the upstream MIT text.
+- Docs now match the implementation: the top of this README states the two things that apply to the whole profile and how to switch them off; "12 historical ids" became 5; broken anchors and a dangling reference are gone; plan mode's "26% more expensive" is corrected to 17% (medians).
+- CI gained a 0.2.2-rc.1 install matrix entry and a pack → unpack → run-user-scripts job, and `bundle-install` now compares exact ids instead of substrings.
 ### v0.2.6 (2026-11-06)
 
 - Two presets remain: lite (13 rules, default) and balance (3 rules). v1, v2, and the experimental variants are no longer shipped.
-- Plan mode moved back into the main package as the third component on the same card (plan-mode v1).
-- New runtime compatibility layer: 12 historical preset ids resolve to lite without rewriting session files.
+- Plan mode moved back into the main package (plan-mode v1), on the same plugin card as the two presets.
+- New runtime compatibility layer: the 5 ids this package ever published resolve to lite without rewriting session files.
 - New composition self-check, a four-layer alignment audit (`npm run audit:align`), and read-only concurrency marks for `glob` / `grep`.
 - Fixed: preset cards showed "failed to load" after DSH 0.2.2-rc.1 removed the `list-agents` subpath.
 

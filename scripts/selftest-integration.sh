@@ -22,8 +22,17 @@ blocks=$(grep -c "dsh-flash-presets: managed block (0.1.7" "$patch" || true)
 [ "$blocks" -eq 1 ] && ok "托管块恰好 1 个" || bad "托管块数量 = ${blocks}（期望 1）"
 grep -q "id: preset-flash-lean-ptc-v3" "$patch" && ok "v3 预设行已写入" || bad "v3 预设行缺失"
 
-# 0.2.6 起安装器如实说明：计划模式组件只有 dsh plugin add 才装，本脚本只写预设行。
-grep -q "计划模式" <<<"$out" && grep -q "dsh plugin add dsh-flash-presets" <<<"$out" && ok "安装器说明计划模式组件只在 dsh plugin add 时装" || bad "安装器未说明计划模式组件的安装方式"
+# 0.2.7 起安装器说的话必须三件事都成立（第二轮审计 N1-3）：
+#   ① 写明「未安装」的到底是哪几项；② 给出按 tag 安装的插件卡命令（不是会装到坏 0.2.5 的裸包名）；
+#   ③ 不再出现「运行时调优已就位」这类与 ① 自相矛盾的断言。
+grep -q "未安装：计划模式组件" <<<"$out" && ok "安装器列出未安装的三项" || bad "安装器没有如实说明未安装的组件"
+grep -q "add github:LarryE135/dsh-flash-presets#v" <<<"$out" && ok "安装器给出的插件卡命令锁了 tag" || bad "安装器推荐的插件卡命令没有锁 tag（可能装到 npm 上的旧版）"
+if grep -q "未安装：计划模式组件" <<<"$out" && grep -q "运行时调优已就位" <<<"$out"; then
+  bad "安装器自相矛盾：同时说「未安装」和「运行时调优已就位」"
+else
+  ok "安装器没有自相矛盾的完成提示"
+fi
+grep -q "二选一" <<<"$out" && ok "安装器提示两条安装路径二选一（含切换前卸载）" || bad "安装器没有说明两条路径的取舍"
 
 if command -v dsh >/dev/null 2>&1; then
   ok "(dsh 可用：跳过本地路径断言)"

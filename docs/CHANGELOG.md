@@ -1,8 +1,33 @@
 # 变更日志
 
-> **版本口径（2026-11-06 发布整理）**：对外只发 **0.2.6**（npm 上接在 0.2.5 之后）。当天为定位问题临时引入的
-> 迭代号 0.2.7–0.2.14 从未发布，全部并入 0.2.6；下面把它们降为三级标题保留，便于追溯与回滚定位。
+> **版本口径（2026-11-06 发布整理）**：对外发布的是 **0.2.6** 与随后的 **0.2.7**（0.2.6 定稿时并入的
+> 迭代号 0.2.7–0.2.14 从未单独发布；0.2.7 是审计修正版，与那批迭代号无关，详见下方 0.2.7 一节）。
+> 同日迭代那批内容降为「同日迭代」下的四级标题保留，便于追溯与回滚定位。
 
+## 0.2.7（2026-11-06，发布）
+
+第二轮第三方审计（19 条新发现 + 36 条复核）之后的一天内修正。这一版**不改预设规则文本、不改模型行为**，只改文档口径、安装器行为、包内容与 CI；因此不需要重测预设效果。
+
+- **版本号**：0.2.6 一晚被 `git tag -f` 移过 5 次（702472b → a8f041b → efff2d8 → 2a337ad → ed68fc9 → 8f069d9），同一个「0.2.6」对应过 6 个提交。`v0.2.6` 自此冻结在 `8f069d9`，本版是干净的 0.2.7；`scripts/publish.sh` 增加硬规则：远端已有同名 tag 就拒绝执行。
+- **安装器**（N1-3 / N2-2 / P2-11）
+  - 完成提示重写：明确「已写入两行预设」「计划模式组件、旧 id 兼容层、`glob`/`grep` 并发只在插件管理器安装时才有」「两条路径二选一，切换前先 `--uninstall`」，删掉自相矛盾的「运行时调优已就位」与会装到坏 0.2.5 的 `add dsh-flash-presets` 建议。
+  - `--with-plan-mode` 更名 `--with-runtime`（旧名保留为别名）：它只写 profile 级 `ptc-runtime: persistent-in-memory`，不装计划模式组件；帮助文本、注释、示例 profile 一并修正。
+  - `--uninstall` 现在会一并撤掉 `--with-runtime` 写入的 `# >>> tune-runtime` 块（`tune-runtime.mjs` 新增 `--revert`），不再出现「卸完整个 profile 仍被改着」。
+  - `tune-runtime.mjs` 尊重 `DSH_HOME` 的两行缩进修正。
+- **doctor**（N2-1）：旧会话扫描器不随包发布，`--sessions` / `--all` 在插件安装形态下不再 `ERR_MODULE_NOT_FOUND`；改为只读说明「旧 id 由兼容层解析，会话无需迁移」，并删掉会改写会话的 `--apply` 建议。
+- **alias 表**（N3-1）：`$comment` 从 `aliases` 移回顶层，`loadAliasMap()` 跳过 `$` 开头的键，计数类输出不再多 1。
+- **peer 范围**（N3-2）：`@deepseek-ai/dsh-llm` 改为 `>=0.2.1-rc.5 <0.2.3-0 || >=0.2.2-0 <0.2.3-0`——原来那条在 npm/pnpm 的严格 semver 下不含 0.2.2-rc.1（DSH 自己的 `engines` 判断用 includePrerelease，不受影响）。
+- **NOTICE**（N3-3）：版权行照抄上游（`Copyright (c) 2026 DeepSeek`），附上游 MIT 全文，并加本包版权行。
+- **文档口径**（P1-7 / N2-3 / N2-4 / N2-5 / N2-8 / N2-9 / N3-4 / N3-5 / P2-5 / P2-6 / P2-8）
+  - README 顶部不再声称「不动共享工具注册表」：如实写出对整个 profile 生效的两项与关闭开关（`DSH_FLASH_PRESETS_CONCURRENCY=0`、`DSH_FLASH_PRESETS_ALIAS=0`）。
+  - 「12 个历史 id」→「5 个本包发布过的历史 id」并给出名字；`DSH_FLASH_PRESETS_ALIAS_EXTRA` 作为个人映射入口。
+  - 失效锚点（`#已知偏差` / `#known-deviations`）与悬空的 P15654 引用修掉；`verify-presets` 现在检查 `#` 锚点并覆盖 `README.en.md`。
+  - 计划模式「full 贵约 26%」改为按中位数算的 17%（40.2 k vs 34.3 k，196 s vs 147 s）；规则数实验写成「最多四臂」。
+  - `docs/版本与兼容性.md` 重写：删掉「一张卡三个组件 / 兼容别名 / 三条 insert / `@0.2.6` / 回退装 0.2.5」整节，headless 与 acp 的结论分开写，体积与文件数改成现查命令。
+  - `marketplace/plugin.json` 落后两版：描述、兼容区间、安装命令按 0.2.7 重写。
+- **CI**（P1-11 / N3-7）：`bundle-install` 加 `0.2.1-rc.5` 与 `0.2.2-rc.1` 两档矩阵，断言改为精确 id 比对（原来 `grep flash-lean-ptc-v3` 是子串匹配，等于什么都没断言），步骤名同步；新增 `pack-doctor` job：`npm pack` → 解包 → 在解出来的 38 个文件里跑 `doctor --all` / `tune-runtime` / `verify-presets`，并断言写会话的维护脚本没有随包发布。
+
+- **仍未做**（需要改模型行为，另行排期）：`tool-presentation` → `tool-executor-ptc`（`dsh-tool-executor-ptc` 在 0.2.1 系列里不存在，换它等于放弃 0.2.1 下限）、规则 4 跨平台、两个预设的 description 中性化、并发标记只作用于本包预设（目前对整个 profile 生效，已在文档如实说明）、日志噪音与轮询间隔。
 ## 0.2.6（2026-11-06，发布）
 
 - **发布前修正：DSH 0.2.2-rc.1 下两张「Agent 预设」卡片显示「加载失败」**（本机实机复现并修复）
@@ -11,7 +36,7 @@
   - 修法：两份 `presets/*.patch.yml` 删掉这个两行条目（`list_agents` 由 `tool-subagent-control` 主插件自带，能力不减），重新合成 `cordis.patch.yml`；`verify-yaml.mjs` 增加断言，禁止再出现该子路径。
   - 验证：`desktop` profile 实机安装后，用一次性诊断插件调 `agentPresets.list()`，两个预设均无 `broken`；`--dump-config` 本包预设行 2 条、`persistent-in-memory` 1 处、`plan-mode-ui` 1 处。
 - **升级注意（0.2.5 → 0.2.6）**
-  - `flash-lean-ptc-v3` 这个 id 不再存在：按 id 恢复的历史会话会找不到预设，需要在「Agent 预设」里重选；`agent-preset-registry` 的 `selectedDefault` 若仍指向旧 id，新建会话报 `Unknown agent preset: flash-lean-ptc-v3`。
+  - `flash-lean-ptc-v3` 不再作为独立预设定义：旧 id 由运行时兼容层解析，按 id 恢复的历史会话**无需重选**；但 `agent-preset-registry` 的 `selectedDefault` 若仍指向旧 id，**仍需手改**（alias 只兜底解析，不改 profile 配置），否则新建会话报 `Unknown agent preset: flash-lean-ptc-v3`。
   - `flash-lean-ptc-v3-lite` 的语义变了：0.2.5 时期它是 3 条规则的弱约束版，0.2.6 起是 13 条规则的默认版；原来的 3 条版本改名为 `flash-lean-ptc-v3-balance`（order 26）。
   - `desktop` / `headless` / `acp` 只在启动时读补丁层，装完必须完全退出再启动；`web` 刷新页面即可。替换后卡片仍然红，说明还有别的行不匹配，按上面 `broken` 字符串的格式继续排查。
   - 自定义预设时不要写 `@deepseek-ai/dsh-tool-subagent-control/list-agents`：DSH 0.2.2 起该子路径已移除，写了会让整份预设失效。
@@ -19,14 +44,15 @@
 - **预设重命名为两个，语义按「约束强度」重新排列**：
   - `flash-lean-ptc-v3-lite`（显示名「轻量PTC-v3 lite」，13 条规则，order 27，**默认**）：原 `flash-lean-ptc-v3` 的自由精确改名，描述改为「效率最高的轻量预设，适用于绝大部分日常工作」。
   - `flash-lean-ptc-v3-balance`（显示名「轻量PTC-v3 balance」，3 条规则，order 26）：原 `flash-lean-ptc-v3-lite` 改名，描述改为「约束较弱的预设，适用于需要模型发挥的场景」。
-  - `flash-lean-ptc-v3` 这个 id 不再存在；按 id 恢复的历史会话会找不到同名预设，需在选择器里重选。
+  - `flash-lean-ptc-v3` 不再作为独立预设定义；旧 id 由运行时兼容层解析，按 id 恢复的历史会话无需重选（兼容层见下方 0.2.10）。
   - `v3-max`（7 条）与 `v3-none`（0 条）仍在 `presets/` 之外，只保留在评测协议 `arm-v3max.yml` / `arm-v0.yml` 里作对照臂。
 - 依据：三床 × 四臂实测（决策 15 次/臂、hard 9 次/臂、算法 10 次/臂）显示 persona 规则条数对质量与 token 均无可测差异（配对比 0.86–1.42，Bonferroni 后无一显著）；同时长任务注意力评测里 v3 在长文阅读轴出现可判定退化（−4.00 [−7.60, −1.20]），故不做进一步削减，也不保留无人格对照组作为发布项。
-- 校验脚本、安装器、doctor、README 与版本表同步改为两预设口径（`verify-runtime` 断言预设行数为 2）。
+- 校验脚本、安装器、doctor 与中英 README 改为两预设口径（`verify-runtime` 断言预设行数为 2）；**版本表当时没有同步**——仍是「一张卡三个组件 / 兼容别名 / 三条 insert」（见下文「第三方审计修复」P1-5 与本节末的措辞更正）。
 
 ### 发布验证（2026-11-06 晚：全新安装 + 同环境 A/B）
 
-- **CI（提交 `a8f041b`，即 tag `v0.2.6`）**：`verify (ubuntu-24.04 / windows-latest / macos-latest)` + `integration` + `bundle-install` + `plugin-tests (22 / 24)` 全部 success（`canary` 只在每周 cron 跑，本次 skipped 属正常）。
+- **tag `v0.2.6` 的指向（如实记录）**：该 tag 在 2026-11-06 19:38–20:29 之间先后指向 6 个提交（`702472b` → `a8f041b` → `efff2d8` → `2a337ad` → `ed68fc9` → `8f069d9`），最终停在 `8f069d9` 并**已冻结，后续改动只进新版本号**。按 tag 安装的用户，锁文件钉住的是各自安装那一刻 tag 所指的提交——所以同一个名字 0.2.6 实际对应过 6 个不同提交；Release 附件也在 20:29 按 `8f069d9` 重传。
+- **CI（提交 `8f069d9`，即 tag `v0.2.6` 最终指向的提交）**：`verify (ubuntu-24.04 / windows-latest / macos-latest)` + `integration` + `bundle-install` + `plugin-tests (22 / 24)` 全部 success（`canary` 只在每周 cron 跑，本次 skipped 属正常）。
   这之前从 `cf955ac` 起 CI **一直是红的**，原因是三处**过期断言**：① `selftest-integration.sh` 写死 `[7] dsh --dump-config`，而 doctor 新增「旧会话的预设 id」小节后该检查漂到 `[8]`；② `verify-runtime.mjs` 写死「预设行数 3」，而 0.2.6 只装 lite / balance 两个；③ `verify-versions.mjs` 要求 `dist/` 附件名带**插件版本**，与真实约定（组合包附件按 tag 命名，如 `dsh-flash-presets-v0.2.6.zip`）冲突。三处分别改为「按小节标题匹配」「从 `SHIPPED` 推导行数」「两类附件各按各的版本口径」。
 - **全新安装（空 `DSH_HOME`）**：`dsh plugin --profile web add dsh-flash-presets-0.2.6.tgz` → `+1 package`、475 ms（pnpm 离线）。安装包内 `lib/{tool-concurrency,preset-alias,composition-check,compat-heal,index}.js` 与仓库 sha256 **逐个相同**；`--dump-config` 里 `ptc-runtime → executionMode: persistent-in-memory`、`preset-flash-lean-ptc-v3-lite` / `-balance` 各 1 行，`verify-runtime.mjs` 对该 dump 断言通过；把**安装包里的 `lib/`** 直接喂给插件测试：12 passed / 0 failed（含「executable 钩子：决策点即时标记（不依赖扫描）」）。
 - **A 在新装里立刻生效**：启动即 `[tool-concurrency] 已启用（目标 glob,grep；全局视图 未注册；已挂载会话 0）→ 会话挂载预设后会补标记`；首个会话挂上后立刻出现 `已标记 glob,grep（全局视图 + 1 个会话作用域，共 2 处）｜调度器判据 glob=true grep=true（最近会话）` —— 不等任何定时扫描，决策点钩子按预期工作。
@@ -34,32 +60,37 @@
   - A 开：`65949→68440(2491ms) / 65951→68447 / 65951→68450` ⇒ **并行**，跨度 2501 ms，各自之和 7486 ms（起始相差 2 ms，窗口完全重叠）。
   - A 关（`DSH_FLASH_PRESETS_CONCURRENCY=0` 重启同一 home）：`8624→11578(2954ms) / 11580→11942(362ms) / 11943→12147(204ms)` ⇒ **串行**，跨度 3523 ms ≈ 各自之和 3520 ms。
   - 结论：并发来自本插件（而不是 DSH 默认行为），且**新装第一轮就生效**。
-- **复现**：隔离实例起在 3099（自带 `--patch` 只把模型指向本机 WB Proxy，不改安装内容），用带 token 的入口打开会话发同一句提示词，然后 `node ~/.dsh/scripts/measure-tool-concurrency.mjs --dsh-home <隔离 home>`。测量时看每批的 `⇒ 并行/串行` 结论，别只看脚本末尾那句汇总（只要存在任一并行批它就会打印「并发确实发生」）。
+- **复现**：隔离实例起在 3099（自带 `--patch` 只把模型指向本机 WB Proxy，不改安装内容），用带 token 的入口打开会话发同一句提示词，然后用本机私有的并发测量脚本（`measure-tool-concurrency.mjs`，不随包发布，参数 `--dsh-home <隔离 home>`）跑一遍。测量时看每批的 `⇒ 并行/串行` 结论，别只看脚本末尾那句汇总（只要存在任一并行批它就会打印「并发确实发生」）。
 - 同版本其它校验：`npm run verify` 退出 0（含 `sync-lib --check`、`check-ps1`）；插件测试 25 项通过；四层对齐审计存储层 1622/1622、reject 0、无幽灵目录、`aliased 0 / orphan 0`；实机 DSH 0.2.2-rc.1（WSL）与 0.2.1-rc.5。
 
 ### 第三方审计修复（2026-11-06 晚，P0/P1/P2 处理）
 
 审计报告共 36 条（P0 1 / P1 13 / P2 16 / P3 6）。本轮只处理**不改规则文本、不改预设行为**的部分；代码级改动另行排期（见本节末「未做」）。
 
-- **P0-1（npm 上 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话）**：README 明确「npm 上的 0.2.5 不可用；0.2.6 上 npm 之前从 GitHub / Release 附件安装」，安装节首选 `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6`。npm 端仍需 `npm login` 后 `npm deprecate dsh-flash-presets@0.2.5 "DSH 0.2.2-rc.1+ 下预设无法加载，请用 0.2.6+"` 并发布 0.2.6（本机 token 已过期）。
+- **P0-1（npm 上 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话）**：README 明确「npm 上的 0.2.5 不可用；0.2.6 上 npm 之前从 GitHub / Release 附件安装」，安装节首选 `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6`。但审计建议的「脚本安装与插件卡安装**二选一**、切换前先 `--uninstall`」这两句**没有**写进 README（全文无「二选一」，卸载节也没有切换前先卸的说明），留给 0.2.7。npm 端仍需 `npm login` 后 `npm deprecate dsh-flash-presets@0.2.5 "DSH 0.2.2-rc.1+ 下预设无法加载，请用 0.2.6+"` 并发布 0.2.6（本机 token 已过期）。
 - **P1-1 DSH 版本闸放错位置**：`engines` 原来嵌在 `dsh` 对象里，而 `dsh-app-boot` 只读**顶层** `fields.engines`（已核对该文件 1098-1102 行），等于没有任何闸。现改为顶层 `engines: { dsh: ">=0.2.1-rc.5 <0.2.3-0", node: ">=22.15" }`，`dsh.engines` 删除。
 - **P1-2 peer 自动安装旧包**：`@deepseek-ai/dsh-llm` 从 `"*"` 收窄到同区间，并加 `peerDependenciesMeta.optional`（与 `plugins/plan-mode-ui/package.json` 一致），避免 `npm i -g` 拉进 2026-08 的 0.0.1-rc.1。
-- **P1-5 预设数量/id 五处打架**：中英文 README、版本表、`cordis.patch.yml` 头注释模板统一为「两个预设：lite（13 条，默认）+ balance（3 条）；旧 id 由运行时 alias 解析，不建兼容卡」；删掉 README 里把 0.2.7–0.2.9 当成已发布版本的段落（改为指向本文件「同日迭代」）；删掉英文版里不存在的 `presets/flash-lean-ptc-v3-alias.patch.yml` 引用。
+- **P1-5 预设数量/id 五处打架（部分完成）**：中英文 README 与 `cordis.patch.yml` 头注释模板统一为「两个预设：lite（13 条，默认）+ balance（3 条）；旧 id 由运行时 alias 解析，不建兼容卡」；**版本表没同步**——`docs/版本与兼容性.md:84-90` 当时仍是「一张卡三个组件」、`preset-flash-lean-ptc-v3（兼容别名）`、「补丁层里的三条 insert」，与 README 的两个预设正面冲突，留给 0.2.7 重写；删掉 README 里把 0.2.7–0.2.9 当成已发布版本的段落（改为指向本文件「同日迭代」）；删掉英文版里不存在的 `presets/flash-lean-ptc-v3-alias.patch.yml` 引用。
 - **P1-6 计划模式安装说明三套说法**：统一为「计划模式与常驻运行时只有 `dsh plugin add dsh-flash-presets` 才装；`install.sh` / `install.ps1` 只写两行预设」。删掉不存在的包名 `dsh-plan-mode-ui` 及对应命令，两个安装器的完成文案同步。
-- **P1-7 README 说「不动宿主」不成立**：README 顶部改为如实列出装后对整个 profile 生效的三项（PTC 常驻运行时、glob/grep 并发标记、旧预设 id 映射），并给关闭开关 `DSH_FLASH_PRESETS_CONCURRENCY=0` / `DSH_FLASH_PRESETS_ALIAS=0`。
+- **P1-7 README 说「不动宿主」不成立（本轮未做）**：0.2.6 定稿时 README 顶部**没有改动**——当时的 `README.md:17` 写的是「不改宿主代码，也不动共享工具注册表」，与同页「插件在运行时为 `glob` / `grep` 补上只读并发标记」直接矛盾；三项全局生效说明与关闭开关 `DSH_FLASH_PRESETS_CONCURRENCY=0` / `DSH_FLASH_PRESETS_ALIAS=0` 当时也都没写进 README（全文只有 `DSH_FLASH_PRESETS_SELFCHECK_HEAL`）。该页在本文件定稿后已另行修改，不属 0.2.6。开关本身在代码里已有（`lib/tool-concurrency.js` / `lib/preset-alias.js`），缺的是文档；留给 0.2.7。
 - **P1-8 alias 表泄漏本机实验 id**：`presets/legacy-preset-map.json` 只保留本包真实发布过的 5 个 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`），移除 `code` / `win-control` / `codex-contract-v1` / `-v3b` / `-v3-1` / `-v3-max` / `-v3-none` 以及全部 `sessions` 计数与本机备注。个人 id 改用新环境变量 `DSH_FLASH_PRESETS_ALIAS_EXTRA=<json>` 追加，不随包发布。
 - **P1-9 会话改写说法矛盾**：README 只保留「默认关闭，`DSH_FLASH_PRESETS_HEAL=1` 才开」；`files` 移除 `scripts/retarget-session-presets.mjs` 等会写会话的维护脚本（仍留在仓库）。
 - **P2-1 根包缺 `type` / `engines.node`，CI 用 Node 20**：加 `"type": "module"` 与 `engines.node >= 22.15`；CI 的 verify job 从 Node 20 升到 24。
-- **P2-2 / P2-3 包体积数字过期、`files` 过宽**：删掉文档里写死的文件数/体积（以 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize` 为准）；`files` 改为白名单，benchmark / AB / 迁移 / 发布类脚本不再进包。
-- **P2-4 / P2-5 description 自相矛盾**：`package.json` 与 `marketplace/plugin.json` 的中英文描述统一为两预设口径，`marketplace` 的 DSH 兼容区间同步。
+- **P2-2 / P2-3 包体积数字过期、`files` 过宽（部分完成）**：README 里写死的文件数/体积已删（口径改为以 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize` 为准），但**版本表当时仍写死**——`docs/版本与兼容性.md:82` 当时还写着「0.2.6 的 45 个文件 / 约 474 kB（压缩后约 161 kB）」，与实测 38 文件 / 171.7 kB 不符，留给 0.2.7；`files` 改为白名单这一半是真做了：benchmark / AB / 迁移 / 发布类脚本不再进包。
+- **P2-4 / P2-5 description 自相矛盾（只做了 `package.json`）**：`package.json` 的 description 已按两预设口径重写；`marketplace/plugin.json` **本轮零改动**（`a8f041b..8f069d9` 对 `marketplace/` 无提交）——当时 `:5` 写着「v3 (13 rules) is the default; v3 lite keeps only the three rules」、`:6` 写着「（v1/v2/v3）……v3（lean-v3）为现行主版本」、`:23` 的兼容区间是 `dsh >=0.1.7-rc.1`，`install` 命令是裸包名。留给 0.2.7（该文件在本文件定稿后已另行修改，不属 0.2.6）。
 - **P2-8 / P2-15 个人路径与账号页**：`docs/实测证据.md` 的复现命令改用 `$HOME` 并注明「私有脚本，不在仓库」；`PUBLISHING.md` 的 token 页改为通用链接。
 - **P2-10 `tune-runtime.mjs` 忽略 `DSH_HOME`**：ROOT 改为 `(${process.env.DSH_HOME || ~/.dsh})/profiles`，隔离环境里跑安装器不再改真实 `~/.dsh`。
 - **P2-16 上游署名**：新增根目录 `NOTICE`（声明预设 agent 树与 `lib/` 复刻/改编自 deepseek-ai/deepseek-harness，MIT），并加进 `files`。
 
-**未做（需要改行为或改规则文本，留给下一个版本）**：P1-3（`dsh-agent-tool-presentation` → `dsh-tool-executor-ptc`，需先核实该包在 0.2.1-rc.5 是否存在）、P1-10（两个预设 description 的中性化措辞）、P1-11（CI 双版本矩阵 + mount 冒烟测试、canary 改每日）、P1-12（规则 4 的 `/usr/bin/time -v` 跨平台化）、P1-13（两套实测口径的原始数据补齐）、P2-12（启动日志合并、扫描频率下调）。P2-9（先发 Release 后 CI 变绿、tag 被移动）见上一节「发布验证」的记录；本轮 tag 未再移动。
-### 同日迭代（0.2.7–0.2.14，未发布，已并入 0.2.6）
+**未做（需要改行为或改规则文本，留给下一个版本）**：P1-3（`dsh-agent-tool-presentation` → `dsh-tool-executor-ptc`，需先核实该包在 0.2.1-rc.5 是否存在）、P1-10（两个预设 description 的中性化措辞）、P1-11（CI 双版本矩阵 + mount 冒烟测试、canary 改每日）、P1-12（规则 4 的 `/usr/bin/time -v` 跨平台化）、P1-13（两套实测口径的原始数据补齐）、P2-12（启动日志合并、扫描频率下调）。P2-9（先发 Release 后 CI 变绿、tag 被移动）见上一节「发布验证」的记录：tag `v0.2.6` 当晚在 19:38–20:29 之间被移了 5 次、共指向 6 个提交，最终停在 `8f069d9`；**该 tag 已冻结，不再移动，后续改动只进新版本号**。
 
-### 0.2.14（2026-11-06，A 的实测验收：发现「第一轮赶不上扫描」的竞态，改成决策点即时标记）
+**本节措辞更正（2026-11-06 晚补记）**：上面几条当时只做了一半，原文却写成了已完成或已统一。补正后的事实是：① 0.2.6 定稿时 README 安装节改成了按 tag 安装，但没有审计建议的「二选一」与「切换前先卸载」；② `docs/版本与兼容性.md` 当时未同步（仍是「一张卡三个组件 / 兼容别名 / 三条 insert」，并写死 45 文件 / 约 474 kB；该页后来另行重写，不属 0.2.6 的改动）；③ 0.2.6 定稿时 README 顶部未动，也没有 `DSH_FLASH_PRESETS_CONCURRENCY=0` / `DSH_FLASH_PRESETS_ALIAS=0` 的说明（该页此后已另行修改，不属 0.2.6）；④ `marketplace/plugin.json` 在 0.2.6 定稿时零改动（中英文描述仍按 v1/v2/v3 口径，`compatibility.dsh` 仍是 `>=0.1.7-rc.1`；该文件后来另行修改，不属 0.2.6）；⑤ tag `v0.2.6` 当晚移动过 6 次（见上一节）。这五项都不是「已修」，留给 0.2.7 处理；本节不做任何未经验证的完成陈述。
+
+### 同日迭代（未单独发布）
+
+> 本节按时间倒序记录 0.2.7–0.2.14 的迭代，全部并入 0.2.6，从未单独发布。**0.2.9 未单独成节**：本次整理时仓库里找不到对应条目（只有代码注释提到它），内容待作者补充。
+
+#### 0.2.14（2026-11-06，A 的实测验收：发现「第一轮赶不上扫描」的竞态，改成决策点即时标记）
 
 - **现场实测（真跑）**：在 GUI 里新建会话、同一轮发 3 个 grep（`path` 都是本仓库，`pattern` 分别是 `preset-alias`/`composition-check`/`tool-concurrency`），从会话日志取 `tool/call → tool/result` 时间窗：
   `18:53:17.880→.920 / .920→.942 / .943→.962` —— **首尾相接，串行 82ms**，不是并行。
@@ -69,9 +100,9 @@
 - **日志改成「按作用域增长各打一条」**（以前只打首次）：每多标住一个会话就多一行 `已标记 glob,grep（全局视图 + N 个会话作用域，共 M 处）｜调度器判据 glob=true grep=true`，方便事后核对「标记是否先于那一轮」。幂等，不刷屏。
 - **测试** 12 项（新增 2 项）：`executable` 钩子在**决策点**即时标记（扫描间隔故意设成 10 分钟，证明不依赖扫描）、非目标工具不受影响、卸载还原；日志随作用域增长（+1 会话 → 多一条且显示 `+ 2 个会话作用域`）。
 - **顺带修正 0.2.13 的文档口径**：0.2.13 条目里「按 500ms/1s/2s 退避重试（默认 4 次）」与 `toolConcurrency.attempts` 是早期设计的残留，实际发布的是「全局 + 按 agent 作用域扫描」这一版，本次一并改正。
-- **验收方法**（重启后）：新开会话发同一轮 3 个 grep，然后 `node ~/.dsh/scripts/measure-tool-concurrency.mjs --session <id片段> --name grep`，应显示 `批 [3] … ⇒ 并行`（跨度 < 各自耗时之和）；对照组把 `DSH_FLASH_PRESETS_CONCURRENCY=0` 打开重启，同样跑一次应显示 `⇒ 串行`。
+- **验收方法**（重启后）：新开会话发同一轮 3 个 grep，然后用本机私有的并发测量脚本（`measure-tool-concurrency.mjs`，不随包发布；参数 `--session <id片段> --name grep`），应显示 `批 [3] … ⇒ 并行`（跨度 < 各自耗时之和）；对照组把 `DSH_FLASH_PRESETS_CONCURRENCY=0` 打开重启，同样跑一次应显示 `⇒ 串行`。
 
-### 0.2.13（2026-11-06，run_code 优化 A 真正落地：不再改 node_modules，改由插件在运行期给 glob/grep 补并发标记）
+#### 0.2.13（2026-11-06，run_code 优化 A 真正落地：不再改 node_modules，改由插件在运行期给 glob/grep 补并发标记）
 
 - **背景（实测）**：在隔离环境做全新安装验证时发现，A（@「原生多调用 492→204 ms」）**一直是空操作**：`scripts/tune-runtime.mjs` 要改的 `profiles/<p>/node_modules/@deepseek-ai/dsh-tool-fs-search/lib/index.js` 在 0.2.2-rc.1 的布局里根本不存在（该包不是 profile 依赖，从全局 dsh 安装解析），脚本自己报 `A 只读并发 = n/a`；上游 `dsh-tool-fs-search` 至今 **0 个** `isConcurrencySafe`（`glob`/`grep` 都没声明），而 `dsh-tools/lib/pipeline.js` 的 `executionMode()` 只认 `=== true`，于是多调用一律串行。B（常驻 PTC 运行时）不受影响，全新安装即生效（dump 里 `persistent-in-memory` 恰好 1 处）。
 - **新做法 `lib/tool-concurrency.js`**：`tools.register()` 不允许同名覆盖（`tool "glob" is already registered`），所以在**已注册的定义对象**上补一个分类函数——`defineTool` 返回的是普通可变对象，registry 与调度器持有同一引用，补完 `executionMode()` 立刻返回 `{kind:"parallel"}`。不碰 `node_modules`、不改 profile 配置、插件卸载时用 `ctx.effect` 撤掉标记。
@@ -84,15 +115,15 @@
   `[tool-concurrency] 已标记 glob,grep（全局视图 + N 个会话作用域，共 M 处）｜调度器判据 glob=true grep=true`。
 - **已知边界**：本模块只在带 `webServer` 的 profile（web / desktop）里生效——plan-mode-ui 整行都要等 `webServer`，headless / tui 下这行是 `pending`（隔离实验里实测：`dsh headless` 跑两次既不报错也不标记）。要做 headless 的并发优化，得把 tool-concurrency 拆成独立插件（它只需要 `tools`+`agents`），这是后续可选项。
 
-### 0.2.12（2026-11-06，对齐审计：四层一次扫完；修掉 0.2.11 记下的路径 bug）
+#### 0.2.12（2026-11-06，对齐审计：四层一次扫完；修掉 0.2.11 记下的路径 bug）
 
 - **新增 `scripts/audit-align.mjs`**（`npm run audit:align`）：一条命令扫完四层，回答“为什么看起来还没对齐”。① 存储层按 DSH 自己的选取规则（同一会话目录只认世代号最大的日志）复核世代文件名 ⇄ `header.version`、"id/cwd → 目录路径" 的身份一致性与幽灵目录；② 解析层列 roster/alias/orphan；③ 记录层列“仍然写着历史 id”的会话（这些会话解析没问题，但头部芯片按 roster 查不到名字，会显示原始 id）；④ 组合层列“实际会跑哪个预设”，并区分“记录为空”的会话。退出码：存储层不变量被破坏或出现孤儿 id 时为 1。
-- **修正 0.2.10 的一处误读**：`audit-compat` 把“没有记录 preset”的 1072 条会话算成“实际跑 selectedDefault”。实测这 1072 条全部来自自动化/实验运行（`~/Work/exp/…`、`~/Work/wbval/…`、`~/Codex-Sub`、`/tmp` 等，多为 700+ 事件的跑批），它们的组合由调用方的 profile 决定，不受 web profile 的默认值支配；真正吃 `selectedDefault` 的是**新建**会话。因此把 profile 默认值改成 lite 只影响新建会话，不能用来“修”这些老会话。
+- **修正 0.2.10 的一处误读**：`audit-compat` 把“没有记录 preset”的 1072 条会话算成“实际跑 selectedDefault”。实测这 1072 条全部来自自动化/实验运行（本机私有试验目录与 `/tmp` 一类临时目录，多为 700+ 事件的跑批；这些目录与脚本都不随包发布），它们的组合由调用方的 profile 决定，不受 web profile 的默认值支配；真正吃 `selectedDefault` 的是**新建**会话。因此把 profile 默认值改成 lite 只影响新建会话，不能用来“修”这些老会话。
 - **修掉 `sessionHeader()` 的路径拼接 bug**（0.2.11 结尾“留待单独评估”的那一条）：DSH 的会话 id **自带 `session-` 前缀**（`workspace.json`、`session.lock`、header 里都是这个形式），目录名就是这个 id；旧代码又拼了一次 `"session-" + id`，得到 `session-session-…`，于是兜底读盘永远落空，`delegationDepth` 恒为 0、`isSubagent()` 恒为假。现在两种写法都试（与 `composition-check` 的取样口径一致），命中后仍走同一份 30 秒失败节流缓存。
 - **`retarget-session-presets.mjs` 与 DSH 的选取规则对齐**：以前它对同一会话目录里**所有**世代日志都做分析，于是同一个会话可能在报告里出现两次、备份里多出一份永远读不到的旧世代；现在只处理世代号最大的那份（与 `audit-align` 同口径），并在摘要里报出“历史世代文件（不动）”的条数（本机 274 份）。待改写会话数因此从 193 变成 162（193 里含 31 份历史世代文件）。
 - **本机审计结论**（WSL，1622 个会话）：存储层 1622/1622 通过（0 世代不匹配 / 0 身份不匹配 / 0 幽灵目录 / 0 旧扁平布局；另有 274 份历史世代日志、182.6 MB 被正确忽略）；解析层 orphan 0（162 条走 alias）；记录层 162 条仍写历史 id（48 条在侧栏 → 芯片显示 `flash-lean-ptc` 之类的原始 id）；组合层 1072 default / 334 lite / 183 standard / 19 minimal / 12 ptc / 2 balance；侧栏可见 268，有内容但无 `session/title` 的 157 条（首次打开时由 DSH 回填）。
 
-### 0.2.11（2026-11-06，组合自检：热重载后的「压缩/计划消失」不再靠人发现）
+#### 0.2.11（2026-11-06，组合自检：热重载后的「压缩/计划消失」不再靠人发现）
 
 - **现场**：0.2.10 装好并重启后，17:31–17:44 之间打开的 **22 条**会话，其 agent 的预设组合层（tool executor / compaction / command-compact / command-goal / plan-mode）在 17:48:21 一次插件热重载中被连同旧插件图 dispose 掉，且不会自动重挂。用户看到的是斜杠菜单只剩 profile 全局命令（`export`/`feedback`/`permission`），「压缩 compact」「计划 plan」「目标 goal」全没了；再发一句就报 `The selected tool executor is unavailable. Load an executor in this composition before running the agent.`。会话日志、预设定义、alias 层全都正常——**纯运行期状态**，重启 dsh 即恢复（实测 22/22 恢复）。
 - **新增 `lib/composition-check.js`**：激活后等 `agents`/`commands` 就绪，每 2 分钟（可调）扫一遍**已挂载** agent，用两个只读探针判定组合是否还在：`commands.list(agent)`（期望命令默认 `compact`，可用 `DSH_FLASH_PRESETS_SELFCHECK_EXPECT` 改）与 `tools.selectExecutor(agent)`（纯查找，缺失时抛 `ToolExecutorUnavailableError`）。任一失败即打一条错误日志，写明「命令层 = …、缺 compact/、工具执行器不可用」和处置（重启 dsh / 重选预设）；同一会话不重复刷屏。
@@ -101,7 +132,7 @@
 - **测试** `plugins/plan-mode-ui/test/composition-check.mjs`（26 项）：健康不报警、只剩全局命令报警一次且不刷屏、仅执行器缺失也报警、heal 降级路径（读不到 preset 时不写日志地放弃）、heal 成功路径（临时 DSH_HOME + 真多帧 zstd 首帧 → 真调 select → 复验恢复）、服务缺失/list 抛错/无 id 的容错、开关与 expect 解析。
 - 顺带修正：会话目录名就是会话 id（`session-<uuid>`），新模块按此解析；`lib/index.js` 里旧有的 `sessionHeader()` 用 `"session-" + id` 拼路径，对真实 id 永远落空（只是被兜底掩盖），本次未动它，留待单独评估。
 
-### 0.2.10（2026-11-06，旧会话的根因修复：id 是持久化契约，不是显示名）
+#### 0.2.10（2026-11-06，旧会话的根因修复：id 是持久化契约，不是显示名）
 
 - **根因**：DSH 把 preset id 写进会话日志（首帧 `header.agentPreset`，以及每条 `agent-preset/selected` 事件），`resume` 时用 `agentPresets.resolve(有效 id)` 解析，解析不到就抛 `agent-preset/not-found`。上游没有 alias / hidden / fallback 字段（definition 只有 id/name/description/order/plugins），picker 只过滤 `broken`——所以**改名或删除 id 等于把旧会话弄丢**。0.2.6 删 `flash-lean-ptc-v3`、0.2.9 又删 `-v3-lite` 以外的兼容卡，都是同一个错误的两次发作。
 - **新增运行时 alias 层** `lib/preset-alias.js` + `presets/legacy-preset-map.json`（12 个历史 id → `flash-lean-ptc-v3-lite`）：只在解析失败时回落一次；不新增 preset 定义、不进 picker、**不写任何会话文件**；方法不存在/签名变化/赋值失败一律静默退化；`ctx.effect` 卸载即还原；`DSH_FLASH_PRESETS_ALIAS=0` 可关。
@@ -110,21 +141,21 @@
 - **新增一次性迁移工具** `scripts/retarget-session-presets.mjs`（默认 dry-run）：只改「决定解析结果的那一处」（最后一条 selection，或 header），**帧级改写**、其余帧按字节拼接，首帧仍必须是一行 header；写前整份备份 + manifest，写后两遍独立校验（逐行语义比对 + 从磁盘重读确认无残留旧 id），失败即回滚；同步清理 `storages/session_projcache` 对应条目（缓存按 seq 续算，不清就会一直沿用旧值——这是 0.2.8 自愈“跑了但没生效”的原因）。沙箱实测：21 个真实会话样本 → 改写 19、失败 0、第二遍 0 改写（幂等）、`--revert` 后与 pristine 逐字节相同。
 - **兼容闸门** `scripts/check-preset-compat.mjs` 接入 `npm run verify`：历史 tag 里的 id 必须三选一才算通过——当前仍定义 / 在 alias 表里 / 登记了例外；并断言 alias 表的 canonical 确实是被定义过的 id。
 - 说明：`agent-preset/selected` 事件里出现过的**中间** id 不作改写（投影按顺序覆盖，不影响解析），只有真正决定解析结果的那一条会被迁移；因此升级后若不再需要 alias 层，跑一次 `npm run retarget:sessions -- --apply --yes --force`（先停 DSH）即可回到“零兼容层”。
-### 0.2.8（2026-11-06，旧会话自愈：用户端无感升级）
+#### 0.2.8（2026-11-06，旧会话自愈：用户端无感升级）
 
 - **新增 lib/compat-heal.js**：启动后 4s 扫描 DSH_HOME/sessions，把 header 里仍是历史 id（flash-lean / flash-lean-ptc / -v1 / -v2，白名单之外一律不动）的会话改写成 flash-lean-ptc-v3。
 - **只重编码首帧**：事件帧按字节拼接，绝不解码-重编码（0.2.6 截断事故的成因）。
 - **写盘四道闸**：整份备份 → 临时文件 → 写后校验（帧数 + 第 2..N 帧逐字节）→ rename；任一步失败保留原文件。
 - **幂等**：第二次启动零改写；锁文件互斥，日志 logs/preset-heal.log，DSH_FLASH_PRESETS_HEAL=0 关闭。
 - 沙箱验证：6 条旧 id 会话样本，修复 6/6、失败 0，逐帧比对只有 agentPreset 变化。
-### 0.2.7（2026-11-06，旧会话兼容：id 不变 + 兼容别名）
+#### 0.2.7（2026-11-06，旧会话兼容：id 不变 + 兼容别名）
 
 - **预设 id 保持 0.2.6 的定义**：`flash-lean-ptc-v3-lite`（13 条，order 27，默认）与 `flash-lean-ptc-v3-balance`（3 条，order 26）。不再改动任何 id。
 - **新增兼容别名预设 `flash-lean-ptc-v3`**（显示名「轻量PTC-v3（lean-v3 兼容）」，order 28）：规则、插件、压缩参数与 lite 完全相同，只为让 0.2.5 及更早写进会话的 lean-v3 id 能按 id 解析。选择器里因此有三张卡：lite / balance / 兼容别名。安装器（`--all-presets` 默认名单）、`merge-presets`、doctor、`verify-*` 与版本表同步收录。
 - **彻底停止改写会话数据**：0.2.7 早期稿的 `scripts/migrate-legacy-preset-ids.mjs` 曾用 `zstdDecompressSync` 读会话日志再整文件重写——DSH 的 `session.v4.jsonl.zstd` 是**多帧 zstd**（首帧 header，其后每帧事件），该 API 只返回第一帧，重写会把事件流全部丢掉。现在 `--apply` / `--revert` 直接拒绝执行并打印原因，脚本只保留只读扫描（doctor `--sessions` 用）。**不要再用任何脚本原地改写会话文件。**
 - 升级说明：旧 lean-v3 会话（记录 `flash-lean-ptc-v3`）直接可开，不需要迁移；`-v1` / `-v2` / `-v3b` 没有对应预设，仍需重选。
 
-## 0.2.6-dev3（原 0.2.8，未发布，已并入 0.2.6）
+### 0.2.6-dev3（未发布，已并入 0.2.6）
 
 - **新增两个预设，GUI 选择器里可直接手动测试**
   - `flash-lean-ptc-v3-lite`（「轻量PTC-v3 lite」，order 26，3 条规则）：保留 persona 前缀，只留引擎替代不了的三条——守语言与范围、不写密钥、同一路子连败两次就换并报确切命令与输出。
@@ -132,15 +163,15 @@
 - **实测与更正**（三床对照，n=5–15，详见 `实测证据.md`）：质量上各臂不可区分（算法床与 hard 床全满分；decision 床 20.13 / 19.73 / 19.73，CI 含 0）；token 配对检验无显著差异（lite/v3 = 0.86–1.22，CI 均含 1）。此前按 n=1 / n=3 得出的「lite 省 2/3 token」「persona 对结构化任务有用」等说法均在噪声内，已在文档中作废。该规模只能排除 >2 倍的差异。
 - 校验同步：`verify-yaml` 对 `rules === 0` 的预设改断言「无 persona 行」，对 3 条版本只要求转录敏感一条；`compose` / `merge` / `doctor` / `install` 的预设清单都扩到四项。
 
-## 0.2.6-dev2（原 0.2.7，未发布）
+### 0.2.6-dev2（未发布）
 
 - **修复客户端插件加载失败（GUI 停在 “Failed to load plugins”）**：合并后 `lib/client.js` 的 `__ModuleLoader__.load({ id: ... })` 仍写着源码包名 `dsh-plan-mode-ui`，而 DSH 的客户端 boot graph 以**包名** `dsh-flash-presets` 作为行 id，`materialize(id)` 查不到 factory，该行永远“未到达”，前端渲染失败页。
   - 治本：`scripts/sync-lib.mjs` 同步 `lib/client.js` 时把注册 id 改写为 `package.json` 的 `name`；`--check` 按改写后内容比对，找不到源 id 直接报错（源码侧再改名不会被静默放过）。
   - 防回归：`npm run verify` 与 `prepublishOnly` 都跑 `sync-lib --check`。
 
-- **0.2.6 的 tgz 作废**：`~/.dsh/profiles/web/vendor/dsh-flash-presets-0.2.6.tgz` 里存的仍是旧 id，任何人再执行 `dsh plugin add` 都会把缺陷装回来，故升版 0.2.7 并重打包。
+- **0.2.6 的 tgz 作废**：本机开发环境 `$DSH_HOME/profiles/web/vendor/` 下缓存的 `dsh-flash-presets-0.2.6.tgz`（本地文件，不随包发布）里存的仍是旧 id，任何人再执行 `dsh plugin add` 都会把缺陷装回来，故升版（本 dev 稿）并重打包。
 
-## 0.2.6-dev1（未发布，历史稿）
+### 0.2.6-dev1（未发布，历史稿）
 
 - **预设收敛为两个：`v3` 与 `v3 max`**：
   - `flash-lean-ptc-v3-1-max` 更名为 `flash-lean-ptc-v3-max`（row id `preset-flash-lean-ptc-v3-max`，order 28），

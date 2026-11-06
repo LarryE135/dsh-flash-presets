@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
+const REVERT = A.includes('--revert');
 // 只有显式 --profile 才收窄；环境里的 DSH_PROFILE 不参与，否则默认只查一个 profile 很坑。
 const only = (() => {
   const i = A.indexOf('--profile');
@@ -25,8 +26,8 @@ const only = (() => {
 })();
 
 // 尊重 DSH_HOME：隔离环境（DSH_HOME=/tmp/x）里跑安装器时不能去改真实的 ~/.dsh。
-  const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
-  const ROOT = path.join(DSH_HOME, 'profiles');
+const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
+const ROOT = path.join(DSH_HOME, 'profiles');
 const FS_PKG = path.join('node_modules', '@deepseek-ai', 'dsh-tool-fs-search', 'lib', 'index.js'); // 旧落点，仅留作历史参考
 
 function semverAtLeast(version, min) {
@@ -101,6 +102,22 @@ function applyB(dir, st, profile) {
   return 'patched';
 }
 
+// --revert：把 --apply 追加的托管块撤掉（安装器卸载时调用；块在托管块之外，必须单独删）。
+function revertB(dir, st) {
+  const text = st.text || '';
+  const start = text.indexOf(MARK);
+  if (start < 0) return 'nothing';
+  const at = text.indexOf('executionMode: persistent-in-memory', start);
+  if (at < 0) return 'nothing';
+  const nl = text.indexOf(String.fromCharCode(10), at);
+  const end = nl < 0 ? text.length : nl + 1;
+  const next = text.slice(0, start) + text.slice(end);
+  const bak = backup(st.file);
+  fs.writeFileSync(st.file, next);
+  const left = fs.readFileSync(st.file, 'utf8');
+  return left.indexOf(MARK) >= 0 ? 'failed (残块未删净，备份 ' + path.basename(bak) + ')' : 'reverted';
+}
+
 // A 已改由插件提供（0.2.6 起）：glob/grep 的定义对象由 plan-mode-ui 的
 // lib/tool-concurrency.js 在运行期补 isConcurrencySafe。以前的实现是改 profile 里的
 // node_modules/@deepseek-ai/dsh-tool-fs-search/lib/index.js，但 0.2.2-rc.1 起该包不再
@@ -147,7 +164,7 @@ for (const dir of dirs) {
   const name = path.basename(dir);
   const b = checkB(dir, name);
   const a = checkA(dir);
-  const bAction = APPLY ? applyB(dir, b, name) : (b.ok ? 'ok' : 'MISSING');
+  const bAction = REVERT ? revertB(dir, b) : (APPLY ? applyB(dir, b, name) : (b.ok ? 'ok' : 'MISSING'));
   const aAction = APPLY ? applyA(dir, a) : (a.ok ? 'ok（插件 ' + (a.version ?? '?') + '）' : (a.version === null ? 'n/a（未装插件）' : 'MISSING'));
   if (!b.ok) missing++;
   if (!a.ok && a.version !== null) missing++;   // 该 profile 根本没装 fs-search 时不计入缺口
