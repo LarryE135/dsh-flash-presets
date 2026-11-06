@@ -3,7 +3,7 @@
 // 用 system-prompt 的 personaSuffix 覆盖（不是 insert —— persona 插件会与 headless 自带的
 // deployment:persona-prefix 冲突，挂载即报错，规则根本不会进 prompt）。
 //
-//   node scripts/ab-overlay.mjs --from presets/flash-lean-ptc-v3.patch.yml --out /tmp/base.overlay.yml
+//   node scripts/ab-overlay.mjs --from presets/flash-lean-ptc-v3-lite.patch.yml --out /tmp/base.overlay.yml
 import fs from "node:fs";
 import path from "node:path";
 

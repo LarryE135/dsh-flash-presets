@@ -18,13 +18,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
 // 0.2.6 起只提供两个预设：v3（默认，基础轻量）与 v3 max（解除预算限制的全量版）。
 // 两者都随包安装，选择器里就这两项。
-const SOURCES = ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-max.patch.yml',
-                 'presets/flash-lean-ptc-v3-lite.patch.yml', 'presets/flash-lean-ptc-v3-none.patch.yml'];
+const SOURCES = ['presets/flash-lean-ptc-v3-lite.patch.yml', 'presets/flash-lean-ptc-v3-balance.patch.yml'];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
   '# 本文件叠加 v3、v3 max、v3 lite、v3 none 四个预设；装一次，选择器里就有四项。',
-  '# 源文件：presets/flash-lean-ptc-v3{,-max,-lite,-none}.patch.yml。',
+  '# 源文件：presets/flash-lean-ptc-v3-lite{,-lite}.patch.yml。',
   '#   node scripts/compose-bundle-patch.mjs          # v3 + v3 max + v3 lite + v3 none',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',

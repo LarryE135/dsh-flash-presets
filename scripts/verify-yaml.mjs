@@ -77,17 +77,17 @@ console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
 console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
-  'flash-lean-ptc-v3.patch.yml': { preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
-                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
-  'flash-lean-ptc-v3-max.patch.yml': { preset: 'flash-lean-ptc-v3-max', order: 28, rules: 7, ptcRow: true,
-                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
-  'flash-lean-ptc-v3-lite.patch.yml': { preset: 'flash-lean-ptc-v3-lite', order: 26, rules: 3, ptcRow: true,
-                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
-  'flash-lean-ptc-v3-none.patch.yml': { preset: 'flash-lean-ptc-v3-none', order: 29, rules: 0, ptcRow: true,
-                                  thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1 },
+  'flash-lean-ptc-v3-lite.patch.yml': {
+    preset: 'flash-lean-ptc-v3-lite', order: 27, rules: 13, ptcRow: true,
+    thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
+  },
+  'flash-lean-ptc-v3-balance.patch.yml': {
+    preset: 'flash-lean-ptc-v3-balance', order: 26, rules: 3, ptcRow: true,
+    thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
+  },
 };
-// bundle 默认只发 v3（EXPECT 里其余是源文件级的对照版本，不进合成产物）
-const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max', 'flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-none'];
+// 合成产物只发 v3 与 v3 lite（两个源预设，全部进 bundle）
+const BUNDLE_IDS = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
 const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
@@ -128,8 +128,14 @@ function checkPatchFile(file, exp) {
   const flat = flatten(plugins);
   check(plugins.length >= 15, 'plugin 行数 ' + plugins.length + '（期望 ≥ 15）');
   check(flat.length >= plugins.length, '嵌套组可展开（展平后 ' + flat.length + ' 行）');
+  // DSH 0.2.2-rc.1 起 list_agents 并入 @deepseek-ai/dsh-tool-subagent-control 主插件，
+  // 子路径 ./list-agents 已从 exports 移除；再声明这一行会让整份预设 mount 失败，
+  // GUI 的「Agent 预设」卡片显示「加载失败」（0.2.6 发布前的实际故障，见 CHANGELOG）。
+  const removedPluginNames = ['@deepseek-ai/dsh-tool-subagent-control/list-agents'];
+  const staleRows = flat.filter(p => removedPluginNames.includes(String((p && p.name) || '')));
+  check(staleRows.length === 0, '不引用上游已移除的插件子路径（list-agents）');
   const persona = flat.find(p => p.id === 'persona');
-  // rules === 0 即对照版 v3-none：故意不带 persona 行，只断言「确实没有」。
+  // rules === 0 的无人格对照版本已移出发布包；保留该分支以兼容历史源文件。
   if (exp.rules === 0) {
     check(!persona, 'persona 行不存在（对照版 none）');
   } else {
@@ -191,9 +197,9 @@ if (args.length) {
     const isInstallTarget = rows.length > 0 || /[\\/]profiles[\\/]/.test(file);
     if (isInstallTarget) {
       // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
-      check(rows.includes('flash-lean-ptc-v3'),
+      check(rows.includes('flash-lean-ptc-v3-lite'),
             '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-max', 'flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-none'];
+      const known = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
       check(rows.every(id => known.includes(id)),
             '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {
@@ -250,7 +256,7 @@ if (args.length) {
     }
   }
   check(!fs.existsSync(path.join(repo, 'presets', 'legacy-0.1.5')),
-        '旧式目录 presets/legacy-0.1.5 已移除（0.2.6 起只保留 v3 与 v3 max 两个插件行式预设）');
+        '旧式目录 presets/legacy-0.1.5 已移除（0.2.6 起只保留 v3 与 v3 lite 两个插件行式预设）');
 }
 
 console.log('\n' + (failed ? 'YAML 校验失败：' + failed + ' 项。' : 'YAML 校验通过。'));

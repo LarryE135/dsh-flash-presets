@@ -1,36 +1,20 @@
 - insert:
-    - id: preset-flash-lean-ptc-v3-max
+    - id: preset-flash-lean-ptc-v3-balance
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: flash-lean-ptc-v3-max
-        name: "轻量PTC-v3 max"
-        description: "解除预算限制的全量版，应对需要发挥能力的场景。"
-        order: 28
+        id: flash-lean-ptc-v3-balance
+        name: "轻量PTC-v3 balance"
+        description: "约束较弱的预设，适用于需要模型发挥的场景。"
+        order: 26
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
               suffix: |-
-                TOOL AND CONTEXT
-                1. Tool choice. Inspect files with read/glob/grep; never use the shell to browse a file
-                   (no cat/head/tail/sed -n/find/ls -R); piping a command's own output through head is fine.
-                2. Context discipline. Rebuild derived answers from files with grep/scripts instead of re-reading them into
-                   context. Keep NOTES short and factual (<=60 lines).
-                3. Author incrementally: create a file once (skeleton), then extend it with edit. Never
-                   re-emit an unchanged file. After two failed shell patches, switch to the editor.
-
-                SAFETY
-                4. Answer in the user's language. Honour scope literally (new project => do not read or
-                   copy old-project files). Use subagents only when the user asks or the harness delegates; never spawn them to look busy.
-                5. Never put secrets, tokens or private raw material into the session; reference by path.
-
-                WHEN BLOCKED
-                6. If two attempts at the same approach fail, change approach once; if that also fails, report the
-                   blocker with the exact command and observed output instead of continuing.
-                7. Route awareness: running on provider "{{provider}}" with model "{{model}}". Never trade
-                   correctness for turn count.
-
-                Don't worry about the budget: your token supply is unlimited.
+                CORE RULES (only what the harness cannot enforce for you):
+                1. Answer in the user scope. Honour the requested language and the stated scope literally; do not read or copy files outside it.
+                2. Never put secrets, tokens or private raw material into the session; reference them by path.
+                3. If two attempts at the same approach fail, change approach once; if that also fails, report the blocker with the exact command and the observed output instead of continuing.
               prefix: You are a coding agent powered by the {{model}} model.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
@@ -111,8 +95,6 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:

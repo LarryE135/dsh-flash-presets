@@ -40,10 +40,8 @@ const repoOnly = ARGV.includes('--repo-only');
 const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
-  'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
-  'flash-lean-ptc-v3-max': { rules: 7, ptc: true, order: 28, legacy: false, thr: '0.25', retain: '20000' },
-  'flash-lean-ptc-v3-lite': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
-  'flash-lean-ptc-v3-none': { rules: 0, ptc: true, order: 29, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3-lite': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3-balance': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
@@ -77,8 +75,8 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
   // （工作目录走 runtime context，不走占位符）。
   const PROMPT_VARS = new Set(['provider', 'model']);
-  for (const f of ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-max.patch.yml',
-                   'presets/flash-lean-ptc-v3-lite.patch.yml', 'presets/flash-lean-ptc-v3-none.patch.yml',
+  for (const f of ['presets/flash-lean-ptc-v3-lite.patch.yml',
+                   'presets/flash-lean-ptc-v3-balance.patch.yml',
                    'cordis.patch.yml',]) {
     const text = read(path.join(repo, f));
     if (text === null) continue;

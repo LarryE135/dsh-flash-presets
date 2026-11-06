@@ -15,8 +15,8 @@
 预设影响三件事：预算与轮数（按轮计，不按步计）、工具输出的折叠与裁剪、判定任务完成的标准。它不提升模型能力，只决定一次会话花多少轮、在哪一步停下、用什么标准收尾。
 
 > [!IMPORTANT]
-> 当前版本：v0.2.8（未发布；GitHub Release 与 npm 上仍是 0.2.5）。一张插件卡带五个组件：预设 `轻量PTC-v3`、`轻量PTC-v3 max`、`轻量PTC-v3 lite`、`轻量PTC-v3 none`，以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。三个组件各自可单独开关。`v3`（内部代号 lean-v3）是主版本，对齐 DSH 0.2.1-rc.2 和 v41flash 1017快照。
-> 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出三个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
+> 当前版本：v0.2.6（2026-11-06 发布；npm 上一次发布是 0.2.5）。一张插件卡带三个组件：预设 `轻量PTC-v3 lite`（13 条规则，默认）、`轻量PTC-v3 balance`（3 条规则），以及计划模式 `plan-mode v1`（1.0.0；开发期的 0.7.x 只是内部编号，不对外发布）。每个组件可单独开关。已对齐 DSH 0.2.1-rc.5 与 0.2.2-rc.1 实机验证（v41flash 1017 快照）。
+> 已验证：三平台安装器回归；模拟安装（临时 `DSH_HOME` 安装后用 `dsh 0.2.1 --dump-config` 合成出两个预设，重复安装幂等，卸载后依赖 / bundle 选择 / patch 层无残留）；组合包合成一致性。
 > 未验证：macOS 真机；native 模式的同规模对照。
 > 数字与失效场景见 [实测证据](docs/实测证据.md) 及下文「已知限制」。
 
@@ -24,12 +24,28 @@
 
 | 预设 | id | order | 规则条数 | 压缩 | 用途 |
 |---|---|---|---|---|---|
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **默认安装**。基础的轻量预设，满足绝大多数日常工作 |
-| v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | 解除预算限制的全量版，应对需要发挥能力的场景 |
-| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | 只留 3 条引擎替代不了的规则；实测（n=5–15）与 v3 在质量与 token 上均无可测差异 |
-| v3 none | `flash-lean-ptc-v3-none` | 29 | 0 | 0.25 / 20k | 无人格规则的对照组，**仅用于手动测试**，不建议日常使用 |
+| 轻量PTC-v3 lite | `flash-lean-ptc-v3-lite` | 27 | 13 | 0.25 / 20k | **默认安装**。效率最高的轻量预设，适用于绝大部分日常工作 |
+| 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | 约束较弱的预设，适用于需要模型发挥的场景 |
 
-**本版提供四个预设**（0.2.6 起移除 v1/v2 与 v3.1 变体；0.2.8 增补 lite 与 none）：四个都随包安装，选择器里就是这四项。v3 适合绝大多数日常任务；v3 lite 适合纯功能型、想把 token 压到最低的活；v3 max 只在你需要模型放开手脚、不在乎消耗时选；v3 none 是手工对照 persona 影响的实验组。
+**本版提供两个预设**（0.2.6 起移除 v1/v2、v3.1 变体、v3 max 与 v3 none）：`轻量PTC-v3 lite`（13 条规则，效率最高，默认装）与 `轻量PTC-v3 balance`（3 条规则，约束最弱）。前者适合绝大部分日常工作；后者需要模型自己发挥时选。
+
+## 装完为什么要重启宿主
+
+预设与运行时都是 **profile 配置的一部分，进程启动时读取一次**：
+
+- 预设卡片 / `plan-mode-ui` 出现在选择器里，靠宿主重新组合 bundle；
+- `run_code` 的常驻运行时（`ptc-runtime: persistent-in-memory`，免掉每个 program 约 108 ms 的固定成本）同样只在宿主启动时装配。
+
+所以 `dsh plugin add` 或 `install.sh` 成功之后，**必须重启桌面端 / web 宿主**，否则会出现「插件已装、但 runcode 优化没生效」。
+验证：`node scripts/tune-runtime.mjs --check --profile <profile>`，两栏都 ok 才算落地。
+
+如果 GUI 里预设卡片显示 **加载失败**，先跑：
+
+```bash
+node scripts/diag-preset-load.mjs --profile desktop
+```
+
+它输出四类证据：预设引用了哪些插件包、哪些在本机解析不到、客户端注册 id 是否等于包名、`--dump-config` 能否解析。
 
 ## 安装、更新、卸载
 
@@ -42,7 +58,7 @@ dsh plugin --profile web add dsh-flash-presets
 
 在 GUI 的「插件 → 添加插件」里填 `dsh-flash-presets`，效果相同。
 
-> 安装后预设列表里出现 **v3 / v3 lite / v3 max / v3 none** 四项（`flash-lean-ptc-v3` / `-lite` / `-max` / `-none`），见上文「预设」。
+> 安装后预设列表里出现 **轻量PTC-v3 lite / 轻量PTC-v3 balance** 两项（id：`flash-lean-ptc-v3-lite` / `flash-lean-ptc-v3-balance`），见上文「预设」。
 
 <img width="413" height="283" alt="屏幕截图 2026-10-29 103513" src="https://github.com/user-attachments/assets/3b824c59-7334-4d1f-a8c1-64c0a3a5bb0b" />
 
@@ -63,7 +79,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 
 适合跟未发布的分支或本地改动。同样写在 GUI 的「插件 → 添加插件」里也能装。
 
-`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的两个 insert 条目（v3、v3 max）叠加到该 profile，另外用一条 `ptc-runtime` 覆盖把 PTC 运行时切成常驻。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
+`--profile` 取 `web`、`desktop`、`headless`、`acp` 之一。管理器把本包写入该 profile 的 `dsh.profile.bundles`，并把 `cordis.patch.yml` 里的两个 insert 条目（`v3-lite`、`v3-balance`）叠加到该 profile，另外用一条 `ptc-runtime` 覆盖把 PTC 运行时切成常驻。`web` 为 live reload，刷新界面即可见；其他 profile 需重启。
 
 更新时重复执行同一条 `add`，或先 `remove` 再 `add`。卸载时把本包从 `dsh.profile.bundles` 与依赖中移除后重装依赖；由脚本写入的托管块用 `scripts/install.sh --uninstall` 清除。
 
@@ -73,7 +89,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 node scripts/verify-presets.mjs                  # 结构与取值断言，可用 DSH_HOME / DSH_PROFILE 指向模拟安装
 node scripts/verify-yaml.mjs                     # YAML 与跨平台标签检查
 node scripts/compose-bundle-patch.mjs --check    # 断言 cordis.patch.yml 与 presets/* 一致
-dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
+dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'
 ```
 
 ## 与计划模式插件一起用（可选）
@@ -90,7 +106,7 @@ bash scripts/install.sh --with-plan-mode
 node scripts/doctor.mjs --profile web --all         # [1]–[5] 预设、[6] 插件、[7] 合成配置
 ```
 
-GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3`、`preset-flash-lean-ptc-v3-max`、`preset-flash-lean-ptc-v3-lite`、`preset-flash-lean-ptc-v3-none` 四个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
+GUI 的「已安装插件」里，预设那张卡的「包含的组件」会列出 `preset-flash-lean-ptc-v3-lite`、`preset-flash-lean-ptc-v3-balance` 两个组件，可以逐个开关；插件那张卡只有 `plan-mode-ui` 一个组件。关掉组件只是停用它，卸载要卸载整个包。
 
 插件是纯可选项：**没装时预设行为完全不变**，`doctor` 只给一行 `⚠ 未安装（纯可选）`，不计入失败。装了之后入口在输入框左侧，档位 off / light / full 独立于预设设置。
 
@@ -169,7 +185,7 @@ npm run checklist:bench    # 发布前人工复核（自动收集证据，人只
 
 ## 兼容性
 
-本仓库在 DSH 0.2.1-rc.5（rc.2 亦实测）上做过模拟安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 v1、v2、v3，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留（pnpm 在 profile 的 `pnpm-workspace.yaml` 里留下的 `minimumReleaseAgeExclude` 记录不属于本包，卸载时不会清除，也不影响配置合成）。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。0.1.7 以前只有 v1 提供 `presets/legacy-0.1.5/` 的目录式回退，v2 与 v3 不支持。web profile 为 live reload，desktop、headless、acp 需重启，因为 provider 补丁层只在启动时读取。
+本仓库在 DSH 0.2.1-rc.5（rc.2 亦实测）与 0.2.2-rc.1 上做过安装回归：临时 `DSH_HOME` 安装后用 `--dump-config` 合成出 `flash-lean-ptc-v3-lite` 与 `flash-lean-ptc-v3-balance` 两行，重复安装幂等，卸载后依赖、`dsh.profile.bundles` 选择与 patch 层均无残留（pnpm 在 profile 的 `pnpm-workspace.yaml` 里留下的 `minimumReleaseAgeExclude` 记录不属于本包，卸载时不会清除，也不影响配置合成）。0.2.2-rc.1 另在 `desktop` profile 上实机验证：`agentPresets/list` 两条预设均无 `broken`。0.1.7 到 0.2.0 走同一套插件行机制，安装器逻辑未改。`web` profile 为 live reload，desktop、headless、acp 需重启，因为补丁层只在启动时读取。
 
 安装器在 Windows PowerShell、Ubuntu、macOS 上跑过三平台 CI（矩阵见 `.github/workflows/verify.yml`）。macOS 未在真机验证，脚本按 bash 3.2 兼容写，变量后接非 ASCII 字符时用 ${var}。补丁里的 `!!js` 标签由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。
 
@@ -211,14 +227,18 @@ node scripts/doctor.mjs --profile web      # 加 --dump 会顺手跑 dsh --dump-
 
 5. 本包只安装预设行，不携带工具：profile 缺对应插件时这些行会失效，安装器也不会补齐依赖。
 
+6. 预设里的插件行必须能被 DSH 解析：DSH 0.2.2-rc.1 起 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，子路径 `./list-agents` 已移除。自行改预设时再写这一行，整份预设会被判 broken，GUI 卡片显示「加载失败」。
+
+7. 升级到 0.2.6 会改预设 id：`flash-lean-ptc-v3` 不再存在，且 `flash-lean-ptc-v3-lite` 的规则数从 3 条变成 13 条；按 id 恢复的旧会话要在选择器里重选，详见 [版本与兼容性](docs/版本与兼容性.md) 的「注意事项」。
+
+8. 装完必须完全退出宿主再启动（desktop / headless / acp），`web` 刷新页面即可。补丁层只在启动时合成，热装不生效。
+
 ## 仓库结构
 
 ```
 presets/
-  flash-lean-ptc-v3.patch.yml     主版本（lean-v3）
-  flash-lean-ptc-v3-max.patch.yml 全量版（解除预算限制）
-  flash-lean-ptc-v3-lite.patch.yml 省 token 版（3 条规则）
-  flash-lean-ptc-v3-none.patch.yml 无人格对照组（仅手动测试）
+  flash-lean-ptc-v3-lite.patch.yml    默认预设（lean-v3，13 条规则）
+  flash-lean-ptc-v3-balance.patch.yml 弱约束版（3 条规则）
 cordis.patch.yml                  由 presets/* 合成，勿手改，CI 断言一致性
 scripts/
   install.sh / install.ps1        安装器，共用 merge-presets.mjs
@@ -240,24 +260,13 @@ marketplace/                      插件市场提交材料（不随包发布）
 
 ## 版本历史
 
-### v0.2.8（未发布）
+### v0.2.6（2026-11-06）
 
-- 新增预设 `轻量PTC-v3 lite`（3 条规则）与 `轻量PTC-v3 none`（无人格对照），选择器里共四项
-- 三床实测：hard-task lite 与 v3 均满分、lite 省 22%；decision-task v3 3/3 满分、lite 2/3、none 1/3
-- `verify-yaml` 按规则条数分支断言，`none` 断言「无 persona 行」
-
-### v0.2.7（未发布）
-
-- 修复客户端插件 bundle 的注册 id：合并后 `lib/client.js` 仍写着源码包名 `dsh-plan-mode-ui`，与 boot graph 的包名行 id 不一致，页面停在 “Failed to load plugins”
-- `scripts/sync-lib.mjs` 同步时把注册 id 改写为包名，`--check` 与 `verify-yaml` 都会拦住回归
-- 0.2.6 的 tgz 作废，请用 0.2.7
-
-### v0.2.6（未发布）
-
-- 预设收敛为 `轻量PTC-v3` 与 `轻量PTC-v3 max` 两个，移除 v1 / v2 / v3.1 变体与旧式目录 `presets/legacy-0.1.5/`
+- 预设收敛为两个：`轻量PTC-v3 lite`（`flash-lean-ptc-v3-lite`，13 条规则，order 27，默认）与 `轻量PTC-v3 balance`（`flash-lean-ptc-v3-balance`，3 条规则，order 26）；旧 id `flash-lean-ptc-v3` 不再存在，v1 / v2 / `v3 max` / `v3 none` 移出发布包
 - 计划模式并回主包，作为同一张卡里的第三个组件（plan-mode v1）；开发期的 0.7.x 编号不再对外发布
 - 运行时调优随包落地：`ptc-runtime: persistent-in-memory`，`run_code` 的固定开销从 108 ms 降到 0，嵌套 bash 从 44 ms 降到 15 ms
-- 0.2.5 的 v3 会话完全兼容：id、order 27、20 个插件、persona 逐字节不变，只有名称与描述两行文案改了
+- **兼容性修复（发布前）**：DSH 0.2.2-rc.1 把 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，`./list-agents` 子路径被移除；原先两个预设都声明了这一行，import 失败导致**整份预设** mount 失败、GUI 卡片显示「加载失败」。0.2.6 起不再声明该行，`verify-yaml` 增加断言禁止回归
+- **升级注意**：预设 id 变了（旧会话需重选）、`flash-lean-ptc-v3-lite` 从 3 条规则变为 13 条、desktop / headless / acp 装完必须重启
 - 旧版目录式安装入口改为明确拒绝（exit 3），不再静默跳过
 
 ### v0.2.5（2026-10-30）

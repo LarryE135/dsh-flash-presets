@@ -1,6 +1,27 @@
 # 变更日志
 
-## 0.2.8（未发布）
+## 0.2.6（2026-11-06，发布）
+
+- **发布前修正：DSH 0.2.2-rc.1 下两张「Agent 预设」卡片显示「加载失败」**（本机实机复现并修复）
+  - 现象：GUI「设置 → Agent 预设」里 `轻量PTC-v3 lite` 与 `轻量PTC-v3 balance` 都带红标「加载失败」；`agentPresets/list` 的 `broken` 为 `tool-subagent-list-agents (@deepseek-ai/dsh-tool-subagent-control/list-agents): never started`，新建会话用不了这两个预设。
+  - 原因：两个预设都声明了 `- id: tool-subagent-list-agents` / `name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'`。DSH 0.2.2-rc.1 把 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，`exports` 只剩 `"."`，子路径 `./list-agents` 已不存在；该行 import 失败，**整份预设**被判 broken。0.2.1-rc.x 上这行有效，所以在旧版本上测不出来。
+  - 修法：两份 `presets/*.patch.yml` 删掉这个两行条目（`list_agents` 由 `tool-subagent-control` 主插件自带，能力不减），重新合成 `cordis.patch.yml`；`verify-yaml.mjs` 增加断言，禁止再出现该子路径。
+  - 验证：`desktop` profile 实机安装后，用一次性诊断插件调 `agentPresets.list()`，两个预设均无 `broken`；`--dump-config` 本包预设行 2 条、`persistent-in-memory` 1 处、`plan-mode-ui` 1 处。
+- **升级注意（0.2.5 → 0.2.6）**
+  - `flash-lean-ptc-v3` 这个 id 不再存在：按 id 恢复的历史会话会找不到预设，需要在「Agent 预设」里重选；`agent-preset-registry` 的 `selectedDefault` 若仍指向旧 id，新建会话报 `Unknown agent preset: flash-lean-ptc-v3`。
+  - `flash-lean-ptc-v3-lite` 的语义变了：0.2.5 时期它是 3 条规则的弱约束版，0.2.6 起是 13 条规则的默认版；原来的 3 条版本改名为 `flash-lean-ptc-v3-balance`（order 26）。
+  - `desktop` / `headless` / `acp` 只在启动时读补丁层，装完必须完全退出再启动；`web` 刷新页面即可。替换后卡片仍然红，说明还有别的行不匹配，按上面 `broken` 字符串的格式继续排查。
+  - 自定义预设时不要写 `@deepseek-ai/dsh-tool-subagent-control/list-agents`：DSH 0.2.2 起该子路径已移除，写了会让整份预设失效。
+
+- **预设重命名为两个，语义按「约束强度」重新排列**：
+  - `flash-lean-ptc-v3-lite`（显示名「轻量PTC-v3 lite」，13 条规则，order 27，**默认**）：原 `flash-lean-ptc-v3` 的自由精确改名，描述改为「效率最高的轻量预设，适用于绝大部分日常工作」。
+  - `flash-lean-ptc-v3-balance`（显示名「轻量PTC-v3 balance」，3 条规则，order 26）：原 `flash-lean-ptc-v3-lite` 改名，描述改为「约束较弱的预设，适用于需要模型发挥的场景」。
+  - `flash-lean-ptc-v3` 这个 id 不再存在；按 id 恢复的历史会话会找不到同名预设，需在选择器里重选。
+  - `v3-max`（7 条）与 `v3-none`（0 条）仍在 `presets/` 之外，只保留在评测协议 `arm-v3max.yml` / `arm-v0.yml` 里作对照臂。
+- 依据：三床 × 四臂实测（决策 15 次/臂、hard 9 次/臂、算法 10 次/臂）显示 persona 规则条数对质量与 token 均无可测差异（配对比 0.86–1.42，Bonferroni 后无一显著）；同时长任务注意力评测里 v3 在长文阅读轴出现可判定退化（−4.00 [−7.60, −1.20]），故不做进一步削减，也不保留无人格对照组作为发布项。
+- 校验脚本、安装器、doctor、README 与版本表同步改为两预设口径（`verify-runtime` 断言预设行数为 2）。
+
+## 0.2.6-dev3（原 0.2.8，未发布，已并入 0.2.6）
 
 - **新增两个预设，GUI 选择器里可直接手动测试**
   - `flash-lean-ptc-v3-lite`（「轻量PTC-v3 lite」，order 26，3 条规则）：保留 persona 前缀，只留引擎替代不了的三条——守语言与范围、不写密钥、同一路子连败两次就换并报确切命令与输出。
@@ -8,7 +29,7 @@
 - **实测与更正**（三床对照，n=5–15，详见 `实测证据.md`）：质量上各臂不可区分（算法床与 hard 床全满分；decision 床 20.13 / 19.73 / 19.73，CI 含 0）；token 配对检验无显著差异（lite/v3 = 0.86–1.22，CI 均含 1）。此前按 n=1 / n=3 得出的「lite 省 2/3 token」「persona 对结构化任务有用」等说法均在噪声内，已在文档中作废。该规模只能排除 >2 倍的差异。
 - 校验同步：`verify-yaml` 对 `rules === 0` 的预设改断言「无 persona 行」，对 3 条版本只要求转录敏感一条；`compose` / `merge` / `doctor` / `install` 的预设清单都扩到四项。
 
-## 0.2.7 — 未发布
+## 0.2.6-dev2（原 0.2.7，未发布）
 
 - **修复客户端插件加载失败（GUI 停在 “Failed to load plugins”）**：合并后 `lib/client.js` 的 `__ModuleLoader__.load({ id: ... })` 仍写着源码包名 `dsh-plan-mode-ui`，而 DSH 的客户端 boot graph 以**包名** `dsh-flash-presets` 作为行 id，`materialize(id)` 查不到 factory，该行永远“未到达”，前端渲染失败页。
   - 治本：`scripts/sync-lib.mjs` 同步 `lib/client.js` 时把注册 id 改写为 `package.json` 的 `name`；`--check` 按改写后内容比对，找不到源 id 直接报错（源码侧再改名不会被静默放过）。
@@ -16,7 +37,7 @@
 
 - **0.2.6 的 tgz 作废**：`~/.dsh/profiles/web/vendor/dsh-flash-presets-0.2.6.tgz` 里存的仍是旧 id，任何人再执行 `dsh plugin add` 都会把缺陷装回来，故升版 0.2.7 并重打包。
 
-## 0.2.6 — 未发布
+## 0.2.6-dev1（未发布，历史稿）
 
 - **预设收敛为两个：`v3` 与 `v3 max`**：
   - `flash-lean-ptc-v3-1-max` 更名为 `flash-lean-ptc-v3-max`（row id `preset-flash-lean-ptc-v3-max`，order 28），

@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.8 (unpublished; the GitHub release and npm are still on 0.2.5). One card carries five components: the presets `v3`, `v3 max`, `v3 lite` and `v3 none`, plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. `v3` (internal name: `lean-v3`) is the current main preset and targets DSH 0.2.1-rc.2 with the v41flash 1017 snapshot.
+> Current version: v0.2.6 (released 2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot).
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -27,12 +27,10 @@ The presets control three things: the budget and round limit (counted by rounds,
 
 | Preset | id | order | Rules | Compaction | Intended use |
 |---|---|---:|---:|---|---|
-| v3 | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. The baseline lightweight preset; covers most everyday work |
-| v3 max | `flash-lean-ptc-v3-max` | 28 | 7 | 0.25 / 20k | Budget-free full version for tasks where you want the model to use its full capability |
-| v3 lite | `flash-lean-ptc-v3-lite` | 26 | 3 | 0.25 / 20k | Only the three rules the harness cannot enforce; measured (n=5-15) no detectable difference vs v3 |
-| v3 none | `flash-lean-ptc-v3-none` | 29 | 0 | 0.25 / 20k | No-persona control, **manual testing only** |
+| lean-ptc-v3 lite | `flash-lean-ptc-v3-lite` | 27 | 13 | 0.25 / 20k | **Installed by default**. Highest-efficiency preset for everyday work |
+| lean-ptc-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | Looser constraints, for work where the model needs room to think |
 
-**This version ships four presets** (v1/v2 and the v3.1 variants were removed in 0.2.6; lite and none added in 0.2.8): all four are installed and the picker shows them. Pick v3 max only when you want the model to stop economising. See the release notes for compatibility details.
+**This version ships two presets** (v1/v2, the v3.1 variants, v3 max and v3 none are all gone): `lean-ptc-v3 lite` (13 rules, highest efficiency, installed by default) and `lean-ptc-v3 balance` (3 rules, loosest constraints).
 
 ## Install, update, and uninstall
 
@@ -65,7 +63,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets
 
 This is useful for an unpublished branch or local changes. The same GitHub spec can be entered through **Plugins → Add plugin**.
 
-`--profile` accepts `web`, `desktop`, `headless`, or `acp`. The manager records this package in the profile's `dsh.profile.bundles` and applies the three insert entries from `cordis.patch.yml` (v1, v2, and v3). The `web` profile uses live reload; the other profiles require a restart.
+`--profile` accepts `web`, `desktop`, `headless`, or `acp`. The manager records this package in the profile's `dsh.profile.bundles` and applies the two insert entries from `cordis.patch.yml` (`v3-lite` and `v3-balance`), plus a `ptc-runtime` override that makes the PTC runtime persistent. The `web` profile uses live reload; the other profiles require a restart.
 
 To update, repeat the same `add` command, or remove and add the package again. To uninstall, remove the package from `dsh.profile.bundles` and the dependency list, then reinstall dependencies. Use `scripts/install.sh --uninstall` to remove the managed block written by the installer.
 
@@ -75,7 +73,7 @@ To update, repeat the same `add` command, or remove and add the package again. T
 node scripts/verify-presets.mjs                  # Structure and value assertions
 node scripts/verify-yaml.mjs                     # YAML and cross-platform tag checks
 node scripts/compose-bundle-patch.mjs --check    # Assert cordis.patch.yml matches presets/*
-dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'
+dsh --profile web --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'
 ```
 
 Set `DSH_HOME` or `DSH_PROFILE` to point these checks at a simulated installation.
@@ -151,7 +149,7 @@ This is not a defect, but you should know it: if a task depends on the current d
 
 ## Compatibility
 
-This repository has been regression-tested against DSH 0.2.1-rc.5 (rc.2 was also tested) using a simulated installation: a temporary `DSH_HOME`, installation, `--dump-config` checks for v1/v2/v3, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers. DSH 0.1.7 through 0.2.0 use the same plugin-row mechanism, so the installer logic is unchanged. Before 0.1.7, only v1 has the directory-style fallback under `presets/legacy-0.1.5/`; v2 and v3 are unsupported there. The web profile uses live reload; desktop, headless, and acp require a restart because the provider patch layer is read at startup.
+This repository has been regression-tested against DSH 0.2.1-rc.5 (rc.2 was also tested) and 0.2.2-rc.1: a temporary `DSH_HOME` install that composes `flash-lean-ptc-v3-lite` and `flash-lean-ptc-v3-balance`, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers. On 0.2.2-rc.1 the `desktop` profile was also tested live: `agentPresets/list` reports no `broken` diagnostics for either preset. The web profile uses live reload; desktop, headless, and acp require a restart because the patch layer is read at startup.
 
 The installer runs in Windows PowerShell, Ubuntu, and macOS CI (see the matrix in `.github/workflows/verify.yml`). macOS hardware has not been tested. The scripts are written for bash 3.2 compatibility; variables followed by non-ASCII text use `${var}`. The `!!js` tag in the patch is interpreted by the DSH loader and is rejected by generic YAML parsers.
 
@@ -187,14 +185,18 @@ Note: the preset patch only defines the agent-side plugin set (persona + tools +
 4. Desktop and Windows users should consider installing MSI PowerShell 7 or Git Bash. This was itself associated with a noticeable improvement in testing. Ask the maintainer if you need installation help.
 5. This package installs preset rows only. It does not ship tools; if the profile lacks the corresponding plugin, these rows have no effect, and the installer does not add missing dependencies.
 
+6. Every plugin name in a preset must resolve on the target DSH. Since DSH 0.2.2-rc.1, `list_agents` ships inside `@deepseek-ai/dsh-tool-subagent-control`, and the `./list-agents` subpath export is gone; declaring that row marks the whole preset broken (the GUI shows it as failing to load).
+
+7. Upgrading to 0.2.6 changes preset ids: `flash-lean-ptc-v3` no longer exists, and `flash-lean-ptc-v3-lite` went from 3 rules to 13. Sessions restored by id must pick a preset again; see the notes in [version and compatibility](docs/版本与兼容性.md).
+
+8. Restart the host after installing (desktop, headless, acp); the web profile only needs a page refresh, because the patch layer is composed at startup.
+
 ## Repository layout
 
 ```text
 presets/
-  flash-lean-ptc-v1.patch.yml
-  flash-lean-ptc-v2.patch.yml
-  flash-lean-ptc-v3.patch.yml     Current main preset (lean-v3)
-  legacy-0.1.5/                   Directory-style fallback for DSH before 0.1.7; v1 only
+  flash-lean-ptc-v3-lite.patch.yml     Default preset (lean-v3, 13 rules)
+  flash-lean-ptc-v3-balance.patch.yml  Weaker-constraint preset (3 rules)
 cordis.patch.yml                  Generated from presets/*; do not edit manually
 scripts/
   install.sh / install.ps1        Installers, sharing merge-presets.mjs
@@ -215,6 +217,15 @@ marketplace/                      Plugin marketplace submission material
 ```
 
 ## Version history
+
+### v0.2.6 (2026-11-06)
+
+- Presets narrowed to two: `lean-ptc-v3 lite` (`flash-lean-ptc-v3-lite`, 13 rules, order 27, default) and `lean-ptc-v3 balance` (`flash-lean-ptc-v3-balance`, 3 rules, order 26). The old `flash-lean-ptc-v3` id no longer exists, and v1 / v2 / `v3 max` / `v3 none` leave the published package.
+- Plan mode ships inside the same package as a third component (plan-mode v1); the internal 0.7.x numbering is no longer published.
+- Runtime tuning ships with the package: `ptc-runtime: persistent-in-memory` removes the fixed `run_code` startup cost (108 ms to 0) and nested bash calls drop from 44 ms to 15 ms.
+- **Compatibility fix (pre-release):** DSH 0.2.2-rc.1 moved `list_agents` into the `@deepseek-ai/dsh-tool-subagent-control` main plugin and removed the `./list-agents` subpath. Both presets declared that row, its import failed, and the whole preset was marked broken (the GUI showed a load failure). The row is gone, and `verify-yaml` now forbids it.
+- **Upgrade notes:** preset ids changed (existing sessions must pick again), `flash-lean-ptc-v3-lite` went from 3 rules to 13, and desktop / headless / acp require a restart.
+- The legacy directory-style entry point now fails explicitly (exit 3) instead of being skipped.
 
 ### v0.2.5 (2026-10-30)
 
