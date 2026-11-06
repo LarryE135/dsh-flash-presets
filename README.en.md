@@ -30,7 +30,7 @@ Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a p
 
 **Not a good fit for**
 
-- Problems clearly beyond the model, such as competition-level tasks where the goal is partial credit. Standard mode holds up better there; see [Unfavorable results](#unfavorable-results).
+- Problems clearly beyond the model, such as competition-level tasks where the goal is partial credit. Standard mode holds up better there; see [measured evidence](docs/实测证据.md).
 - Workflows that rely on the current date, installing plugins from inside a conversation, or scheduled tasks. Those capabilities are trimmed out (see [Differences from the official PTC preset](#differences-from-the-official-ptc-preset)).
 - Models other than DeepSeek V4.1 Flash. The rules may still help, but nobody has checked.
 - DSH 0.2.0 and earlier. Use the matching older release instead (see [versions and compatibility](docs/版本与兼容性.md), in Chinese). The directory-style presets for DSH before 0.1.7 are no longer shipped as of 0.2.6.
@@ -57,7 +57,7 @@ For the reasoning behind each setting, with source line references, see the [fou
 
 | Preset | id | Rules | Compaction | Use it when |
 |---|---|---:|---|---|
-| 轻量PTC-v3 lite | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
+| Lean PTC-v3 lite (formerly lean-v3) | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
 | 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
 
 Both share the same compaction, trimming, plugin set, and PTC setup. Only the persona rules differ.
@@ -97,37 +97,6 @@ How to read it:
 - Tokens only. Every run of every configuration was fully correct, so accuracy isn't broken out. Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
 - `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
 - Scoring rules are public in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading); ground truth and graders live in a private repository.
-
-### A controlled algorithm run
-
-Luogu P15114 (32 MB memory limit), DSH headless + PTC, n = 2:
-
-| Preset | Billed (M) | Steps | Wall clock (s) | Correct |
-|---|---:|---:|---:|---|
-| Standard | 7.03 | 66.5 | 719 | 2/2 |
-| v3 (today's lite) | 4.64 | 39.5 | 759 | 2/2 |
-
-With every run correct, v3 billed about 66% of standard, at a slightly longer wall-clock time. Two runs per arm show a direction, not a statistically significant result.
-
-### Unfavorable results
-
-These are as much a part of the presets as the savings — they mark where not to use them.
-
-- **Vague acceptance criteria hurt.** On P15654 with the original problem statement, v3 scored full marks in only one of three runs; both failures hit the 4 s time limit (4.00 s and 4.01 s). Standard mode scored full marks in both of its runs. Once the statement required a re-runnable verification log that must pass in full, v3 went three for three.
-- **On problems beyond the model, standard mode is the better deal.** USACO 2026 Platinum, two rounds combined: standard mode scored 51.5/80 on 51.4M tokens; the lean PTC preset scored 47.5/80 on 48.0M — about 7% cheaper and about 8% lower. These numbers come from the 0.2.0-era preset (before v3), are recorded in the [0.2.0 README](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/README-0.2.0.md), and have not been re-run with v3.
-- **More rules don't fix correctness.** Two candidates, v4 (an acceptance gate) and v4-b (a budget brake), left quality unchanged item for item across four experiments. v4 used 117% more tokens; v4-b's apparent savings vanished in a 3 × 8-task re-run. Both were rejected.
-- **Asking the model to assess difficulty and question the user first didn't help.** In a controlled comparison, that path scored a median ratio of 1.05–1.06 against 1.02 for simply starting (lower is better). The presets therefore contain no self-assessment step and don't ask questions before starting.
-
-Full data, withdrawn claims, and reproduction commands are in [measured evidence](docs/实测证据.md) (Chinese).
-
-## How it relates to dsh-ops
-
-They work at different layers and can be installed side by side.
-
-- [dsh-ops](https://github.com/T-Auto/dsh-ops) works at the **tool layer**: it adds a set of ops tools and replaces or hides some official ones, so each call returns less.
-- dsh-flash-presets works at the **preset layer**: compaction thresholds, output trimming, which plugins load, and the rules the model follows.
-
-The office benchmark includes `OPS + standard` and `OPS + PTC`, but OPS combined with these presets hasn't been measured yet, so we make no claim about stacking them.
 
 ## Install
 
