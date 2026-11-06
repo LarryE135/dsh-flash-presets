@@ -18,9 +18,14 @@
 - **lite 的 id 回到 `flash-lean-ptc-v3`**：`presets/flash-lean-ptc-v3.patch.yml`（原 `-lite.patch.yml`）里条目 id 与
   `config.id` 都是 `flash-lean-ptc-v3`，`name` 简化为「轻量PTC-v3」，`description` 注明 id 稳定、旧会话可直接打开。
   规则文本一字未动（仍是 13 条），order 仍为 27。
-- **兼容层反向保留**：`presets/legacy-preset-map.json` 的 canonical 改为 `flash-lean-ptc-v3`，别名表收
-  `flash-lean` / `flash-lean-ptc` / `-v1` / `-v2` 与 0.2.7–0.2.8 产生的 `flash-lean-ptc-v3-lite`（5 个）。0.2.7–0.2.8
-  期间新建的会话因此照常打开，不需要任何迁移。
+- **v1/v2 变成真实兼容卡，不再被映射**：`presets/flash-lean-ptc-v1.patch.yml`、`-v2.patch.yml` 从 tag `v0.2.5`
+  原样取回（14 条 / 12 条规则、压缩 0.3·50k / 0.25·20k 全部不变），唯一改动是删掉上游已移除的
+  `dsh-tool-subagent-control/list-agents` 子路径；显示名改成「兼容·PTC v1/v2（历史 id）」，order 移到 91/92，
+  description 注明只服务旧会话。这样 0.2.5 及更早创建的会话解析到的是**它们自己的预设**，规则不进任何跨 id 对齐。
+  两张卡的文本按「冻结」处理：`lint-presets` 对它们豁免「规则自相矛盾」「POSIX 路径」两项写作规范检查（当年
+  的文本就是那样），其余检查照做。
+- **兼容层收敛到 3 个别名**：`presets/legacy-preset-map.json` 的 canonical 仍是 `flash-lean-ptc-v3`，别名表只留
+  `flash-lean` / `flash-lean-ptc` / 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite`（后者规则与 v3 完全相同，映射不改行为）。
 - **自愈目标同步**：`lib/compat-heal.js` 的 `CURRENT_PRESET_ID` 改为 `flash-lean-ptc-v3`（默认关闭，需
   `DSH_FLASH_PRESETS_HEAL=1`）。
 - **校验与文档口径同步**：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、
@@ -28,11 +33,18 @@
 - README（中英）、`docs/版本与兼容性.md`、`docs/技术文档-精简预设实现.md`、`docs/实测证据.md` 的命名口径同步；
   版本号统一到 0.2.9（`package.json`、`package-lock.json`、`marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
 
-### 为什么不用「保留旧 id 的兼容卡」
+### 为什么不给 v3 也做一张「兼容卡」
 
-注册一张 id 为 `flash-lean-ptc-v3` 的兼容预设卡会多出一张卡片与一份重复规则，且用户在选择器里会看到两个
-等价预设；把 id 改回去则既让旧会话可解析，也不新增任何条目。唯一代价是 0.2.7–0.2.8 期间产生的 `-lite` 会话
-要靠兼容层解析 —— 而这批会话数量少，且兼容层在 `resolve` 上确实有效。
+v3 不需要兼容卡：把 lite 的 id 直接改回 `flash-lean-ptc-v3` 就让 281 个会话原生解析，既不多出卡片也不出现
+两个等价预设。只有 v1/v2 例外 —— 它们的规则与 v3 不同，**映射过去就等于改写了这些会话的行为**，所以必须
+用真卡把它们自己的规则带回来。
+
+### 安装流程会不会动会话
+
+不会。`install.sh` / `install.ps1` 里没有任何 `sessions` / `retarget` / `migrate` / `heal` 相关调用；包也没有
+`install` / `postinstall` 钩子（只有 `prepack` / `prepublishOnly`）；插件启动只挂 alias（纯内存解析）并打印
+`[compat-heal] 未启用（默认关闭；DSH_FLASH_PRESETS_HEAL=1 可开）`。唯一会写会话文件的是 `compat-heal`，需显式
+开环境变量，且只改 header、其余帧逐字节保留、写前写后各校验一次。
 
 ### 测试
 
@@ -42,6 +54,7 @@
 - **A/B 复现**：把同一个桌面端会话文件分别对着 0.2.8 与 0.2.9 的 roster 跑 `scripts/audit-compat.mjs`，
   0.2.8 判为 `orphan`（打不开），0.2.9 判为 `defined`（可解析）。本机全部 1007 个桌面端会话里，
   孤儿 id 从 284 个（`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）降到只剩那 3 个私有 id。
+  四张卡进 roster 之后复跑：`defined` 502、`aliased` 0、`orphan` 3（仍是那 3 个私有 `v3b`）。
   那 3 个属于个人实验 id（`flash-lean-ptc-v3b`），按既定策略不进发布映射表，需要时用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 指过去。
 
 ## 0.2.8（2026-11-06，发布）

@@ -30,7 +30,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 0.2.6 起只有两个预设：lite（默认）与 balance；-AllPresets 与默认等价，保留以兼容旧脚本
-if ($AllPresets) { $Presets = @('flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance') }
+if ($AllPresets) { $Presets = @('flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance') }
 
 if ($Help) {
   $self = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }

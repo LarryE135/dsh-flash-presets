@@ -53,14 +53,18 @@ Two more things come with the bundle:
 
 For the reasoning behind each setting, with source line references, see the [four mechanisms write-up](docs/技术文档-省token四机制.md) (Chinese).
 
-## The two presets
+## Presets: two current, two compatibility cards
 
 | Preset | id | Rules | Compaction | Use it when |
 |---|---|---:|---|---|
 | 轻量PTC-v3 (Lean PTC-v3; formerly lean-v3) | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | Default. Covers most day-to-day work; the id is fixed and never renamed again |
 | 轻量PTC-v3 balance (Lean PTC-v3 balance) | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
+| 兼容·PTC v1 (compat card) | `flash-lean-ptc-v1` | 14 | 0.3 / 50k | **Compatibility card**: the 0.2.5 rules kept verbatim so sessions created then resolve to their own preset |
+| 兼容·PTC v2 (compat card) | `flash-lean-ptc-v2` | 12 | 0.25 / 20k | **Compatibility card**: same idea, v2's rules kept verbatim |
 
-Both share the same compaction, trimming, plugin set, and PTC setup. Only the persona rules differ.
+All four share the same compaction/trimming framework and plugin set; only the persona rule text differs. The two compatibility cards are **verbatim copies of the 0.2.5 rules** (the only edit is dropping the upstream-removed `dsh-tool-subagent-control/list-agents` subpath), so they are exempt from the writing-standard checks applied to current presets. They sit at the end of the picker (order 91/92); pick one of the two current presets for new sessions.
+
+v1's 14 rules and v2's 12 rules are frozen history and no longer evolve; the two paragraphs below describe only the current presets.
 
 Lite's 13 rules fall into five groups: budget (count turns, not steps; aim for 20 or fewer, and stop to re-plan past roughly 60), sequencing (think briefly, run one cheap probe, and for submission tasks ship the smallest working artifact first), verification (one consolidated acceptance pass, then deliver — no extra random or stress rounds), tools and output (read files with read/glob/grep, batch calls, edit incrementally), and scope (answer in the user's language, stay in scope, keep secrets out of the session, switch approach after two failures).
 
@@ -164,7 +168,8 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 ### Upgrading from an older release
 
 - **Preset ids no longer change.** The 13-rule preset is `flash-lean-ptc-v3`; the 3-rule preset is `flash-lean-ptc-v3-balance`. 0.2.7–0.2.8 renamed the first one to `flash-lean-ptc-v3-lite`; 0.2.9 reverts that and will not rename ids again — DSH persists the preset id inside the session log, so renaming it is what makes old sessions fail to open. Rule text may evolve; identifiers stay put.
-- Old sessions still open. A runtime compatibility layer resolves `flash-lean`, `flash-lean-ptc`, `-v1`, `-v2`, and the 0.2.7–0.2.8 `flash-lean-ptc-v3-lite` to `flash-lean-ptc-v3`; ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
+- Old sessions still open, and none of them get rewritten: `flash-lean-ptc-v1` and `-v2` are now real presets (the 0.2.5 rules kept verbatim), so sessions created back then resolve to their own preset; the 0.2.7–0.2.8 `flash-lean-ptc-v3-lite` has exactly the same rules as v3 and is mapped to `flash-lean-ptc-v3` by the runtime compatibility layer; the older `flash-lean` and `flash-lean-ptc` resolve the same way. Ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. The layer steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
+- **The install never touches sessions**: `install.sh` / `install.ps1` and plugin startup do not scan or rewrite `sessions/`. The only code that writes session files is `lib/compat-heal.js`, it is off by default (it needs `DSH_FLASH_PRESETS_HEAL=1` explicitly), and it only rewrites the header.
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
 - If the profile's `selectedDefault` points at `flash-lean-ptc-v3-lite`, set it to `flash-lean-ptc-v3` (the old value still resolves through the compatibility layer).
 

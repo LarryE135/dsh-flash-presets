@@ -53,14 +53,18 @@
 
 逐项原理与源码行号见[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)。
 
-## 两个预设
+## 预设：两个现役 + 两张兼容卡
 
 | 预设 | id | 规则 | 压缩 | 何时用 |
 |---|---|---:|---|---|
 | 轻量PTC-v3（原 lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | 默认。适合绝大多数日常工作；id 固定，不再随版本改名 |
 | 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 规则更少，留给模型更多发挥空间 |
+| 兼容·PTC v1（历史 id） | `flash-lean-ptc-v1` | 14 | 0.3 / 50k | **兼容卡**：0.2.5 及更早的规则原样保留，只让那时创建的会话解析到自己的预设 |
+| 兼容·PTC v2（历史 id） | `flash-lean-ptc-v2` | 12 | 0.25 / 20k | **兼容卡**：同上，v2 的规则原样保留 |
 
-两者共享同一套压缩、裁剪、插件与 PTC 配置，区别只在 persona 规则。
+四个预设共享同一套压缩/裁剪框架与插件配置，区别只在 persona 规则文本。两张兼容卡的规则文本**逐字来自 0.2.5**（唯一改动是删掉上游已移除的 `dsh-tool-subagent-control/list-agents` 子路径），因此不参与现役预设的写作规范检查；它们排在列表末尾（order 91/92），新建会话选上面两个即可。
+
+v1 的 14 条、v2 的 12 条是历史文本，不再演进；下面两段只描述现役的两个。
 
 lite 的 13 条规则分五组：预算（按轮而不是按步计，目标 20 轮以内，超过约 60 轮就停下重新规划）、动手顺序（短判断加一次廉价探测，提交型任务先交最小可行产物）、验证（验收一次通过即交付，不追加随机测试与压测）、工具与输出（用 read/glob/grep 读文件，批量调用，增量改写）、交付与范围（按用户语言作答，守住范围，不把密钥写进会话，同一路子失败两次就换）。
 
@@ -164,7 +168,8 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 ### 从旧版本升级
 
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
-- 旧会话照常打开：`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2` 以及 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 都由运行时兼容层解析到 `flash-lean-ptc-v3`；本机实验用的 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。它只在解析失败时介入，不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
+- 旧会话照常打开，而且**不被改写**：`flash-lean-ptc-v1`、`-v2` 现在是真实预设（0.2.5 的规则原样保留），那时创建的会话解析到的就是它们自己；0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。本机实验用的 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
+- **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`；唯一会写会话的是 `lib/compat-heal.js`，它默认关闭（需显式设 `DSH_FLASH_PRESETS_HEAL=1`），且只改 header。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
 

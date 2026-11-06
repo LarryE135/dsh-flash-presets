@@ -21,14 +21,19 @@ const repo = path.resolve(here, '..');
 // id 一旦发布就不再变动：DSH 把 preset id 写进会话日志，改名等于让旧会话报
 // agent-preset/not-found。0.2.7–0.2.8 把 lite 的 id 改成 -lite 是错的，0.2.9 起改回。
 const SOURCES = [
+  // 兼容卡放最前面：两个历史 id（v1/v2）用 0.2.5 的原规则，只服务于那时创建的会话。
+  'presets/flash-lean-ptc-v1.patch.yml',
+  'presets/flash-lean-ptc-v2.patch.yml',
   'presets/flash-lean-ptc-v3.patch.yml',
   'presets/flash-lean-ptc-v3-balance.patch.yml',
 ];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件叠加两个预设：',
+  '# 本文件叠加四个预设行：两个现役 + 两张历史 id 兼容卡。',
   '#   轻量PTC-v3（flash-lean-ptc-v3，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、',
+  '#   兼容卡：PTC v1（flash-lean-ptc-v1，14 条）、PTC v2（flash-lean-ptc-v2，规则文本原样保留），',
+  '#   只为让 0.2.5 及更早的会话解析到自己的预设，不被映射到别的 id；',
   '#   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；',
   '#   更早的 id（flash-lean / flash-lean-ptc / -v1 / -v2 / v3-lite）由 lib/preset-alias.js 运行时映射。',
   '#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle',

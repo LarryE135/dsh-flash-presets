@@ -43,7 +43,7 @@ const agentPresetProjectionDefinition = {
 |---|---|---|
 | 0.2.6 | 删掉 `flash-lean-ptc-v3` 等旧 id；`migrate-legacy-preset-ids.mjs` 用 `zstdDecompressSync` 整文件重写 | 多帧 zstd 只解出首帧 → 事件帧全丢；WSL 194 / Windows 273 个会话被截断 |
 | 0.2.8 | 启动时“自愈”改写 header | 只改 header 不改 `agent-preset/selected`，而且没清投影缓存 → 一部分会话仍旧 not-found（看起来“修了但没生效”） |
-| 0.2.9 | 把 lite 的 id 从 `flash-lean-ptc-v3-lite` **改回** `flash-lean-ptc-v3`，并宣布此后不再改名 | 修好上一行：281 个桌面端会话的有效 preset 重新落进 roster，不再依赖兼容层；`-lite` 反过来变成历史 id |
+| 0.2.9 | ①把 lite 的 id 从 `flash-lean-ptc-v3-lite` **改回** `flash-lean-ptc-v3` 并冻结；②把 `flash-lean-ptc-v1` / `-v2` 按 0.2.5 原文注册成兼容卡 | 修好上一行：281 个桌面端会话重新落进 roster，不再依赖兼容层；v1/v2 的会话解析到**自己的**规则，不会被映射成 v3 的行为。本机 1007 个桌面端会话：`defined` 502、`aliased` 0、`orphan` 3（全是私有 id） |
 
 另外两个隐藏前提，出事时会让局面更难判断：
 
@@ -53,6 +53,7 @@ const agentPresetProjectionDefinition = {
 ## 4. 正确的升级姿势（本包 0.2.9 起真正执行）
 
 1. **id 冻结**：任何发布过的 id 不再删除、不再改名。要改行为就改内容、改显示名、改 `description`。现役两个 id 是 `flash-lean-ptc-v3`（13 条，默认）与 `flash-lean-ptc-v3-balance`（3 条）；0.2.7–0.2.8 期间的 `flash-lean-ptc-v3-lite` 是**一次违背本条的改名**，0.2.9 已改回，代价是那两版产生的会话要靠 alias 层兜底。
+1b. **规则不同的历史 id 必须带自己的规则回来**：`flash-lean-ptc-v1` / `-v2` 用 0.2.5 原文注册成兼容卡（order 91/92）。把它们映射到 v3 会让那些会话的行为被悄悄改掉——那不是兼容，是改写。规则相同的 id（`-lite` 与 v3）才可以用别名。
 2. **alias 层兜底**（`lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。
 3. **审计按 DSH 语义**（`npm run audit:sessions`）：有效 preset = header + 最后一条 selection；roster 取 `dsh --profile web --dump-config`。发现孤儿 id 就 `exit 1`。
 4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id。

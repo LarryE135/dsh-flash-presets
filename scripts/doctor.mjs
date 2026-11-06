@@ -38,7 +38,8 @@ const END = '# <<< dsh-flash-presets: managed block <<<';
 // 现役两个预设由补丁层/组合包提供；历史 id 只由运行时兼容层解析，不写入补丁（R3-9）。
 const CURRENT = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
 // 0.2.9 起 lite 的 id 回归 flash-lean-ptc-v3；0.2.7–0.2.8 的 -lite 变成历史 id。
-const LEGACY_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3-lite'];
+// v1/v2 已作为真实兼容卡进补丁层，不再算历史 id；真正靠别名解析的只剩这三个。
+const LEGACY_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v3-lite'];
 const PRESETS = [...CURRENT, ...LEGACY_IDS];
 
 if (argv.includes('--help') || argv.includes('-h')) {

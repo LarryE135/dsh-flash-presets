@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
                  PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
-    --all-presets) PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance); shift ;;
+    --all-presets) PRESETS=(flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3 flash-lean-ptc-v3-balance); shift ;;
     --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help)   sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;

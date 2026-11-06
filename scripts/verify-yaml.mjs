@@ -77,6 +77,14 @@ console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
 console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
+  'flash-lean-ptc-v1.patch.yml': {
+    preset: 'flash-lean-ptc-v1', order: 91, rules: 14, ptcRow: true,
+    thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2,
+  },
+  'flash-lean-ptc-v2.patch.yml': {
+    preset: 'flash-lean-ptc-v2', order: 92, rules: 12, ptcRow: true,
+    thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
+  },
   'flash-lean-ptc-v3.patch.yml': {
     preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
     thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
@@ -87,7 +95,7 @@ const EXPECT = {
   },
 };
 // 合成产物只发 v3 与 v3 lite（两个源预设，全部进 bundle）
-const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+const BUNDLE_IDS = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
 const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
@@ -199,7 +207,7 @@ if (args.length) {
       // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
       check(rows.includes('flash-lean-ptc-v3'),
             '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+      const known = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
       check(rows.every(id => known.includes(id)),
             '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {
