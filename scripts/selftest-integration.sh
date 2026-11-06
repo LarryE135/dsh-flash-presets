@@ -33,8 +33,9 @@ fi
 dout=$(DSH_HOME="$TMP" node "$HERE/scripts/doctor.mjs" --profile web --all 2>&1)
 drc=$?
 [ "$drc" -eq 0 ] && ok "doctor --all 退出码 0" || bad "doctor --all 退出码 $drc"
-grep -q "\[6\] 计划模式组件" <<<"$dout" && ok "doctor 有计划模式一节" || bad "doctor 缺计划模式一节"
-grep -q "\[7\] dsh --dump-config" <<<"$dout" && ok "doctor --all 触发合成配置检查" || bad "doctor --all 未触发合成配置检查"
+# 断言按小节标题匹配，不绑定 [n] 编号 —— doctor 加一节（如 [7] 旧会话的预设 id）不该让 CI 变红。
+grep -q "计划模式组件" <<<"$dout" && ok "doctor 有计划模式一节" || bad "doctor 缺计划模式一节"
+grep -q "dsh --dump-config 是否认得这些预设" <<<"$dout" && ok "doctor --all 触发合成配置检查" || bad "doctor --all 未触发合成配置检查"
 if command -v dsh >/dev/null 2>&1; then
   grep -q "preset-flash-lean-ptc-v3 出现在合成配置里" <<<"$dout" && ok "合成配置认得 v3" || bad "合成配置不认 v3"
 fi

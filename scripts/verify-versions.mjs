@@ -64,11 +64,15 @@ const mentions = [...compat.matchAll(/dsh-plan-mode-ui\s*(\d+\.\d+\.\d+)/g)].map
 const wrong = mentions.filter((v) => v !== plugin);
 check(wrong.length === 0, "兼容性-rc5.md 引用的插件版本 = " + plugin, "出现旧版本 " + wrong.join(", "));
 
-// ⑥ dist 里的附件文件名
+// ⑥ dist 里的附件文件名：两类附件各有各的版本口径，别互相要求。
+//    - 组合包附件（主版本 Release 的那个）按 tag 命名：dsh-flash-presets-v0.2.6.zip
+//    - 插件附件（若要单独发）按插件版本命名：dsh-plan-mode-ui-1.0.0.zip
 if (existsSync(join(REPO, "dist"))) {
   const zips = readdirSync(join(REPO, "dist")).filter((f) => f.endsWith(".zip"));
-  const bad = zips.filter((f) => !f.includes(plugin));
-  check(bad.length === 0, "dist/ 附件文件名带插件版本 " + plugin, bad.join(", "));
+  const badPlugin = zips.filter((f) => f.includes("plan-mode-ui") && !f.includes(plugin));
+  check(badPlugin.length === 0, "dist/ 插件附件文件名带插件版本 " + plugin, badPlugin.join(", "));
+  const badBundle = zips.filter((f) => f.startsWith("dsh-flash-presets-") && !f.includes(base));
+  check(badBundle.length === 0, "dist/ 组合包附件文件名带版本 " + base, badBundle.join(", "));
 }
 
 if (problems.length > 0) {

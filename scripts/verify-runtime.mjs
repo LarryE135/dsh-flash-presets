@@ -20,8 +20,9 @@ const EXPECT = {
   'flash-lean-ptc-v3': { order: 28, rules: 13, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { order: 26, rules: 3, thr: '0.25', retain: '20000' },
 };
-// 0.2.8 起 bundle 默认装四个：v3 / v3 max / v3 lite / v3 none。v1/v2 是对照版本，装了才校验。
-const SHIPPED = new Set(['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3']);
+// 0.2.6 起 bundle 默认装两个：v3 lite / v3 balance。v1/v2/v3(max) 是对照版本，装了才校验。
+// 数量断言从 SHIPPED 推导，不写死 —— 增删预设时这里自动跟随，避免再出现「代码改了、断言没改」的假红。
+const SHIPPED = new Set(['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance']);
 
 const arg = process.argv[2];
 let dump = '';
@@ -68,7 +69,7 @@ for (const [name, exp] of Object.entries(EXPECT)) {
   check(/mode: ptc/.test(slice), 'PTC 展示层');
 }
 const installed = (dump.match(/id: preset-flash-lean-ptc-v/g) || []).length;
-check(installed === 3, '预设行数 ' + installed + '（lite / balance / 兼容别名，期望 3）');
+check(installed === SHIPPED.size, '预设行数 ' + installed + '（' + [...SHIPPED].join(' / ') + '，期望 ' + SHIPPED.size + '）');
 
 console.log('');
 if (failed === 0) { console.log('运行时合成断言通过'); process.exit(0); }
