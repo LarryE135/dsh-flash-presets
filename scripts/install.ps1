@@ -138,11 +138,12 @@ function Install-Modern {
   Write-Host '  已写入：两行预设 —— 轻量PTC-v3 lite / 轻量PTC-v3 balance。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
   Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.2.8"
-  Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall，否则预设会重复注册。'
+  Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装不会报错，但预设会重复出现）。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-lite'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"
   if ($WithRuntime) { Install-Runtime }
+  Prune-Backups
 }
 
 # -WithRuntime：只写 profile 级的 ptc-runtime 覆盖（plan-mode 组件不在脚本路径里）。
@@ -156,7 +157,8 @@ function Install-Runtime {
   }
   $tune = Join-Path $here 'scripts\tune-runtime.mjs'
   if (-not (Test-Path $tune)) { Write-Host "  未找到 tune-runtime.mjs，已跳过（不影响两个预设）。"; return }
-  node $tune --apply --profile $Profile | Out-Null
+  # --no-backup：Install-Modern 开头已经整份备份过，不必再留一份 .bak-tune-*
+  node $tune --apply --profile $Profile --no-backup | Out-Null
   if ((Test-Path $patch) -and (Select-String -Path $patch -Pattern 'executionMode: persistent-in-memory' -Quiet)) {
     Write-Host "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
     Write-Host "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
@@ -179,11 +181,25 @@ function Revert-Runtime {
   }
 }
 
+# 我们自己的备份会随每次装卸累积（.bak-<时间戳> 与 .bak-tune-<时间戳>）：只保留最近 10 个，
+# 且只动这两类命名 —— 用户自己的备份不碰（与 bash 版的 prune_backups 同一口径）。
+function Prune-Backups {
+  $dir = Split-Path -Parent $patch
+  $mine = @(Get-ChildItem -Path $dir -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^cordis\.patch\.yml\.bak-(tune-)?\d+(-\d+)?$' } |
+    Sort-Object LastWriteTime -Descending)
+  if ($mine.Count -le 10) { return }
+  $mine | Select-Object -Skip 10 | ForEach-Object {
+    Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+  }
+}
+
 function Uninstall-Modern {
   if (-not (Test-Path $patch)) { Write-Host "缺少 ${patch}（无需卸载）"; return }
   Copy-Item $patch "$patch.bak-$stamp"
   Revert-Runtime
   Invoke-Merge @('--remove')
+  Prune-Backups
   Write-Host "已移除托管块（备份 cordis.patch.yml.bak-${stamp}）"
 }
 

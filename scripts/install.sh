@@ -104,7 +104,7 @@ install_modern() {
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
   echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.8"
-  echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall，否则预设会重复注册。"
+  echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装不会报错，但预设会重复出现）。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
