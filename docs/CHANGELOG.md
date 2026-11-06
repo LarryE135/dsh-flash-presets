@@ -24,6 +24,19 @@
 - 依据：三床 × 四臂实测（决策 15 次/臂、hard 9 次/臂、算法 10 次/臂）显示 persona 规则条数对质量与 token 均无可测差异（配对比 0.86–1.42，Bonferroni 后无一显著）；同时长任务注意力评测里 v3 在长文阅读轴出现可判定退化（−4.00 [−7.60, −1.20]），故不做进一步削减，也不保留无人格对照组作为发布项。
 - 校验脚本、安装器、doctor、README 与版本表同步改为两预设口径（`verify-runtime` 断言预设行数为 2）。
 
+### 发布验证（2026-11-06 晚：全新安装 + 同环境 A/B）
+
+- **CI（提交 `a8f041b`，即 tag `v0.2.6`）**：`verify (ubuntu-24.04 / windows-latest / macos-latest)` + `integration` + `bundle-install` + `plugin-tests (22 / 24)` 全部 success（`canary` 只在每周 cron 跑，本次 skipped 属正常）。
+  这之前从 `cf955ac` 起 CI **一直是红的**，原因是三处**过期断言**：① `selftest-integration.sh` 写死 `[7] dsh --dump-config`，而 doctor 新增「旧会话的预设 id」小节后该检查漂到 `[8]`；② `verify-runtime.mjs` 写死「预设行数 3」，而 0.2.6 只装 lite / balance 两个；③ `verify-versions.mjs` 要求 `dist/` 附件名带**插件版本**，与真实约定（组合包附件按 tag 命名，如 `dsh-flash-presets-v0.2.6.zip`）冲突。三处分别改为「按小节标题匹配」「从 `SHIPPED` 推导行数」「两类附件各按各的版本口径」。
+- **全新安装（空 `DSH_HOME`）**：`dsh plugin --profile web add dsh-flash-presets-0.2.6.tgz` → `+1 package`、475 ms（pnpm 离线）。安装包内 `lib/{tool-concurrency,preset-alias,composition-check,compat-heal,index}.js` 与仓库 sha256 **逐个相同**；`--dump-config` 里 `ptc-runtime → executionMode: persistent-in-memory`、`preset-flash-lean-ptc-v3-lite` / `-balance` 各 1 行，`verify-runtime.mjs` 对该 dump 断言通过；把**安装包里的 `lib/`** 直接喂给插件测试：12 passed / 0 failed（含「executable 钩子：决策点即时标记（不依赖扫描）」）。
+- **A 在新装里立刻生效**：启动即 `[tool-concurrency] 已启用（目标 glob,grep；全局视图 未注册；已挂载会话 0）→ 会话挂载预设后会补标记`；首个会话挂上后立刻出现 `已标记 glob,grep（全局视图 + 1 个会话作用域，共 2 处）｜调度器判据 glob=true grep=true（最近会话）` —— 不等任何定时扫描，决策点钩子按预期工作。
+- **同环境 A/B（一步里三个 grep，同一句提示词）**：
+  - A 开：`65949→68440(2491ms) / 65951→68447 / 65951→68450` ⇒ **并行**，跨度 2501 ms，各自之和 7486 ms（起始相差 2 ms，窗口完全重叠）。
+  - A 关（`DSH_FLASH_PRESETS_CONCURRENCY=0` 重启同一 home）：`8624→11578(2954ms) / 11580→11942(362ms) / 11943→12147(204ms)` ⇒ **串行**，跨度 3523 ms ≈ 各自之和 3520 ms。
+  - 结论：并发来自本插件（而不是 DSH 默认行为），且**新装第一轮就生效**。
+- **复现**：隔离实例起在 3099（自带 `--patch` 只把模型指向本机 WB Proxy，不改安装内容），用带 token 的入口打开会话发同一句提示词，然后 `node ~/.dsh/scripts/measure-tool-concurrency.mjs --dsh-home <隔离 home>`。测量时看每批的 `⇒ 并行/串行` 结论，别只看脚本末尾那句汇总（只要存在任一并行批它就会打印「并发确实发生」）。
+- 同版本其它校验：`npm run verify` 退出 0（含 `sync-lib --check`、`check-ps1`）；插件测试 25 项通过；四层对齐审计存储层 1622/1622、reject 0、无幽灵目录、`aliased 0 / orphan 0`；实机 DSH 0.2.2-rc.1（WSL）与 0.2.1-rc.5。
+
 ### 同日迭代（0.2.7–0.2.14，未发布，已并入 0.2.6）
 
 ### 0.2.14（2026-11-06，A 的实测验收：发现「第一轮赶不上扫描」的竞态，改成决策点即时标记）
