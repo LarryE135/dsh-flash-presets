@@ -39,17 +39,10 @@ const BANNED = /\b(cat|head|tail|find|ls -r|sed -n)\b/i;
 const USES = /\|\s*head\b|head\s+-\d+|tail\s+-\d+|\bcat\s+\S|\bfind\s+\S/;
 const PLATFORM_PATHS = [['/tmp/', 'POSIX 专属临时目录'], ['C:\\', 'Windows 专属盘符'], ['/home/', '机器相关路径']];
 
-// 冻结的兼容卡：规则文本按 0.2.5 原样保留（唯一改动是删掉上游已移除的 list-agents 子路径），
-// 存在的意义就是让 0.2.5 及更早的会话解析到**它自己的**预设，而不是被映射到别的 id。
-// 文本一旦改写就不是同一个预设了，所以下面两项「写作规范」检查对它们豁免：
-//   · 规则自相矛盾（v1/v2 当年确实既禁 shell 又在示例里用管道）
-//   · POSIX 专属路径（/tmp/）
-// 这两项针对的是现役预设的写作质量，兼容卡不在其列。
-const FROZEN_CARDS = new Set(['flash-lean-ptc-v1.patch.yml', 'flash-lean-ptc-v2.patch.yml']);
-
+// 发行包里的每个预设都要过「写作规范」检查（规则自相矛盾 / POSIX 专属路径）。
+// 0.2.9 起 v1/v2/v3b/v3e 不随包发行（谁需要就写进 profile 补丁），所以不再有豁免名单。
 for (const file of fs.readdirSync(path.join(ROOT, 'presets')).filter((f) => f.endsWith('.patch.yml'))) {
   const full = path.join(ROOT, 'presets', file);
-  const frozen = FROZEN_CARDS.has(file);
   const rules = parseRules(fs.readFileSync(full, 'utf8'));
   if (rules.length === 0) { warn.push(file + ': 未解析到编号规则（若为故意留空可忽略）'); continue; }
 
@@ -63,7 +56,6 @@ for (const file of fs.readdirSync(path.join(ROOT, 'presets')).filter((f) => f.en
   }
 
   for (const r of rules) {
-    if (frozen) continue;   // 兼容卡：文本冻结，不做写作规范检查
     const low = r.body.toLowerCase();
     const explicitlyAllows = /piping[^.]{0,40}head[^.]{0,20}fine|head[^.]{0,20}is fine/i.test(low);
     if (!explicitlyAllows && /never|no /.test(low) && BANNED.test(low)) {

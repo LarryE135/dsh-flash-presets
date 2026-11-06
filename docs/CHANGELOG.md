@@ -20,13 +20,15 @@
   id 稳定、旧会话可直接打开。0.2.7–0.2.8 那个 `-lite` 只是 v3 的一次改名，规则与 v3 完全相同，**不再做成卡片**，
   只作为历史 id 交给兼容层解析。
   规则文本一字未动（仍是 13 条），order 仍为 27。
-- **v1/v2 变成真实兼容卡，不再被映射**：`presets/flash-lean-ptc-v1.patch.yml`、`-v2.patch.yml` 从 tag `v0.2.5`
-  原样取回（14 条 / 12 条规则、压缩 0.3·50k / 0.25·20k 全部不变），唯一改动是删掉上游已移除的
-  `dsh-tool-subagent-control/list-agents` 子路径。显示名与 order 都按 v0.2.5 原样（`Flash 精简·PTC v1/v2`、21/22），
-  description 里注明只服务旧会话。这样 0.2.5 及更早创建的会话解析到的是**它们自己的预设**，规则不进任何跨 id 对齐，
-  选择器里的位置也与 0.2.5 一致。
-  两张卡的文本按「冻结」处理：`lint-presets` 对它们豁免「规则自相矛盾」「POSIX 路径」两项写作规范检查（当年
-  的文本就是那样），其余检查照做。
+- **发行包收窄成两张卡：lean-v3 + balance**。中间曾把 0.2.5 的 v1/v2 也做成随包发行的「兼容卡」，同一个 0.2.9
+  里又撤掉：发行包只负责「正式发布的 lean-v3」与「新增的 balance」，v1/v2/v3b/v3e 一律不随包发行。
+  - 不随包，但**也不许无声消失**：`presets/compat-exceptions.json` 里为 `flash-lean-ptc-v1`、`-v2` 各登记一条
+    `reason` + `fallback`（`check-preset-compat` 会从 git tag 里逐个抓历史 id，缺定义又没有例外就 exit 1）。
+  - 不映射到 `flash-lean-ptc-v3`：它们的规则不同（14 条 / 0.3·50k、12 条 / 0.25·20k），映射过去等于让那时创建的
+    会话静默换掉规则。
+  - 需要它们的人在自己的 profile 补丁里加一行，源文件见 tag `v0.2.5`（唯一改动：删掉上游已移除的
+    `dsh-tool-subagent-control/list-agents` 子路径）。本机就是这么做的：`v2`（3 个桌面端会话在用）与自建的
+    `v3b` / `v3e` 只写在两侧 profile 的 `cordis.patch.yml` 里。
 - **兼容层收敛到 3 个别名**：`presets/legacy-preset-map.json` 的 canonical 仍是 `flash-lean-ptc-v3`，别名表只留
   `flash-lean` / `flash-lean-ptc` / 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite`（后者规则与 v3 完全相同，映射不改行为）。
 - **自愈目标同步**：`lib/compat-heal.js` 的 `CURRENT_PRESET_ID` 改为 `flash-lean-ptc-v3`（默认关闭，需
@@ -36,11 +38,15 @@
 - README（中英）、`docs/版本与兼容性.md`、`docs/技术文档-精简预设实现.md`、`docs/实测证据.md` 的命名口径同步；
   版本号统一到 0.2.9（`package.json`、`package-lock.json`、`marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
 
-### 为什么不给 v3 也做一张「兼容卡」
+### 为什么发行包只留两张卡
 
-v3 不需要兼容卡：把 lite 的 id 直接改回 `flash-lean-ptc-v3` 就让 281 个会话原生解析，既不多出卡片也不出现
-两个等价预设。只有 v1/v2 例外 —— 它们的规则与 v3 不同，**映射过去就等于改写了这些会话的行为**，所以必须
-用真卡把它们自己的规则带回来。
+三条判断标准，按顺序：
+
+1. **规则相同的历史 id 用别名**：0.2.7–0.2.8 的 `-lite` 与 v3 规则逐字相同，映射不改任何行为，所以它只是
+   `legacy-preset-map.json` 里的一条别名（连同更早的 `flash-lean`、`flash-lean-ptc`），不占卡片。
+2. **规则不同的历史 id 不映射、也不随包发行**：映射等于改写行为，随包发行等于让所有装了这个包的人背上
+   别人的历史包袱。它们进 `compat-exceptions.json` 留档，需要的人在自己的 profile 层加行。
+3. **正式发布的那张卡 id 永不变更**：`flash-lean-ptc-v3` 就是 lean-v3，改 id 等于让旧会话打不开（0.2.7 踩过）。
 
 ### 实现逻辑复查（同版修掉）
 
@@ -48,12 +54,15 @@ v3 不需要兼容卡：把 lite 的 id 直接改回 `flash-lean-ptc-v3` 就让 
   原来还列着 `flash-lean-ptc-v1` / `-v2` / `-v3`：前两个现在是真实兼容卡，一旦有人设了
   `DSH_FLASH_PRESETS_HEAL=1`，它们会被改写成 `flash-lean-ptc-v3` —— 那就是强制对齐，会改掉旧会话的行为；
   第三个等于 canonical 自己，纯空转。
-- **`prune-stale-presets.mjs` 不再把 v1/v2 当退役 id**（清理会把兼容卡连根拔掉）。
-- **`migrate-legacy-preset-ids.mjs` 的 `KEEP` 加上 v1/v2**：它只做只读报告（`--apply` 早已停用），但报告里
-  也不该把真实预设算成待迁移对象。
-- **`doctor` 认识兼容卡**：第 8 节对 `preset-flash-lean-ptc-v1/v2` 单独判定（在合成配置里 = 正常），
-  不再和「历史 id 不该出现」混在一起。
-- **启动期验证**：在临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主，四张卡全部注册通过（没有
+- **`prune-stale-presets.mjs` 的退役名单只有 `v3-1-high` / `v3-1-max`**：它清理的是升级残留行，不能把
+  真在用的预设当垃圾。
+- **`migrate-legacy-preset-ids.mjs` 的 `KEEP` = `{`flash-lean-ptc-v3`, `flash-lean-ptc-v3-balance`}`**：
+  它只做只读报告（`--apply` 早已停用），但报告里也不该把现役预设算成待迁移对象。
+- **`doctor` 回到「现役两行 + 历史三别名」**：第 8 节只判定 `preset-flash-lean-ptc-v3` /
+  `preset-flash-lean-ptc-v3-balance` 是否在合成配置里，其余 id 一律按「历史 id 不该出现」处理。
+- **`lint-presets` 不再有豁免名单**：包内只剩两张卡，都必须过写作规范检查；v1/v2 的「规则自相矛盾 /
+  POSIX 路径」豁免随卡片一起删掉了。
+- **启动期验证**：在临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主，两张卡都注册通过（没有
   `agent-preset/invalid`），日志为 `[preset-alias] 已启用 3 个历史 preset id 的解析兜底` +
   `[compat-heal] 未启用（默认关闭）`。
 
@@ -68,12 +77,14 @@ v3 不需要兼容卡：把 lite 的 id 直接改回 `flash-lean-ptc-v3` 就让 
 
 - `npm run verify`（129 项）、`selftest.sh`（39 项）、`selftest-integration.sh`（17 项）、插件测试（25 项）全绿。
 - 安装后 `dsh --profile web --dump-config` 出现 `id: preset-flash-lean-ptc-v3` 与 `-balance` 两条，
-  `legacy-preset-map.json` 的 5 个别名逐一解析到 `flash-lean-ptc-v3`。
+  `legacy-preset-map.json` 的 3 个别名逐一解析到 `flash-lean-ptc-v3`。
 - **A/B 复现**：把同一个桌面端会话文件分别对着 0.2.8 与 0.2.9 的 roster 跑 `scripts/audit-compat.mjs`，
   0.2.8 判为 `orphan`（打不开），0.2.9 判为 `defined`（可解析）。本机全部 1007 个桌面端会话里，
-  孤儿 id 从 284 个（`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）降到只剩那 3 个私有 id。
-  四张卡进 roster 之后复跑：`defined` 502、`aliased` 0、`orphan` 3（仍是那 3 个私有 `v3b`）。
-  那 3 个属于个人实验 id（`flash-lean-ptc-v3b`），按既定策略不进发布映射表，需要时用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 指过去。
+  孤儿 id 一开始是 284 个（`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）。
+- **本机最终口径**（包内两张卡 + profile 层自加的 `v2` / `v3b` / `v3e` 三行）：
+  桌面端 1007 个会话 `defined` 505、`aliased` 0、`orphan` 0；WSL 1899 个会话 `defined` 449、
+  `aliased` 363（`-lite` 340 + `flash-lean-ptc` 15 + `flash-lean` 8）、`orphan` 8（`code` / `win-control`，
+  是更早的别的预设，未处理）。三个自加 id 只在本机 profile 补丁里，不随包发行。
 
 ## 0.2.8（2026-11-06，发布）
 

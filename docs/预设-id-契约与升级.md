@@ -53,7 +53,7 @@ const agentPresetProjectionDefinition = {
 ## 4. 正确的升级姿势（本包 0.2.9 起真正执行）
 
 1. **id 冻结**：任何发布过的 id 不再删除、不再改名。要改行为就改内容、改显示名、改 `description`。现役两个 id 是 `flash-lean-ptc-v3`（13 条，默认）与 `flash-lean-ptc-v3-balance`（3 条）；0.2.7–0.2.8 期间的 `flash-lean-ptc-v3-lite` 是**一次违背本条的改名**，0.2.9 已改回，代价是那两版产生的会话要靠 alias 层兜底。
-1b. **规则不同的历史 id 必须带自己的规则回来**：`flash-lean-ptc-v1` / `-v2` 用 0.2.5 原文、原 order（21/22）注册成兼容卡；规则相同的历史 id（`-lite` 与 v3）只用别名，不占卡片。把它们映射到 v3 会让那些会话的行为被悄悄改掉——那不是兼容，是改写。规则相同的 id（`-lite` 与 v3）才可以用别名。
+1b. **规则不同的历史 id 不许映射、也不强行随包发行**：`flash-lean-ptc-v1` / `-v2` 的规则与 v3 不同（14 条 / 0.3·50k、12 条 / 0.25·20k），映射过去等于让那时创建的会话静默换规则。0.2.9 的最终口径是：发行包只发 `flash-lean-ptc-v3` 与 `flash-lean-ptc-v3-balance`，v1/v2 在 `presets/compat-exceptions.json` 里登记 reason + fallback（`check-preset-compat` 强制要求），谁需要谁在自己的 profile 补丁里加行（源文件见 tag `v0.2.5`，唯一改动是删掉上游已移除的 `list-agents` 子路径）。把它们映射到 v3 会让那些会话的行为被悄悄改掉——那不是兼容，是改写。规则相同的 id（`-lite` 与 v3）才可以用别名，也不占卡片。
 2. **alias 层兜底**（`lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。
 3. **审计按 DSH 语义**（`npm run audit:sessions`）：有效 preset = header + 最后一条 selection；roster 取 `dsh --profile web --dump-config`。发现孤儿 id 就 `exit 1`。
 4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id。

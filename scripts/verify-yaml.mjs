@@ -77,14 +77,6 @@ console.log('平台: ' + process.platform + ' / node ' + process.versions.node);
 console.log('js-yaml: ' + found.from);
 
 const EXPECT = {
-  'flash-lean-ptc-v1.patch.yml': {
-    preset: 'flash-lean-ptc-v1', order: 21, rules: 14, ptcRow: true,
-    thresholdRatio: 0.3, retainTokens: 50000, compactionRetries: 2,
-  },
-  'flash-lean-ptc-v2.patch.yml': {
-    preset: 'flash-lean-ptc-v2', order: 22, rules: 12, ptcRow: true,
-    thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
-  },
   'flash-lean-ptc-v3.patch.yml': {
     preset: 'flash-lean-ptc-v3', order: 27, rules: 13, ptcRow: true,
     thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
@@ -94,8 +86,8 @@ const EXPECT = {
     thresholdRatio: 0.25, retainTokens: 20000, compactionRetries: 1,
   },
 };
-// 合成产物只发 v3 与 v3 lite（两个源预设，全部进 bundle）
-const BUNDLE_IDS = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+// 合成产物只发这两个（0.2.9 起发行包收窄；v1/v2/v3b/v3e 不随包发行）
+const BUNDLE_IDS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
 const EXPECT_IDS = BUNDLE_IDS;
 
 let failed = 0;
@@ -204,10 +196,10 @@ if (args.length) {
     // 以前一律硬断言，导致 candidates/*.yml 全被误判为"校验失败"
     const isInstallTarget = rows.length > 0 || /[\\/]profiles[\\/]/.test(file);
     if (isInstallTarget) {
-      // 0.2.5 起默认只装 v3；v1/v2 只在 --all-presets / -AllPresets 时出现
+      // 发行包只提供 v3 与 balance；其余 id 若出现，只能是使用者自己在 profile 层加的兼容行
       check(rows.includes('flash-lean-ptc-v3'),
             '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
       check(rows.every(id => known.includes(id)),
             '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
     } else {

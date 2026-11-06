@@ -1,1 +1,11 @@
-{}
+{
+  "$policy": "历史上发布过的 id 只要不再随包发行，就必须在这里留一条 reason + fallback；空对象表示没有例外。v1/v2 故意不映射到 flash-lean-ptc-v3：它们规则不同（14 条 / 0.3 / 50k 与 12 条 / 0.25 / 20k），映射等于让那时创建的会话静默换掉规则。",
+  "flash-lean-ptc-v1": {
+    "reason": "0.2.9 起发行包只提供 lean-v3（flash-lean-ptc-v3）与 v3 balance 两张卡；0.2.5 的 v1 不再随包发行。它的规则与 v3 不同，所以不做别名映射。",
+    "fallback": "需要它的人在自己的 profile 补丁里加一行（源文件见 tag v0.2.5 的 presets/flash-lean-ptc-v1.patch.yml，唯一改动是删掉上游 0.2.2-rc.1 已移除的 dsh-tool-subagent-control/list-agents 子路径）。"
+  },
+  "flash-lean-ptc-v2": {
+    "reason": "同上：v2 也不再随包发行，规则（12 条 / 0.25 / 20k）与 v3 不同，不映射。",
+    "fallback": "同上（tag v0.2.5 的 presets/flash-lean-ptc-v2.patch.yml，同样删掉 list-agents 子路径）。本机 3 个桌面端会话用的是 v2，已按这条路径写进 desktop profile 补丁。"
+  }
+}

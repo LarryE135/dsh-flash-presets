@@ -1,7 +1,7 @@
 {
   "$comment": "历史 preset id → 当前 id 的解析映射。DSH 把 preset id 持久化在会话日志里，上游没有改名/别名机制：id 不在 roster 里就直接 agent-preset/not-found。本表由 lib/preset-alias.js 在运行时兜底解析（不写任何会话文件）。",
-  "$policy": "0.2.9 起：id 不搬家。lite 的 id 回归 flash-lean-ptc-v3 并冻结；v1/v2 直接以原规则注册成兼容卡（见 presets/flash-lean-ptc-v1|v2.patch.yml），因此不再需要别名。真正还靠别名的是 0.1.x 的两个 id 与 0.2.7–0.2.8 的 -lite。",
-  "$note": "刻意不映射的 id：上游内置预设（standard / minimal / ptc / cordis）常驻 roster；本包 0.2.6 之后发布过的 v1/v2 已是真实预设。",
+  "$policy": "0.2.9 起：id 不搬家。lite 的 id 回归 flash-lean-ptc-v3 并冻结；发行包只提供 flash-lean-ptc-v3 与 flash-lean-ptc-v3-balance 两张卡。v1/v2 的规则与 v3 不同，映射过去等于改写旧会话行为，所以既不映射、也不随包发行（见 presets/compat-exceptions.json 的 reason + fallback）。真正还靠别名的是 0.1.x 的两个 id 与 0.2.7–0.2.8 的 -lite。",
+  "$note": "刻意不映射的 id：上游内置预设（standard / minimal / ptc / cordis）常驻 roster；flash-lean-ptc-v1 / -v2 规则不同，需要的人在自己的 profile 补丁里加行。",
   "$format": "aliases[id] = { since: 该 id 最后出现在哪个版本；可选 note }",
   "canonical": "flash-lean-ptc-v3",
   "aliases": {

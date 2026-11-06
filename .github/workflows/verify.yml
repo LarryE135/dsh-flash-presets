@@ -207,10 +207,11 @@ jobs:
             echo "$id: $n"
             [ "$n" -ge 1 ] || { echo "::error::$id 未进入组合配置"; exit 1; }
           done
-          for id in flash-lean-ptc-v3 flash-lean-ptc-v2 flash-lean-ptc-v1; do
-            n=$(grep -cE -- "$id([^-]|$)" "$RUNNER_TEMP/dump.txt" || true)
+          # 0.2.9 起发行包只有 lean-v3 与 balance；v1/v2/v3b/v3e 不随包发行，历史三别名也不建卡。
+          for id in flash-lean-ptc-v1 flash-lean-ptc-v2 flash-lean-ptc-v3-lite flash-lean flash-lean-ptc; do
+            n=$(grep -cE -- "id: preset-$id(\s|$)" "$RUNNER_TEMP/dump.txt" || true)
             echo "$id: $n（期望 0）"
-            [ "$n" -eq 0 ] || { echo "::error::$id 是历史 id，不应进组合配置"; exit 1; }
+            [ "$n" -eq 0 ] || { echo "::error::$id 不应进组合配置"; exit 1; }
           done
 
       # 只断言"id 出现过"还不够：order / 阈值 / 规则条数 / PTC 才是预设真正的行为参数

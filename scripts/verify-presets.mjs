@@ -40,9 +40,7 @@ const repoOnly = ARGV.includes('--repo-only');
 const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
-  // 兼容卡：0.2.5 的原规则原样注册，只为让那时的会话解析到自己
-  'flash-lean-ptc-v1': { rules: 14, ptc: true, order: 21, legacy: false, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v2': { rules: 12, ptc: true, order: 22, legacy: false, thr: '0.25', retain: '20000' },
+  // 发行包里只有这两个预设（0.2.9 起收窄：v1/v2/v3b/v3e 一律不随包发行）
   'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
 };
@@ -79,9 +77,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
   // （工作目录走 runtime context，不走占位符）。
   const PROMPT_VARS = new Set(['provider', 'model']);
-  for (const f of ['presets/flash-lean-ptc-v1.patch.yml',
-                   'presets/flash-lean-ptc-v2.patch.yml',
-                   'presets/flash-lean-ptc-v3.patch.yml',
+  for (const f of ['presets/flash-lean-ptc-v3.patch.yml',
                    'presets/flash-lean-ptc-v3-balance.patch.yml',
                    'cordis.patch.yml',]) {
     const text = read(path.join(repo, f));
