@@ -37,7 +37,7 @@ grep -q "二选一" <<<"$out" && ok "安装器提示两条安装路径二选一�
 if command -v dsh >/dev/null 2>&1; then
   ok "(dsh 可用：跳过本地路径断言)"
 else
-  grep -q "装成插件卡" <<<"$out" && ok "无 dsh 时给出插件卡安装方式" || bad "无 dsh 时未给出插件卡安装方式"
+  grep -q "dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v" <<<"$out" && ok "无 dsh 时仍给出插件卡安装方式" || bad "无 dsh 时未给出插件卡安装方式"
 fi
 
 dout=$(DSH_HOME="$TMP" node "$HERE/scripts/doctor.mjs" --profile web --all 2>&1)
