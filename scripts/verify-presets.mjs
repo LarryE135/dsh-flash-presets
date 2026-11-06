@@ -87,9 +87,15 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
           + (bad.length ? '（发现 ' + bad.map(v => '{{' + v + '}}').join(' ') + '）' : ''));
   }
 
-  for (const s of ['install.sh', 'install.ps1', 'publish.sh', 'publish.ps1', 'merge-presets.mjs',
+  for (const s of ['install.sh', 'install.ps1', 'merge-presets.mjs',
                    'verify-presets.mjs', 'verify-yaml.mjs']) {
     check(fs.existsSync(path.join(here, s)), 'scripts/' + s + ' 存在');
+  }
+  // 发布脚本只在仓库里（npm 包里没有它们，它们会改 tag / 建 release）：从装出来的包跑这一套时不该报错。
+  if (fs.existsSync(path.join(repo, '.git'))) {
+    for (const s of ['publish.sh', 'publish.ps1']) {
+      check(fs.existsSync(path.join(here, s)), 'scripts/' + s + ' 存在');
+    }
   }
   const merge = read(path.join(here, 'merge-presets.mjs')) || '';
   check(/- insert:/.test(merge), 'merge-presets.mjs 会读取预设的 insert 条目');

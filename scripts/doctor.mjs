@@ -111,7 +111,9 @@ const insideBlock = (() => {
 const outside = raw.replace(insideBlock, '');
 const strayRows = PRESETS.filter(id => new RegExp('^-\\s*id:\\s*' + id + '\\s*$', 'm').test(outside) ||
   new RegExp('^\\s*-\\s*id:\\s*' + id + '\\s*$', 'm').test(outside));
-const insideCount = id => (insideBlock.match(new RegExp('id: ' + id + '\\b', 'g')) || []).length;
+// (?![\w-]) 而不是 \\b：`id: flash-lean-ptc-v3` 是 `-v3-lite` / `-v3-balance` 的子串，
+// 用 \\b 会把三个预设算成一个。
+const insideCount = id => (insideBlock.match(new RegExp('id: ' + id + '(?![\\w-])', 'g')) || []).length;
 for (const id of PRESETS) {
   const n = insideCount(id) + (strayRows.includes(id) ? 1 : 0);
   if (strayRows.includes(id)) warn(id + '：块内 ' + insideCount(id) + ' 份 + 块外残留 1 份 → 预设列表会重复');
@@ -228,10 +230,16 @@ if (flag('--dump') || flag('--all')) {
   console.log('[8] dsh --dump-config 是否认得这些预设');
   try {
     const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
-    for (const id of PRESETS) {
-      const pkg = 'preset-' + id;
-      if (out.includes(pkg)) ok(pkg + ' 出现在合成配置里');
-      else warn(pkg + ' 不在合成配置里');
+    // 精确匹配整行，避免 `preset-flash-lean-ptc-v3` 命中 `-v3-lite` / `-v3-balance`。
+    const hasRow = (id) => new RegExp('^\\s*-\\s*id:\\s*preset-' + id + '\\s*$', 'm').test(out);
+    const CURATED = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
+    for (const id of CURATED) {
+      if (hasRow(id)) ok('preset-' + id + ' 出现在合成配置里');
+      else warn('preset-' + id + ' 不在合成配置里');
+    }
+    for (const id of PRESETS.filter((x) => !CURATED.includes(x))) {
+      if (hasRow(id)) warn('preset-' + id + ' 是历史 id，不应出现在合成配置里');
+      else ok('preset-' + id + ' 未出现（历史 id，由兼容层解析）');
     }
   } catch (e) {
     bad('dump-config 失败：' + String(e.message).split('\n')[0]);
