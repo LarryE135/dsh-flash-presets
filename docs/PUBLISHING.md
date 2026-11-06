@@ -118,9 +118,22 @@ npm publish --otp=<6 位码>    # 真发；token 勾了 Bypass 2FA 时直接 npm
 node scripts/sync-published-version.mjs   # 把 package.json 的 publishedVersion 写成当前 version
 ```
 
-### 坑 1：网页授权流程我这边走不完
+### 坑 1：网页授权流程在非交互 shell 里根本走不完（2026-11-06 实测）
 
-不带 bypass token 时 npm 会打印 `https://www.npmjs.com/auth/cli/...` 让人在浏览器批准，**它需要一个交互式终端**；在非交互 shell 里 npm 直接以 `EOTP` 退出。所以自动化发布必须用 bypass token 或带 `--otp`。
+账号用 passkey / 电脑 PIN 登录时没有 6 位 TOTP，走的是网页授权：npm 打印 `https://www.npmjs.com/auth/cli/<secret>`，
+浏览器里用 PIN 批准后 npm 取回一个短期 token。实测（npm 11.17.0 / node 24.19）在**非 TTY** 的 shell 里：
+
+- `npm publish` 直接以 `npm error code EOTP` 退出，不会去轮询；
+- 那条 auth URL 被替换成 `***`，`~/.npm/_logs/` 的 debug 日志里也没有（所以 agent / CI 连“把链接转给人”都做不到）；
+- EOTP 之后 registry 没有任何半成品（`npm view dsh-flash-presets version` 仍是上一版）。
+
+两条可行路径：
+
+| 做法 | 谁来做 | 说明 |
+|---|---|---|
+| 在**真终端**里跑 `npm publish` | 本人 | 有 TTY 才会打印真实 URL，浏览器用 PIN 批准即可 |
+| 建 **Bypass 2FA** 的 granular token 写进 `~/.npmrc` | 本人 | 之后 agent/CI 可 `npm publish`；token 不要进聊天、不进仓库 |
+| `npm publish --otp=<6 位码>` | 已开 TOTP 的账号 | 本机账号没有 TOTP，不适用 |
 
 ### 坑 2：会多出一个 `0.0.0-stage` 版本
 
