@@ -90,6 +90,8 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 - **0.2.5 没有打 `deprecated` 标记**，这是作者的明确选择：账号 `tfa.mode = auth-and-writes`，废弃标记属于写操作，需要一次性验证码；
   而收益有限 —— `latest` 已是 0.2.8，`npm i dsh-flash-presets` 默认装到的就是修好的版本，只有显式钉 `@0.2.5` 的人受影响，
   且 README 与安装说明都指向 0.2.8。以后要补这条标记，用 Automation token 跑 `npm deprecate` 即可（不受 2FA 拦截）。
+- 顺带收紧了 `lint-presets` 的版本号检查：只判**代码块里**的安装命令（照抄会踩空的那种），正文里的历史叙述（「0.2.5 那版有回归」）不再误报 ——
+  原来把 `publishedVersion` 同步成 0.2.8 之后，0.2.6 一节里那句历史说明就把 CI 判红了。负例已验证：代码块里写 `npm i dsh-flash-presets@0.2.5` 仍会被拦。
 
 ## 0.2.7（2026-11-06，发布）
 

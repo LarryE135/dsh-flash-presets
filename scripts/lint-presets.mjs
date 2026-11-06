@@ -80,12 +80,30 @@ const ACCEPTED = new Set([VERSION, PUBLISHED]);
 const DOCS = ['README.md', ...fs.readdirSync(path.join(ROOT, 'docs')).filter((f) => f.endsWith('.md')).map((f) => 'docs/' + f)]
   .filter((f) => !/README-0\.\d+\.\d+\.md$/.test(f)); // 历史 README 保留旧版本号
 
+// 只判**代码块里的**版本号：那是可以直接照抄执行的安装命令，版本错了就踩空。
+// 正文里提到旧版本（「0.2.5 那版有回归，请用 0.2.8」）是必要的历史叙述，不该被拦。
+const fenceRanges = (text) => {
+  const ranges = [];
+  let open = -1;
+  let pos = 0;
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      if (open < 0) open = pos; else { ranges.push([open, pos + line.length]); open = -1; }
+    }
+    pos += line.length + 1;
+  }
+  if (open >= 0) ranges.push([open, text.length]);
+  return ranges;
+};
+const inFence = (ranges, idx) => ranges.some(([a, b]) => idx >= a && idx <= b);
 for (const doc of DOCS) {
   const full = path.join(ROOT, doc);
   if (!fs.existsSync(full)) continue;
   const text = fs.readFileSync(full, 'utf8');
+  const fences = fenceRanges(text);
   for (const m of text.matchAll(/dsh-flash-presets(?:@|\^)?(\d+\.\d+\.\d+)(?![-\w])/g)) {
-    if (!ACCEPTED.has(m[1])) problems.push(doc + ': 引用了 ' + m[1] + '，当前版本是 ' + VERSION + '、已发布版本是 ' + PUBLISHED + '（照抄会踩空）');
+    if (!inFence(fences, m.index)) continue;
+    if (!ACCEPTED.has(m[1])) problems.push(doc + ': 代码块里的安装命令引用了 ' + m[1] + '，当前版本是 ' + VERSION + '、已发布版本是 ' + PUBLISHED + '（照抄会踩空）');
   }
   if (/^##+\s*未发布/m.test(text)) {
     problems.push(doc + ': 仍有「未发布」章节；若该版本已放弃发布，请删除或改标题');
