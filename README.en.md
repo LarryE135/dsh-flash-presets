@@ -65,8 +65,9 @@ Both share the same compaction/trimming framework and plugin set; only the perso
 **ids that are not shipped** (add a row to your own profile patch if you need one):
 
 - `flash-lean-ptc-v1` (14 rules / 0.3·50k) and `flash-lean-ptc-v2` (12 rules / 0.25·20k): the 0.2.5 rules.
-  Their rules differ from v3, so they are **not aliased** (aliasing would silently change old sessions); they are
-  registered in `presets/compat-exceptions.json` with a `reason` and a `fallback`. Source files: tag `v0.2.5`.
+  They still **resolve** to `flash-lean-ptc-v3` through the alias layer (opening old sessions wins over rule
+  fidelity); they carry `rulesDiffer: true` and print a warning on first hit. Add a row to your own profile patch
+  if you want the original rules. Source files: tag `v0.2.5`.
 - `flash-lean-ptc-v3-lite` (0.2.7–0.2.8) and the older `flash-lean` / `flash-lean-ptc`: identical (or superseded)
   rules, resolved to `flash-lean-ptc-v3` by the runtime alias layer — no card needed.
 
