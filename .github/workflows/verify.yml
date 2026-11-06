@@ -59,6 +59,8 @@ jobs:
         run: |
           $h = "$env:RUNNER_TEMP/dsh-runtime"
           New-Item -ItemType Directory -Force -Path "$h/profiles/web" | Out-Null
+          # install.ps1 要求补丁文件已存在（它不负责建 profile），先按 0.1.7 布局铺一个。
+          Set-Content -Path "$h/profiles/web/cordis.patch.yml" -Value "# ci profile patch`n[]" -Encoding utf8NoBOM
           pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome $h -WithRuntime
           $p = "$h/profiles/web/cordis.patch.yml"
           if (-not (Select-String -Path $p -Pattern 'executionMode: persistent-in-memory' -Quiet)) { throw "-WithRuntime 没有写入 ptc-runtime" }
