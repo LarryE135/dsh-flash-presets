@@ -42,7 +42,18 @@
   `DSH_JS_YAML` 优先；提示里的安装命令一律钉版本（不再给裸包名）。
 - **`publish.sh` 加四条前置守卫**（fail-closed）：工作区必须干净、`package.json` 版本必须等于标签、标签必须在当前分支历史上、
   远端 `main` 不能有本地没有的提交。0.2.9 的标签一度打在不在 `main` 上的提交，这四条就是为此加的；`DRY_RUN=1` 只检查不推送。
-- **CI 断言安装器不碰会话**：装一次 + 卸一次，`sessions/` 下文件的校验和必须完全不变。
+- **CI 断言安装器不碰会话**：装一次 + 卸一次，`sessions/` 下文件的校验和必须完全不变（用 POSIX `cksum`；
+  macOS runner 上没有 `md5sum`，BSD 的 `xargs` 也不认 `-r`）。
+- **`verify-yaml` 的「安装目标」断言修正**：以前只要路径里带 `profiles/` 就要求补丁里含 v3 行，于是
+  ①插件卡安装的 profile（行在包的 `cordis.patch.yml` 里，profile 补丁里只有使用者自加的行）与 ②任何自加行的
+  profile 一律判失败 → `install.sh` 走回滚；连带 ③升级路径要写的 `-lite` 兼容行永远写不进去（T0-1 的死路）。
+  现在只对「带托管块的补丁」硬断言 v3 + balance 两行、并检查同一预设不重复；自加行只提示不判失败。
+- **`check-preset-compat` 的冻结 id 必须是源定义**：以前只看「仓库里某处出现过」，于是删掉
+  `presets/flash-lean-ptc-v3-balance.patch.yml` 之后，陈旧合成产物里的那一行仍能让闸门放行。现在要求冻结 id
+  出现在 `presets/*.patch.yml` 源文件里。
+- **`selftest.sh` 增 8 项升级路径断言**（47 项）：只有自加行的补丁要过 `verify-yaml`、旧 `-lite` 补丁升级后必须是
+  3 行且 `order: 99`、全新安装只能 2 行、插件卡已装时脚本必须 `exit 4` 而 `--force` 可叠加。
+- **审计索引随包发布**：`docs/审计索引-0.2.9.md` 进 `files`（`npm pack` 实测 39 个文件）。
 - 校验与文档口径同步：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、`compose-bundle-patch`
   的注释、安装器默认预设、CI 的 id 断言都跟着改；版本号统一到 0.2.9（`package.json`、`package-lock.json`、
   `marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
@@ -69,8 +80,8 @@ v1/v2 会话，0.2.9 打不开了 —— 对用户来说「会话丢了」比「
 
 ### 测试
 
-- `npm run verify`（127 项 + 21 项环境相关跳过；退出码 0）、`selftest.sh`（39 项）、`selftest-integration.sh`（17 项）、
-  插件测试（25 项）全绿。
+- `npm run verify` 退出码 0（输出 129 行 ✓、0 行 ✗）、`selftest.sh`（47 项）、`selftest-integration.sh`（17 项）、
+  插件测试（26 个测试文件全过）全绿。行数与项数会随手加检查而变化，以脚本输出为准。
 - 临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主：日志出现 `[preset-alias] 已启用 5 个历史 preset id 的解析兜底`
   与 `（resolve/retain/acquireScope/readDocument/mount/select）`，两张卡都注册通过（没有 `agent-preset/invalid`），
   并且自检把 `flash-lean-ptc-v3-lite` 解析成了 `flash-lean-ptc-v3`。

@@ -75,6 +75,18 @@ assert.equal(service.readDocument('flash-lean-ptc-v3-lite').id, 'flash-lean-ptc-
 // ⑦ 陌生 id 照常抛错
 assert.throws(() => service.resolve('totally-unknown'), (e) => e.code === 'agent-preset/not-found');
 
+// ⑦b 上游 readDocument 的真实形态是「返回被拒绝的 Promise」（Promise.reject，不是同步 throw）：
+//     别名层必须走 .catch 分支也照样重试（同步 try/catch 抓不到它）。
+{
+  const p = makeService();
+  p.service.readDocument = (id) => (p.definitions.has(id) ? Promise.resolve({ id })
+    : Promise.reject(notFound(id)));
+  installPresetAliases({ effect: () => {} }, p.service, map, { verbose: false });
+  const doc = await p.service.readDocument('flash-lean-ptc-v3-lite');
+  assert.equal(doc.id, 'flash-lean-ptc-v3', 'Promise.reject 形态也要能被别名层救回');
+  await assert.rejects(() => p.service.readDocument('totally-unknown'), (e) => e.code === 'agent-preset/not-found');
+}
+
 // ⑧ rulesDiffer 警告（flash-lean 命中过一次）
 const ruleWarnings = captured.filter((w) => w.includes('规则与'));
 assert.ok(ruleWarnings.length >= 1, 'rulesDiffer 的别名必须打印过警告');
@@ -84,4 +96,4 @@ assert.equal(status.selfCheck, 'ok', '自检必须把别名解析到 canonical�
 
 console.warn = realWarn;
 console.info = realInfo;
-console.log('preset-alias: 8 组断言全部通过');
+console.log('preset-alias: 9 组断言全部通过（含 Promise.reject 形态）');

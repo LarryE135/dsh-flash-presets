@@ -189,21 +189,31 @@ if (args.length) {
       continue;
     }
     check(Array.isArray(doc), '顶层是数组');
+    const text = fs.readFileSync(file, 'utf8');
     const rows = ((doc || []).flatMap(e => (e && e.insert) || []))
       .filter(r => String(r.name || '').includes('@deepseek-ai/dsh-agent-preset'))
       .map(r => (r.config || {}).id);
-    // 安装目标（profile 补丁）必须含三行；候选/实验文件不含我们的预设行是正常的，
-    // 以前一律硬断言，导致 candidates/*.yml 全被误判为"校验失败"
-    const isInstallTarget = rows.length > 0 || /[\\/]profiles[\\/]/.test(file);
-    if (isInstallTarget) {
-      // 发行包只提供 v3 与 balance；其余 id 若出现，只能是使用者自己在 profile 层加的兼容行
-      check(rows.includes('flash-lean-ptc-v3'),
-            '含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
-      check(rows.every(id => known.includes(id)),
-            '预设行只来自本包（实际: ' + (rows.join(', ') || '无') + '）');
+    // 只有「脚本安装写的托管块」才硬断言预设行：
+    //  - 插件卡安装的 profile 补丁里根本没有本包的行（行在包的 cordis.patch.yml 里）；
+    //  - 使用者在 profile 层自加的行（本机的 v2 / v3b / v3e）也不该被当成错误。
+    // 以前写成「路径里带 profiles 就要求含 v3」，于是 bundle 安装的 profile 与任何自加行的 profile
+    // 一律校验失败 → install.sh 走回滚，连升级路径要写的 -lite 兼容行也永远写不进去。
+    const managed = text.includes('dsh-flash-presets: managed block');
+    if (rows.length === 0 || !managed) {
+      console.log('  · 不是脚本安装的托管块（插件卡安装或手写），跳过预设行断言'
+        + (rows.length ? '；本包预设行：' + rows.join(', ') : ''));
     } else {
-      console.log('  · 非安装目标（不含本仓库预设行），跳过预设行断言');
+      check(rows.includes('flash-lean-ptc-v3'),
+            '托管块含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
+      check(rows.includes('flash-lean-ptc-v3-balance'),
+            '托管块含 balance 预设行（实际: ' + (rows.join(', ') || '无') + '）');
+      const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3-lite'];
+      const unknown = [...new Set(rows.filter(id => !known.includes(id)))];
+      if (unknown.length > 0) {
+        console.log('  ⚠ 托管块里有本包之外的预设行（使用者自加，不计失败）：' + unknown.join(', '));
+      }
+      const dup = [...new Set(rows.filter((id, i) => rows.indexOf(id) !== i))];
+      check(dup.length === 0, '托管块里同一预设不重复（实际重复: ' + (dup.join(', ') || '无') + '）');
     }
   }
 } else {

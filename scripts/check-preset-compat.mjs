@@ -80,6 +80,12 @@ const walk = (dir) => {
   }
 };
 walk(path.join(repo, 'presets'));
+// 冻结 id 必须来自 presets/*.patch.yml 这个「源」，光在合成出来的 cordis.patch.yml 里出现不算：
+// 否则删掉一个源文件时，脚本会因为陈旧产物而假装通过（compose --check 会拦，但那是另一道闸门）。
+const sourceIds = new Set();
+for (const id of idsInText(fs.readdirSync(path.join(repo, 'presets'))
+  .filter((f) => /\.ya?ml$/.test(f) && !/\.bak|disabled|\.removed/.test(f))
+  .map((f) => fs.readFileSync(path.join(repo, 'presets', f), 'utf8')).join('\n'))) sourceIds.add(id);
 const bundle = path.join(repo, 'cordis.patch.yml');
 if (fs.existsSync(bundle)) for (const id of idsInText(fs.readFileSync(bundle, 'utf8'))) current.add(id);
 
@@ -109,7 +115,7 @@ if (typeof aliasDoc.canonical !== 'string' || !current.has(aliasDoc.canonical)) 
   failures.push('alias 表的 canonical 必须是当前仓库里真实定义过的 id，实际：' + String(aliasDoc.canonical));
 }
 for (const id of FROZEN) {
-  if (!current.has(id)) failures.push('冻结 id 必须在当前仓库里有定义：' + id);
+  if (!sourceIds.has(id)) failures.push('冻结 id 必须在 presets/*.patch.yml 里有定义（合成产物里的行不算）：' + id);
   if (Object.prototype.hasOwnProperty.call(aliases, id)) failures.push('冻结 id 不能出现在别名表里（它本身就是定义）：' + id);
   if (exceptions && Object.prototype.hasOwnProperty.call(exceptions, id)) failures.push('冻结 id 不能登记例外：' + id);
 }

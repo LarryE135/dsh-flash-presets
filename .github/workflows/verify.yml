@@ -104,10 +104,11 @@ jobs:
           mkdir -p "$h/profiles/web" "$h/sessions/proj-1"
           printf '[]\n' > "$h/profiles/web/cordis.patch.yml"
           printf 'marker\n' > "$h/sessions/proj-1/sess-1.log.zstd"
-          before=$(find "$h/sessions" -type f | sort | xargs -r md5sum)
+          # cksum 是 POSIX 命令：macOS runner 上没有 md5sum，BSD 的 xargs 也不认 -r。
+          before=$(find "$h/sessions" -type f -exec cksum {} + | sort)
           DSH_HOME="$h" bash scripts/install.sh >/dev/null
           DSH_HOME="$h" bash scripts/install.sh --uninstall >/dev/null
-          after=$(find "$h/sessions" -type f | sort | xargs -r md5sum)
+          after=$(find "$h/sessions" -type f -exec cksum {} + | sort)
           [ "$before" = "$after" ] || { echo "::error::安装/卸载动过 $h/sessions"; exit 1; }
           echo "安装与卸载全程未触碰 sessions/"
 

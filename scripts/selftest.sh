@@ -171,6 +171,46 @@ fi
 AFTER="$(hash_file "$NF/profiles/web/cordis.patch.yml")"
 [ "$BEFORE" = "$AFTER" ] && ok "失败时 profile 已回滚到安装前" || bad "失败后 profile 未回滚（内容被改动）"
 
+step "升级路径：旧 -lite 会话 / 使用者自加行"
+# (a) 插件卡安装的 profile 补丁里只有使用者自加的行 —— verify-yaml 不能判失败
+#     （以前这里要求「路径里带 profiles 就必须含 v3」，于是 bundle 装法与任何自加行都被判失败）
+UP1="$TMP/up1"; mkdir -p "$UP1/profiles/web"
+printf -- "- insert:\n    - id: preset-flash-lean-ptc-v3b\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: flash-lean-ptc-v3b\n" > "$UP1/profiles/web/cordis.patch.yml"
+if node scripts/verify-yaml.mjs "$UP1/profiles/web/cordis.patch.yml" >"$TMP/up1.log" 2>&1; then
+  ok "只有自加行的 profile 补丁通过 verify-yaml"
+else
+  bad "只有自加行的 profile 补丁被 verify-yaml 判失败"; tail -4 "$TMP/up1.log"
+fi
+
+# (b) 旧托管块 / 旧裸行里有 -lite → 脚本安装要多写一行兼容行，且校验通过（T0-1）
+UP2="$TMP/up2"; mkdir -p "$UP2/profiles/web"
+printf -- "- insert:\n    - id: preset-flash-lean-ptc-v3-lite\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: flash-lean-ptc-v3-lite\n" > "$UP2/profiles/web/cordis.patch.yml"
+DSH_HOME="$UP2" bash scripts/install.sh --profile web >"$TMP/up2.log" 2>&1
+ROWS2="$(grep -c 'id: preset-' "$UP2/profiles/web/cordis.patch.yml" 2>/dev/null || echo 0)"
+[ "$ROWS2" = "3" ] && ok "旧 -lite 补丁升级后写入 3 行（含兼容行）" || bad "旧 -lite 补丁升级后是 $ROWS2 行（期望 3）"
+grep -q "id: flash-lean-ptc-v3-lite" "$UP2/profiles/web/cordis.patch.yml" \
+  && ok "兼容行 id 就是 flash-lean-ptc-v3-lite（旧会话才解析得到）" || bad "兼容行 id 不对"
+grep -q "order: 99" "$UP2/profiles/web/cordis.patch.yml" \
+  && ok "兼容行 order=99（排在两张卡后面，不影响默认选择）" || bad "兼容行 order 不是 99"
+node scripts/verify-yaml.mjs "$UP2/profiles/web/cordis.patch.yml" >"$TMP/up2v.log" 2>&1 \
+  && ok "升级后补丁通过 verify-yaml（兼容行不被当成外来行）" || bad "升级后补丁未通过 verify-yaml"
+
+# (c) 全新安装不该多出兼容行
+UP3="$TMP/up3"; mkdir -p "$UP3/profiles/web"; printf '[]\n' > "$UP3/profiles/web/cordis.patch.yml"
+DSH_HOME="$UP3" bash scripts/install.sh --profile web >/dev/null 2>&1
+ROWS3="$(grep -c 'id: preset-' "$UP3/profiles/web/cordis.patch.yml" 2>/dev/null || echo 0)"
+[ "$ROWS3" = "2" ] && ok "全新安装只有 2 行（不带兼容行）" || bad "全新安装写出了 $ROWS3 行（期望 2）"
+
+# (d) 该 profile 已用插件卡装了本包时，脚本必须拒绝叠加（exit 4），--force 才放行
+UP4="$TMP/up4"; mkdir -p "$UP4/profiles/web"; printf '[]\n' > "$UP4/profiles/web/cordis.patch.yml"
+printf '{"dsh":{"profile":{"bundles":["dsh-flash-presets"]}}}\n' > "$UP4/profiles/web/package.json"
+if DSH_HOME="$UP4" bash scripts/install.sh --profile web >"$TMP/up4.log" 2>&1; then
+  bad "插件卡已装时脚本仍然安装了（应 exit 4）"
+else
+  rc=$?; [ "$rc" = "4" ] && ok "插件卡已装时脚本拒绝叠加（exit 4）" || bad "拒绝叠加的退出码是 ${rc}（期望 4）"
+fi
+DSH_HOME="$UP4" bash scripts/install.sh --profile web --force >/dev/null 2>&1 \
+  && ok "--force 可以显式叠加" || bad "--force 也没能叠加"
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then
   bad "publish.sh 对不存在的 tag 竟然放行"; tail -3 "$TMP/pub.log"
