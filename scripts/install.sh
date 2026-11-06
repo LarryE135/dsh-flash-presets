@@ -12,6 +12,7 @@
 #   bash scripts/install.sh --with-runtime         # 额外写入 profile 级 PTC 常驻运行时
 #   bash scripts/install.sh --all-presets          # 与默认等价（两个预设都写），保留以兼容
 #   bash scripts/install.sh --uninstall            # remove the managed block（含运行时覆盖）
+#   bash scripts/install.sh --force                # 即使该 profile 已用插件卡装了本包也照装（默认 exit 4 拒绝）
 #   DSH_HOME=/tmp/dsh bash scripts/install.sh       # custom DSH home
 #
 # Safe to run repeatedly: the managed block is replaced in place and the patch
@@ -26,6 +27,7 @@ ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # 0.2.6 起只发两个预设：lite（13 条，默认）与 balance（3 条）
 PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance)
+FORCE=0
 # --with-runtime（旧名 --with-plan-mode，保留为别名）：额外往 profile 补丁层追加
 # ptc-runtime: persistent-in-memory。这是 profile 级覆盖，对该 profile 的所有预设生效，
 # --uninstall 会一并撤掉。计划模式组件不在脚本路径里，它只随插件管理器安装。
@@ -37,6 +39,7 @@ while [ $# -gt 0 ]; do
                  PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
+    --force) FORCE=1; shift ;;   # 与插件卡叠加也照装（默认拒绝：会重复注册同一个预设）
     --all-presets) PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance); shift ;;  # 0.2.9 起包内就这两个，保留开关只为兼容旧脚本
     --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
@@ -73,6 +76,13 @@ fi
 merge_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH" --only "$(IFS=,; echo "${PRESETS[*]}")"; }
 strip_patch()  { node "$HERE/scripts/merge-presets.mjs" --patch "$PATCH" --remove >/dev/null; }
 
+# 这个 profile 是不是已经用插件卡（dsh plugin add）装了本包？装了的话脚本再写托管块 = 同一个预设注册两次。
+bundle_installed() {
+  _pkg="$DSH_DIR/profiles/$PROFILE/package.json"
+  [ -f "$_pkg" ] || return 1
+  node -e 'const fs=require("fs");try{const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const b=(p.dsh&&p.dsh.profile&&p.dsh.profile.bundles)||[];process.exit(b.indexOf("dsh-flash-presets")>=0?0:1)}catch(e){process.exit(1)}' "$_pkg"
+}
+
 validate_patch() {
   if command -v node >/dev/null 2>&1 && [ -f "$HERE/scripts/verify-yaml.mjs" ]; then
     _yrc=0
@@ -93,6 +103,16 @@ validate_patch() {
 # ── 四个动作 ──────────────────────────────────────────────────────────────────
 install_modern() {
   [ -f "$PATCH" ] || { echo "缺少 $PATCH" >&2; exit 1; }
+  # 第五轮审计 T3-6：以前只提示"都装不会报错"，实际结果是同一个预设出现两次（预设列表里重复、
+  # 选哪个都可能撞到不同的规则）。现在默认拒绝，--force 才继续。
+  if [ "$FORCE" != "1" ] && bundle_installed; then
+    echo "✖ 这个 profile 已经用插件卡装了本包（profiles/$PROFILE/package.json 的 dsh.profile.bundles）。" >&2
+    echo "  再跑脚本会把同一个预设注册两次。二选一：" >&2
+    echo "    ① 只留插件卡：什么都不用做（插件卡已经带两个预设 + 旧 id 兼容 + 计划模式）" >&2
+    echo "    ② 只留脚本安装：dsh plugin --profile $PROFILE remove dsh-flash-presets" >&2
+    echo "  确实要叠加（不推荐）：bash scripts/install.sh --profile $PROFILE --force" >&2
+    exit 4
+  fi
   cp "$PATCH" "$PATCH.bak-$STAMP"
   echo "已备份 $PATCH → $(basename "$PATCH").bak-$STAMP"
   merge_patch
@@ -104,7 +124,7 @@ install_modern() {
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
   echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.9"
-  echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装不会报错，但预设会重复出现）。"
+  echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装会被默认拒绝：预设会重复注册）。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"

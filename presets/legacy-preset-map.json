@@ -1,19 +1,34 @@
 {
-  "$comment": "历史 preset id → 当前 id 的解析映射。DSH 把 preset id 持久化在会话日志里，上游没有改名/别名机制：id 不在 roster 里就直接 agent-preset/not-found。本表由 lib/preset-alias.js 在运行时兜底解析（不写任何会话文件）。",
-  "$policy": "0.2.9 起：id 不搬家。lite 的 id 回归 flash-lean-ptc-v3 并冻结；发行包只提供 flash-lean-ptc-v3 与 flash-lean-ptc-v3-balance 两张卡。v1/v2 的规则与 v3 不同，映射过去等于改写旧会话行为，所以既不映射、也不随包发行（见 presets/compat-exceptions.json 的 reason + fallback）。真正还靠别名的是 0.1.x 的两个 id 与 0.2.7–0.2.8 的 -lite。",
-  "$note": "刻意不映射的 id：上游内置预设（standard / minimal / ptc / cordis）常驻 roster；flash-lean-ptc-v1 / -v2 规则不同，需要的人在自己的 profile 补丁里加行。",
-  "$format": "aliases[id] = { since: 该 id 最后出现在哪个版本；可选 note }",
+  "$comment": "历史 preset id → 当前 id 的解析映射。DSH 把 preset id 持久化在会话日志里，上游没有改名/别名机制：id 不在 roster 里就直接 agent-preset/not-found。本表由 lib/preset-alias.js 在运行时兜底解析（纯内存，不写任何会话文件）。",
+  "$policy": "0.2.9 起：id 不搬家，发行包只提供 flash-lean-ptc-v3（lean-v3）与 flash-lean-ptc-v3-balance 两张卡。**所有发布过的历史 id 都在下面的别名表里**——0.2.8 能打开的会话，0.2.9 必须还能打开（第四轮/第五轮审计的教训：让会话 not-found 比规则变化伤人得多）。规则与 canonical 不同的别名标 rulesDiffer: true，加载时打印一次警告，让「规则变了」可见、可还原（要原规则就在 profile 补丁里加对应行）。",
+  "$note": "上游内置预设（standard / minimal / ptc / cordis）常驻 roster，不在此表。rulesDiffer: false 表示与该版本的 canonical 逐字相同；true 表示规则不同（映射后按 canonical 规则运行，会在启动日志里警告）。",
+  "$format": "aliases[id] = { since: 最后出现在哪个版本；rulesDiffer: boolean；note?: 说明 }",
   "canonical": "flash-lean-ptc-v3",
   "aliases": {
     "flash-lean-ptc-v3-lite": {
       "since": "v0.2.8",
-      "note": "0.2.7–0.2.8 的 lite id，规则与 flash-lean-ptc-v3 完全相同，映射过去不改变行为"
+      "rulesDiffer": false,
+      "note": "0.2.6–0.2.8 的 lite id，规则与 flash-lean-ptc-v3 完全相同；打过 tag 的版本都是 13 条（11-04 main 上那两天是 3 条版，见 CHANGELOG）"
     },
-    "flash-lean": {
-      "since": "v0.1.0"
+    "flash-lean-ptc-v1": {
+      "since": "v0.2.5",
+      "rulesDiffer": true,
+      "note": "14 条 / 0.3·50k；0.2.8 时期也是映射到 lite，映射不引入新的行为变化"
+    },
+    "flash-lean-ptc-v2": {
+      "since": "v0.2.5",
+      "rulesDiffer": true,
+      "note": "12 条 / 0.25·20k；同上"
     },
     "flash-lean-ptc": {
-      "since": "v0.1.0"
+      "since": "v0.1.0",
+      "rulesDiffer": true,
+      "note": "14 条，与 v1 逐字相同（只差一行 {{cwd}}）"
+    },
+    "flash-lean": {
+      "since": "v0.1.0",
+      "rulesDiffer": true,
+      "note": "11 条 / 0.3"
     }
   }
 }

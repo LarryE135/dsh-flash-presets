@@ -10,6 +10,7 @@
 #   ... -Profile desktop       # another profile
 #   ... -WithRuntime           # also write the profile-level PTC resident runtime
 #   ... -Uninstall             # remove the managed block (and the runtime override)
+#   ... -Force                 # install even when the bundle already provides the presets (default: exit 4)
 #   ... -DshHome "D:\dsh"      # custom DSH home (default: $env:DSH_HOME or ~\.dsh)
 #   ... -Help                  # show this help
 #
@@ -24,7 +25,8 @@ param(
   [switch]   $Legacy,
   [switch]   $Uninstall,
   [Alias('WithPlanMode')][switch] $WithRuntime,
-  [switch]   $AllPresets
+  [switch]   $AllPresets,
+  [switch]   $Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -121,8 +123,28 @@ function Uninstall-Legacy {
 }
 
 # ── 新版：写 profile 补丁层 ───────────────────────────────────────────────────
+# 该 profile 是否已用插件卡（dsh plugin add）装了本包？装了再写托管块 = 同一个预设注册两次。
+function Test-BundleInstalled {
+  $pkg = Join-Path (Join-Path (Join-Path $DshHome 'profiles') $Profile) 'package.json'
+  if (-not (Test-Path $pkg)) { return $false }
+  try {
+    $json = Get-Content -LiteralPath $pkg -Raw | ConvertFrom-Json
+    $bundles = @($json.dsh.profile.bundles)
+    return ($bundles -contains 'dsh-flash-presets')
+  } catch { return $false }
+}
+
 function Install-Modern {
   if (-not (Test-Path $patch)) { throw "缺少 $patch" }
+  # 第五轮审计 T3-6：默认拒绝与插件卡叠加（预设会重复注册），-Force 才继续。
+  if (-not $Force -and (Test-BundleInstalled)) {
+    Write-Host "✖ 这个 profile 已经用插件卡装了本包（profiles/$Profile/package.json 的 dsh.profile.bundles）。" -ForegroundColor Red
+    Write-Host '  再跑脚本会把同一个预设注册两次。二选一：'
+    Write-Host '    ① 只留插件卡：什么都不用做（插件卡已经带两个预设 + 旧 id 兼容 + 计划模式）'
+    Write-Host "    ② 只留脚本安装：dsh plugin --profile $Profile remove dsh-flash-presets"
+    Write-Host "  确实要叠加（不推荐）：install.ps1 -Profile $Profile -Force"
+    exit 4
+  }
   Copy-Item $patch "$patch.bak-$stamp"
   Write-Host "已备份 $patch → cordis.patch.yml.bak-$stamp"
   Invoke-Merge @()
@@ -137,13 +159,14 @@ function Install-Modern {
     if (Test-Path "$patch.bak-$stamp") { Copy-Item "$patch.bak-$stamp" $patch -Force }
     throw "YAML 校验未通过，未完成安装。复查：node `"$verifyYaml`" `"$patch`""
   }
-  # 旧会话的预设 id 由 0.2.7 起「预设 id 对齐 lean-v3」保证，不需要改会话数据。
+  # 旧会话的 preset id 由插件卡的「别名层」（lib/preset-alias.js，只 inject agentPresets）在解析时兜底；
+  # 脚本安装这条路没有别名层，升级时 merge-presets 会为旧托管块里出现过的 -lite 额外留一行兼容行。
   Write-Host ''
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已写入：两行预设 —— 精简·PTC v3（lean-v3）/ 精简·PTC balance。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
   Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.2.9"
-  Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装不会报错，但预设会重复出现）。'
+  Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装会被默认拒绝：预设会重复注册）。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"

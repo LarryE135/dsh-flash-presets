@@ -370,7 +370,7 @@
             name: '@deepseek-ai/dsh-plugin-manager/tools'
             disabled: true
 
-# 运行时调优（随组合包生效，见 docs/压测-run_code开销.md）：PTC 运行时改为会话内常驻进程，
+# 运行时调优（随组合包生效；实测数据见仓库内 docs/压测-run_code开销.md，不随包发行）：PTC 运行时改为会话内常驻进程，
 # 每个 run_code program 只付一次启动成本，嵌套工具调用 44ms → 15ms。
 # 配套 scripts/tune-runtime.mjs --apply 负责 A（fs-search 的 glob/grep 只读并发）。
 - id: ptc-runtime
@@ -380,3 +380,7 @@
 - insert:
     - id: plan-mode-ui
       name: 'dsh-flash-presets'
+# 历史 preset id 解析兜底（旧会话能否打开靠这一行）：纯内存映射，不写任何会话文件。
+- insert:
+    - id: flash-presets-alias
+      name: 'dsh-flash-presets/alias'

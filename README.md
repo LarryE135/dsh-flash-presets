@@ -172,8 +172,10 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 ### 从旧版本升级
 
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
-- 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 不随包发行、也不做映射（规则不同），需要它们的人在 profile 补丁里加行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
-- **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`；唯一会写会话的是 `lib/compat-heal.js`，它默认关闭（需显式设 `DSH_FLASH_PRESETS_HEAL=1`），且只改 header。
+- 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
+- **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.2.9`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
 

@@ -42,7 +42,7 @@ const HEADER = [
 // 不能写成插件代码里的热改——executionMode 在 ptc-runtime 构造函数里读，构造后改不动。
 const RUNTIME = [
   '',
-  '# 运行时调优（随组合包生效，见 docs/压测-run_code开销.md）：PTC 运行时改为会话内常驻进程，',
+  '# 运行时调优（随组合包生效；实测数据见仓库内 docs/压测-run_code开销.md，不随包发行）：PTC 运行时改为会话内常驻进程，',
   '# 每个 run_code program 只付一次启动成本，嵌套工具调用 44ms → 15ms。',
   '# 配套 scripts/tune-runtime.mjs --apply 负责 A（fs-search 的 glob/grep 只读并发）。',
   '- id: ptc-runtime',
@@ -61,13 +61,24 @@ const PLUGIN_ROW = [
   "      name: 'dsh-flash-presets'",
 ].join('\n');
 
+// 历史 preset id 的解析兜底**单独成行**：只 inject agentPresets，任何宿主（web / 桌面端 / tui）都能加载。
+// 挂在 plan-mode-ui 上的话，桌面端会因为 inject 里有 webServer 而停在 pending，旧会话照样打不开
+// （第五轮审计 T1-1）。实现见 lib/alias-plugin.js + lib/preset-alias.js。
+const ALIAS_ROW = [
+  '',
+  '# 历史 preset id 解析兜底（旧会话能否打开靠这一行）：纯内存映射，不写任何会话文件。',
+  '- insert:',
+  '    - id: flash-presets-alias',
+  "      name: 'dsh-flash-presets/alias'",
+].join('\n');
+
 function compose() {
   const parts = SOURCES.map(rel => {
     const abs = path.join(repo, rel);
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + ALIAS_ROW + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

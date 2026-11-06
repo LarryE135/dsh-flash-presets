@@ -37,9 +37,16 @@ const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets
 const END = '# <<< dsh-flash-presets: managed block <<<';
 // 现役两个预设由补丁层/组合包提供；历史 id 只由运行时兼容层解析，不写入补丁（R3-9）。
 const CURRENT = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
-// 0.2.9 起 lite 的 id 回归 flash-lean-ptc-v3；0.2.7–0.2.8 的 -lite 变成历史 id。
-// 发行包只发 v3 与 balance；靠别名解析的历史 id 是这三个。
-const LEGACY_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v3-lite'];
+// 历史 id 一律从 presets/legacy-preset-map.json 读（第五轮审计 T2-4：以前硬编码三个，
+// v1/v2 被写进补丁层也不报警）。读不到才退回硬编码，保证老安装上 doctor 仍能用。
+const LEGACY_IDS = (() => {
+  try {
+    const m = loadAliasMap();
+    const ids = m ? Object.keys(m.aliases) : [];
+    if (ids.length > 0) return ids;
+  } catch {}
+  return ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3-lite'];
+})();
 const PRESETS = [...CURRENT, ...LEGACY_IDS];
 
 if (argv.includes('--help') || argv.includes('-h')) {
@@ -117,7 +124,10 @@ const bundleInstalled = (() => {
 })();
 const blocks = raw.split('\n').filter(l => l.trim() === BEGIN).length;
 const ends = raw.split('\n').filter(l => l.trim() === END).length;
-if (blocks === 0) {
+if (blocks > 0 && bundleInstalled) {
+  bad('脚本安装的托管块与插件卡同时存在 —— 同一个预设会被注册两次');
+  problems.push('脚本安装 + 插件卡叠加（应先 --uninstall 再 dsh plugin add，或二选一）');
+} else if (blocks === 0) {
   if (bundleInstalled) ok('没有托管块，但组合包 dsh-flash-presets 已装 —— 预设行由 bundle 提供');
   else warn('没有托管块 —— 这些预设不是用本仓库的安装脚本装的（可能是手抄或 bundle patch）');
 } else if (blocks > 1 || ends !== blocks) {
@@ -149,8 +159,16 @@ for (const id of CURRENT) {
 }
 // 历史 id 不写入补丁层（组合包里也没有这一行），出现才提示（R3-9）。
 for (const id of LEGACY_IDS) {
-  const n = insideCount(id) + (strayRows.includes(id) ? 1 : 0);
-  if (n > 0) warn(id + '：历史 id 不该写进补丁层（由兼容层解析），请删掉这 ' + n + ' 行');
+  const inBlock = insideCount(id);
+  const stray = strayRows.includes(id);
+  if (inBlock > 0 && id === 'flash-lean-ptc-v3-lite' && !bundleInstalled) {
+    // 脚本安装的升级路径：旧托管块里有 -lite 时，merge-presets 会额外留一行兼容行
+    // （脚本安装没有别名层，删掉它旧会话就 not-found）。这是**预期**状态，不是问题。
+    ok(id + '：兼容行在托管块里（脚本安装的升级路径，供 0.2.6–0.2.8 的旧会话使用）');
+    continue;
+  }
+  if (inBlock > 0) info(id + '：补丁层里有 ' + inBlock + ' 行定义 → 该行优先，别名不生效（若是刻意保留可忽略；不是就删掉）');
+  if (stray) warn(id + '：块外残留 1 行（重装即可自动认领）');
 }
 if (strayRows.length > 0) problems.push('块外残留 ' + strayRows.length + ' 行（重装即可自动认领）');
 
@@ -172,6 +190,7 @@ if (tagLines.length === 0) {
 console.log('[5] 标准 YAML 解析');
 const require = createRequire(import.meta.url);
 const yamlCandidates = [
+  ...(process.env.DSH_JS_YAML ? [process.env.DSH_JS_YAML] : []),
   path.join(here, '..', 'node_modules', 'js-yaml'),
   path.join(home, 'profiles', 'node_modules', 'js-yaml'),
   '/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/js-yaml',
@@ -213,6 +232,19 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
   else { warn('缺少 lib/client.js —— 客户端不会加载'); problems.push('插件客户端入口缺失'); }
   if (fs.existsSync(path.join(pluginDir, 'lib', 'index.js'))) ok('宿主入口存在（lib/index.js）');
   else { warn('缺少 lib/index.js —— 计划模式组件不会加载'); problems.push('计划模式宿主入口缺失'); }
+  // 第五轮审计 T1-1：旧会话能不能打开，全看组合包里有没有这一行（只 inject agentPresets 的别名插件）。
+  const bundlePatch = path.join(pluginDir, 'cordis.patch.yml');
+  if (fs.existsSync(bundlePatch)) {
+    const text = fs.readFileSync(bundlePatch, 'utf8');
+    if (/id:\s*flash-presets-alias/.test(text)) ok('旧 id 兼容行存在（flash-presets-alias，旧会话可解析）');
+    else {
+      warn('组合包里没有 flash-presets-alias 行 —— 旧会话（-lite / v1 / v2 / flash-lean）会 not-found');
+      info('这是 0.2.9 之前的插件卡：升级 dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
+      problems.push('旧 id 兼容行缺失');
+    }
+  } else {
+    warn('插件目录里没有 cordis.patch.yml —— 预设行可能没随包提供');
+  }
 } else {
   let dep = null;
   try {
@@ -223,7 +255,7 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
     }
   } catch {}
   if (dep) {
-    warn('profile 依赖里有 ' + PLUGIN + '@' + dep + '，但 node_modules 里没有 —— 重装一次：dsh plugin --profile ' + profile + ' add ' + PLUGIN);
+    warn('profile 依赖里有 ' + PLUGIN + '@' + dep + '，但 node_modules 里没有 —— 重装一次：dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
     problems.push('插件声明存在但未落盘');
   } else {
     if (blocks > 0) {
@@ -285,8 +317,11 @@ if (flag('--dump') || flag('--all')) {
       else warn('preset-' + id + ' 不在合成配置里');
     }
     for (const id of PRESETS.filter((x) => !CURATED.includes(x))) {
-      if (hasRow(id)) warn('preset-' + id + ' 是历史 id，不应出现在合成配置里');
-      else ok('preset-' + id + ' 未出现（历史 id，由兼容层解析）');
+      if (hasRow(id)) {
+        // 有定义 = 该行优先，别名层对它是死代码。可能是刻意保留的本机行（例如自己维护 v1/v2），
+        // 也可能是升级时忘了删 —— 提醒但不计入 problems。
+        info('preset-' + id + ' 在补丁层里有定义：该行优先，别名对它不生效（刻意保留可忽略）');
+      } else ok('preset-' + id + ' 未出现（历史 id，由兼容层解析）');
     }
   } catch (e) {
     bad('dump-config 失败：' + String(e.message).split('\n')[0]);
@@ -315,8 +350,22 @@ if (problems.length === 0) {
   console.log('      下一步看浏览器 Console 的错误，以及同一份配置下用默认预设是否也异常。');
 } else {
   console.log('结论：发现 ' + problems.length + ' 项 —— ' + problems.join('；'));
-  console.log('      先跑：node scripts/merge-presets.mjs --patch "' + patchPath + '"   （认领残留、重建托管块）');
-  console.log('      再跑：node scripts/doctor.mjs --profile ' + profile + (tagLines.length ? ' --fix' : ''));
+  // 按问题类型给对应的修法：以前不分青红皂白就让人跑 merge-presets + --fix，
+  // 对「插件卡旧了」「脚本安装与插件卡叠加」根本不对症（第五轮审计 T2-4）。
+  const has = (needle) => problems.some((p) => p.includes(needle));
+  if (has('脚本安装 + 插件卡') || has('托管块重复')) {
+    console.log('      二选一：① 只留插件卡  bash scripts/install.sh --profile ' + profile + ' --uninstall  然后确认 dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
+    console.log('              ② 只留脚本安装  dsh plugin --profile ' + profile + ' remove ' + PLUGIN);
+  }
+  if (has('旧 id 兼容行缺失') || has('插件声明存在但未落盘')) {
+    console.log('      插件卡旧了：dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
+  }
+  if (has('块外残留') || has('托管块')) {
+    console.log('      认领残留、重建托管块：node scripts/merge-presets.mjs --patch "' + patchPath + '"');
+  }
+  if (tagLines.length > 0) {
+    console.log('      就地解析 !!js：node scripts/doctor.mjs --profile ' + profile + ' --fix');
+  }
   console.log('      仍不对：cp "' + patchPath + '.bak-*" "' + patchPath + '"  回滚到安装前');
 }
 // 有 problems 时退出码 1：CI 与「体检」才能真正失败（第三轮审计 R3-8）。

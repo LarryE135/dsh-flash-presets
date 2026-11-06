@@ -43,7 +43,7 @@ const agentPresetProjectionDefinition = {
 |---|---|---|
 | 0.2.6 | 删掉 `flash-lean-ptc-v3` 等旧 id；`migrate-legacy-preset-ids.mjs` 用 `zstdDecompressSync` 整文件重写 | 多帧 zstd 只解出首帧 → 事件帧全丢；WSL 194 / Windows 273 个会话被截断 |
 | 0.2.8 | 启动时“自愈”改写 header | 只改 header 不改 `agent-preset/selected`，而且没清投影缓存 → 一部分会话仍旧 not-found（看起来“修了但没生效”） |
-| 0.2.9 | ①把 lite 的 id 从 `flash-lean-ptc-v3-lite` **改回** `flash-lean-ptc-v3` 并冻结；②把 `flash-lean-ptc-v1` / `-v2` 按 0.2.5 原文注册成兼容卡 | 修好上一行：281 个桌面端会话重新落进 roster，不再依赖兼容层；v1/v2 的会话解析到**自己的**规则，不会被映射成 v3 的行为。本机 1007 个桌面端会话：`defined` 502、`aliased` 0、`orphan` 3（全是私有 id） |
+| 0.2.9 | ①把 lite 的 id 从 `flash-lean-ptc-v3-lite` **改回** `flash-lean-ptc-v3` 并冻结；②把全部历史 id（含 `flash-lean-ptc-v1` / `-v2`）放进别名表，规则不同的标 `rulesDiffer` + 首次命中警告；③别名层拆成独立插件行 `flash-presets-alias`（只 inject `agentPresets`） | 修好前两行：281 个桌面端会话重新落进 roster；v1/v2 的会话可解析（按 v3 规则运行，首次命中会警告，原规则可在 profile 补丁里加回）。本机 1007 个桌面端会话：`defined` 505、`aliased` 0、`orphan` 0 |
 
 另外两个隐藏前提，出事时会让局面更难判断：
 
@@ -53,15 +53,15 @@ const agentPresetProjectionDefinition = {
 ## 4. 正确的升级姿势（本包 0.2.9 起真正执行）
 
 1. **id 冻结**：任何发布过的 id 不再删除、不再改名。要改行为就改内容、改显示名、改 `description`。现役两个 id 是 `flash-lean-ptc-v3`（13 条，默认）与 `flash-lean-ptc-v3-balance`（3 条）；0.2.7–0.2.8 期间的 `flash-lean-ptc-v3-lite` 是**一次违背本条的改名**，0.2.9 已改回，代价是那两版产生的会话要靠 alias 层兜底。
-1b. **规则不同的历史 id 不许映射、也不强行随包发行**：`flash-lean-ptc-v1` / `-v2` 的规则与 v3 不同（14 条 / 0.3·50k、12 条 / 0.25·20k），映射过去等于让那时创建的会话静默换规则。0.2.9 的最终口径是：发行包只发 `flash-lean-ptc-v3` 与 `flash-lean-ptc-v3-balance`，v1/v2 在 `presets/compat-exceptions.json` 里登记 reason + fallback（`check-preset-compat` 强制要求），谁需要谁在自己的 profile 补丁里加行（源文件见 tag `v0.2.5`，唯一改动是删掉上游已移除的 `list-agents` 子路径）。把它们映射到 v3 会让那些会话的行为被悄悄改掉——那不是兼容，是改写。规则相同的 id（`-lite` 与 v3）才可以用别名，也不占卡片。
-2. **alias 层兜底**（`lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。
+1b. **规则不同的历史 id 也映射，但不许无声地换规则、也不随包发行**：`flash-lean-ptc-v1` / `-v2` 的规则与 v3 不同（14 条 / 0.3·50k、12 条 / 0.25·20k）。0.2.8 的口径是「不映射、只在 `presets/compat-exceptions.json` 里登记 reason + fallback」——第五轮审计判定那本身是个回归：0.2.8 打得开的会话，升级到 0.2.9 反而 not-found。所以 0.2.9 改为：**映射**（打得开优先），但标 `rulesDiffer: true`，首次命中打印 `[preset-alias] 注意：… 的规则与 … 不同`；要原规则就在自己的 profile 补丁里加行（源文件见 tag `v0.2.5`，唯一改动是删掉上游已移除的 `list-agents` 子路径）。发行包仍然只发 `flash-lean-ptc-v3` 与 `flash-lean-ptc-v3-balance` 两张卡。
+2. **alias 层兜底**（`lib/alias-plugin.js` + `lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。它由 `cordis.patch.yml` 里 `id: flash-presets-alias` 那一行载入，**只 inject `agentPresets`** —— 与计划模式是否可用无关。
 3. **审计按 DSH 语义**（`npm run audit:sessions`）：有效 preset = header + 最后一条 selection；roster 取 `dsh --profile web --dump-config`。发现孤儿 id 就 `exit 1`。
-4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id。
+4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`，也是 `.github/workflows/verify.yml` 的一条 step）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id；冻结 id（`flash-lean-ptc-v3` / `-balance`）不许进例外表；例外必须写全 `{ reason, fallback, since }` 且该 id 真的在历史 tag 里出现过。**没有 tag 时 exit 2**（无法判定，绝不假装通过）—— 所以 CI 的 checkout 是 `fetch-depth: 0` + `fetch-tags: true`。
 5. **可选的一次性迁移**（`npm run retarget:sessions`，默认 dry-run）：想把兼容层彻底清掉时用。**这两个脚本只在仓库里，不随 npm 包发布**（它们会改写会话文件，属于维护者工具）。约束见脚本头注释：只改决定解析结果的那一处、帧级改写、整份备份、写前写后双校验、清投影缓存、可回滚、幂等。
 
 ## 4.1 已知限制（复查时确认、暂不修）
 
-1. **alias 层跟着 `plan-mode-ui` 这一行加载**，而该行的 `inject` 里有 `webServer`。桌面端（Electron）不走 web profile，这一行很可能停在 pending、alias 根本没装上 —— 所以**不要把兼容层当成「旧会话一定能开」的保证**；真正兜底的是 id 不再改名。所以它只在**装了本组合包、且该 profile 有 webServer（web）** 时生效；把本包装进 `tui` / `headless` 一类 profile 时，这一行会停在 pending，alias 也不会挂上。要覆盖那种场景，需要把 alias 拆成一个只 `inject: ['agentPresets']` 的独立 loader 行（改动面更大，暂不做，已在待办里）。
+1. **0.2.8 的坑（0.2.9 已修）：alias 层跟着 `plan-mode-ui` 这一行加载**，而那一行的 `inject` 里有 `webServer`。桌面端（Electron）不走 web profile，那一行很可能停在 pending、alias 根本没装上 —— 这就是「即便做了兼容层仍旧打不开」的直接原因。0.2.9 把 alias 拆成独立的一行 `flash-presets-alias`（`inject: ['agentPresets']`），web / 桌面端 / 无 web 的宿主都能加载；`node scripts/doctor.mjs` 的第 6 节会检查组合包里有没有这一行。
 2. **alias 是运行时的、不是永久的**：会话日志里仍然写着旧 id。若以后彻底清理（`retarget:sessions`），日志才真正改成新 id；在那之前删掉 alias 表等于让这些会话再次打不开。
 3. **注册表实例重建时包装会失效**（profile 热重载插件的场景）。进程重启会重新挂上；同一进程内重建不会。审计脚本随时可查（`orphan=0` 才健康）。
 ## 5. 升级后的自查流程

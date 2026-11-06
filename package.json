@@ -91,6 +91,9 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./alias": {
+      "default": "./lib/alias-plugin.js"
+    },
     "./package.json": "./package.json"
   },
   "peerDependencies": {

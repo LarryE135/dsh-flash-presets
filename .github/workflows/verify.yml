@@ -24,7 +24,12 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
     steps:
+      # fetch-depth: 0 + fetch-tags: 兼容性闸门靠「历史上打过 tag 的 preset id」判定，
+      # 浅克隆里没有 tag，脚本会 exit 2（无法判定）。第五轮审计 T2-6：以前 CI 根本不跑它。
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'   # Node 20 已 EOL；lib/ 用到 zstdDecompressSync（22.15+）
@@ -84,6 +89,27 @@ jobs:
       - name: Structural + cross-platform check (no dependencies)
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/dsh" node scripts/verify-presets.mjs
+
+      # 历史 id 必须仍可解析：定义 / 别名 / 登记例外三者之一。缺 tag 时 exit 2（= 无法判定，也算失败）。
+      - name: 历史 preset id 兼容性闸门
+        shell: bash
+        run: node scripts/check-preset-compat.mjs
+
+      # 安装器只该动 profile 补丁层，不许碰会话目录（第五轮审计 T3-9：以前没有任何断言）。
+      - name: 安装器不碰会话数据
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          h="$RUNNER_TEMP/dsh-nohea"
+          mkdir -p "$h/profiles/web" "$h/sessions/proj-1"
+          printf '[]\n' > "$h/profiles/web/cordis.patch.yml"
+          printf 'marker\n' > "$h/sessions/proj-1/sess-1.log.zstd"
+          before=$(find "$h/sessions" -type f | sort | xargs -r md5sum)
+          DSH_HOME="$h" bash scripts/install.sh >/dev/null
+          DSH_HOME="$h" bash scripts/install.sh --uninstall >/dev/null
+          after=$(find "$h/sessions" -type f | sort | xargs -r md5sum)
+          [ "$before" = "$after" ] || { echo "::error::安装/卸载动过 $h/sessions"; exit 1; }
+          echo "安装与卸载全程未触碰 sessions/"
 
       - name: 预设文本审计（编号/缩进/自相矛盾/平台路径/版本引用）
         shell: bash

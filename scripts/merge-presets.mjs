@@ -50,7 +50,29 @@ function detectEol(s) {
   return crlf > lf ? '\r\n' : '\n';
 }
 
-function buildBlock(eol = '\n') {
+/**
+ * 0.2.6–0.2.8 的脚本安装会把 id 写成 flash-lean-ptc-v3-lite；0.2.9 起这个 id 不在补丁里，
+ * 而脚本安装这条路没有别名层，那些会话就会 not-found（第五轮审计 T0-1）。
+ * 所以升级时若发现旧块里有 -lite，就额外写一行「兼容行」：规则与 v3 相同、order 放到 99、
+ * 名字标「勿选」。全新安装（旧块里没有 -lite）不会多这一行。
+ */
+function buildLiteCompatBody() {
+  const src = path.join(presetsDir, 'flash-lean-ptc-v3.patch.yml');
+  if (!fs.existsSync(src)) throw new Error('缺少兼容行源文件: ' + src);
+  const text = fs.readFileSync(src, 'utf8');
+  const m = /^- insert:\n/m.exec(text);
+  if (!m) throw new Error('flash-lean-ptc-v3.patch.yml: 找不到行首的 - insert: 条目');
+  let body = resolvePlatformTags(text.slice(m.index + m[0].length).replace(/\s+$/, ''));
+  const before = body;
+  body = body.replace(/^(\s*)- id: preset-flash-lean-ptc-v3\s*$/m, '$1- id: preset-flash-lean-ptc-v3-lite');
+  body = body.replace(/^(\s*)id: flash-lean-ptc-v3\s*$/m, '$1id: flash-lean-ptc-v3-lite');
+  body = body.replace(/^(\s*)name: "精简·PTC v3（lean-v3）"\s*$/m, '$1name: "兼容行 · 旧 lite 会话（flash-lean-ptc-v3-lite，勿选）"');
+  body = body.replace(/^(\s*)order: 27\s*$/m, '$1order: 99');
+  if (body === before || !body.includes('flash-lean-ptc-v3-lite')) throw new Error('兼容行生成失败：v3 源文件的结构变了');
+  return body;
+}
+
+function buildBlock(eol = '\n', opts = {}) {
   const bodies = FILES.map(name => {
     const file = path.join(presetsDir, name);
     if (!fs.existsSync(file)) throw new Error('缺少预设文件: ' + file);
@@ -60,6 +82,7 @@ function buildBlock(eol = '\n') {
     // 落盘前把 !!js 平台标签解成布尔：用户机器上的补丁必须是普通 YAML
     return resolvePlatformTags(text.slice(m.index + m[0].length).replace(/\s+$/, ''));
   });
+  if (opts.legacyLite === true) bodies.push(buildLiteCompatBody());
   return (BEGIN + '\n- insert:\n' + bodies.join('\n') + '\n' + END + '\n').replace(/\n/g, eol);
 }
 
@@ -90,7 +113,7 @@ function stripBlock(raw) {
  * 这里把它们整条摘掉（只摘"整条都由我们的预设行组成"的条目，别人的行一个不碰），
  * 随后由托管块统一重建 —— 结果就是"装几次都只有一份"。
  */
-const OUR_ROW = /^preset-flash-lean-ptc-v[0-9]+$/;
+const OUR_ROW = /^preset-flash-lean-ptc-v[0-9]+(-lite)?$/;
 
 function adoptForeignRows(text) {
   const lines = text.split(/(?<=\n)/);
@@ -135,6 +158,14 @@ function adoptForeignRows(text) {
 
 let raw = fs.existsSync(patchPath) ? fs.readFileSync(patchPath, 'utf8') : '[]\n';
 const eol = detectEol(raw);
+// 旧托管块 / 旧裸行里出现过 -lite → 这次升级要带一行兼容行（除非显式 --no-legacy-lite）
+const hadLegacyLite = /preset-flash-lean-ptc-v3-lite/.test(raw);
+const keepLegacyLite = hadLegacyLite && !flag('--no-legacy-lite');
+if (hadLegacyLite) {
+  console.log(keepLegacyLite
+    ? '检测到旧安装写过 flash-lean-ptc-v3-lite：本次会额外写一行兼容行（脚本安装没有别名层，否则那些会话会打不开）'
+    : '检测到旧安装写过 flash-lean-ptc-v3-lite，但已按 --no-legacy-lite 跳过兼容行');
+}
 const isEmptyArray = s => /^\[\s*\]$/.test(s.trim());
 
 let out;
@@ -156,9 +187,9 @@ try {
     const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
     if (body.length === 0 || (body.length === 1 && isEmptyArray(body[0]))) {
       const kept = raw.split(/\r?\n/).filter(l => !isEmptyArray(l)).join(eol).replace(/\s+$/, '');
-      out = (kept.trim() ? kept + eol + eol : '') + buildBlock(eol);
+      out = (kept.trim() ? kept + eol + eol : '') + buildBlock(eol, { legacyLite: keepLegacyLite });
     } else if (body[0].trimStart().startsWith('- ')) {
-      out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol);
+      out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol, { legacyLite: keepLegacyLite });
     } else {
       console.error('✖ 该补丁文件不是「块状数组」形式（可能是 [{...}] 之类的流式写法）。');
       console.error('  请先把这个文件改回块状数组（形如 `[]` 或 `- ...` 开头），再跑一次。');

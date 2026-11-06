@@ -15,8 +15,35 @@ if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   exit 1
 fi
 REMOTE="${REMOTE:-https://github.com/$GH_USER/$REPO.git}"
+DRY_RUN="${DRY_RUN:-0}"
 
+# ── 发布前置守卫（第五轮审计 T1-4）──────────────────────────────────────────────
+# 事故形态：标签打在一个不在 main 上的提交（0.2.9 就是这样：tag → 536959e，而 main 早已往前走），
+# 于是 `git push origin $TAG` 把一条孤儿提交推上去，GitHub Release 的压缩包与用户装的 main 完全不同。
+# 这四条是 fail-closed 的：任一不满足就退出，不做任何推送。
 echo "目标：${GH_USER}/${REPO}（${VISIBILITY}），标签 ${TAG}"
+
+fail() { echo "✖ $1" >&2; shift; for line in "$@"; do echo "  $line" >&2; done; exit 1; }
+
+# ① 工作区必须干净：发布出去的东西必须就是仓库里的东西
+[ -z "$(git status --porcelain)" ] || fail "工作区有未提交的改动（发布物必须与仓库一致）" "先 git commit 或 git stash 再跑本脚本"
+
+# ② package.json 的版本必须与标签一致
+PKG_VERSION="$(node -p 'require("./package.json").version' 2>/dev/null || echo '')"
+[ "$PKG_VERSION" = "${TAG#v}" ] || fail "package.json 版本（$PKG_VERSION）与标签（$TAG）不一致" "改 package.json / README / CHANGELOG 后重新打标签"
+
+# ③ 标签必须指在当前分支上（否则推上去的是孤儿提交）
+git merge-base --is-ancestor "$TAG" HEAD || fail "标签 $TAG 不在当前分支（$(git rev-parse --abbrev-ref HEAD)）的历史上" "重新打标签：git tag -d $TAG && git tag $TAG HEAD"
+
+# ④ 远端 main 不能有本地没有的提交（否则 Release 与用户拉到的 main 不一致）
+if git remote get-url origin >/dev/null 2>&1; then
+  git fetch -q origin main 2>/dev/null || true
+  if git rev-parse -q --verify origin/main >/dev/null 2>&1; then
+    git merge-base --is-ancestor origin/main HEAD || fail "远端 main 有本地没有的提交" "先 git pull --rebase origin main（解决冲突）再重试；没对齐就不要发版"
+  fi
+fi
+echo "前置守卫通过（版本 ${PKG_VERSION}，标签在 HEAD 历史上）"
+if [ "$DRY_RUN" = "1" ]; then echo "DRY_RUN=1：只做检查，不推送。"; exit 0; fi
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
 
 # 硬规则：远端已有的同名 tag 不得移动。

@@ -1,90 +1,87 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本；本机 tag 已打，尚未推到 GitHub、也未发 npm）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 
-## 0.2.9（2026-11-07，发布）
+## 0.2.9（2026-11-07，未发布）
 
-**把预设 id 改回稳定值。** 桌面端装上新版 0.2.8 后，旧会话直接打不开 —— 根因是 0.2.7 把 13 条规则版的 id 从
-`flash-lean-ptc-v3` 改名成 `flash-lean-ptc-v3-lite`。DSH 把 preset id 持久化在会话日志里，改名之后那些会话
-在解析这一步就找不到预设。0.2.8 加过一层运行时兼容层，但它在桌面端靠不住：alias 跟着 `plan-mode-ui` 那一行
-加载，而该行的 `inject` 里有 `webServer`，桌面端（Electron）不走 web profile，这一行很容易停在 pending，
-于是「即便做了兼容层」仍旧打不开。修法改为不动标识符：**id 保持 `flash-lean-ptc-v3`，只演进规则文本与描述**，
+**把预设 id 改回稳定值，并让「旧会话能不能打开」不再是运气。** 桌面端装上新版 0.2.8 后旧会话直接打不开 —— 根因是
+0.2.7 把 13 条规则版的 id 从 `flash-lean-ptc-v3` 改名成 `flash-lean-ptc-v3-lite`。DSH 把 preset id 持久化在会话日志里，
+改名之后那些会话在解析这一步就找不到预设。修法是**不动标识符**：id 保持 `flash-lean-ptc-v3`，只演进规则文本与描述，
 0.2.9 起不再改名。本版**不改预设规则文本、不改模型行为**。
 
 ### 改动
 
-- **lite 的 id 回到 `flash-lean-ptc-v3`**：`presets/flash-lean-ptc-v3.patch.yml`（原 `-lite.patch.yml`）里条目 id 与
-  `config.id` 都是 `flash-lean-ptc-v3`，`name` 用回 lean-v3 的叫法「精简·PTC v3（lean-v3）」，`description` 注明
-  id 稳定、旧会话可直接打开。0.2.7–0.2.8 那个 `-lite` 只是 v3 的一次改名，规则与 v3 完全相同，**不再做成卡片**，
-  只作为历史 id 交给兼容层解析。
-  规则文本一字未动（仍是 13 条），order 仍为 27。
-- **发行包收窄成两张卡：lean-v3 + balance**。中间曾把 0.2.5 的 v1/v2 也做成随包发行的「兼容卡」，同一个 0.2.9
-  里又撤掉：发行包只负责「正式发布的 lean-v3」与「新增的 balance」，v1/v2/v3b/v3e 一律不随包发行。
-  - 不随包，但**也不许无声消失**：`presets/compat-exceptions.json` 里为 `flash-lean-ptc-v1`、`-v2` 各登记一条
-    `reason` + `fallback`（`check-preset-compat` 会从 git tag 里逐个抓历史 id，缺定义又没有例外就 exit 1）。
-  - 不映射到 `flash-lean-ptc-v3`：它们的规则不同（14 条 / 0.3·50k、12 条 / 0.25·20k），映射过去等于让那时创建的
-    会话静默换掉规则。
-  - 需要它们的人在自己的 profile 补丁里加一行，源文件见 tag `v0.2.5`（唯一改动：删掉上游已移除的
-    `dsh-tool-subagent-control/list-agents` 子路径）。本机就是这么做的：`v2`（3 个桌面端会话在用）与自建的
-    `v3b` / `v3e` 只写在两侧 profile 的 `cordis.patch.yml` 里。
-- **兼容层收敛到 3 个别名**：`presets/legacy-preset-map.json` 的 canonical 仍是 `flash-lean-ptc-v3`，别名表只留
-  `flash-lean` / `flash-lean-ptc` / 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite`（后者规则与 v3 完全相同，映射不改行为）。
-- **自愈目标同步**：`lib/compat-heal.js` 的 `CURRENT_PRESET_ID` 改为 `flash-lean-ptc-v3`（默认关闭，需
-  `DSH_FLASH_PRESETS_HEAL=1`）。
-- **校验与文档口径同步**：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、
-  `compose-bundle-patch` 的注释、安装器默认预设、CI 的 id 断言都改到新 id；`doctor` 把 `-lite` 归入历史 id。
-- README（中英）、`docs/版本与兼容性.md`、`docs/技术文档-精简预设实现.md`、`docs/实测证据.md` 的命名口径同步；
-  版本号统一到 0.2.9（`package.json`、`package-lock.json`、`marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
+- **lite 的 id 回到 `flash-lean-ptc-v3`**：`presets/flash-lean-ptc-v3.patch.yml` 里条目 id 与 `config.id` 都是
+  `flash-lean-ptc-v3`，`name` 用「精简·PTC v3（lean-v3）」，`description` 注明 id 稳定、旧会话可直接打开。0.2.7–0.2.8
+  那个 `-lite` 只是 v3 的一次改名，规则与 v3 完全相同，**不再做成卡片**，只作为历史 id 交给别名层解析。规则仍是 13 条，order 27。
+- **发行包收窄成两张卡：lean-v3 + balance**。中间曾把 0.2.5 的 v1/v2 也做成随包发行的「兼容卡」，同一个 0.2.9 里又撤掉：
+  发行包只负责「正式发布的 lean-v3」与「新增的 balance」，v1/v2/v3b/v3e 一律不随包发行。
+- **所有发布过的历史 id 都能解析**（0.2.8 能打开的会话，0.2.9 必须还能打开）：`presets/legacy-preset-map.json` 的别名表是
+  `flash-lean-ptc-v3-lite`（规则与 v3 逐字相同）、`flash-lean-ptc-v1`、`flash-lean-ptc-v2`、`flash-lean-ptc`、`flash-lean`
+  共 5 条，全部指向 canonical `flash-lean-ptc-v3`。规则不同的那 4 条标 `rulesDiffer: true`，首次命中打印一条警告
+  （打得开优先，规则变化必须可见；要原规则就在 profile 补丁里加自己的行）。`presets/compat-exceptions.json` 因此清空，
+  只保留机制与 `$policy` 说明。
+- **别名层独立成一行插件**：`lib/alias-plugin.js`（`inject: ['agentPresets']`）由 `cordis.patch.yml` 里的
+  `id: flash-presets-alias` 载入。以前它挂在 `plan-mode-ui` 那一行上，而那一行 inject 了 `webServer`，桌面端（Electron）
+  会停在 pending —— 「即便做了兼容层」仍然打不开。现在任何宿主都能加载，与计划模式是否可用无关。
+- **启动自愈删除**：`lib/compat-heal.js` 已删除（`DSH_FLASH_PRESETS_HEAL` 不再有任何作用）。它改 header 却不失效 DSH 的
+  会话投影缓存，实际基本无效；锁文件还不释放；名单里还挂着 `flash-lean-ptc-v1` / `-v2`，一旦被打开就是强制对齐。
+  从此**本包没有任何代码写会话文件**。
+- **脚本安装不再悄悄弄丢 `-lite` 会话**：`install.sh` / `install.ps1` 这条路没有别名层，所以 `merge-presets.mjs` 发现旧
+  托管块/旧裸行里出现过 `flash-lean-ptc-v3-lite` 时，会额外保留一行兼容行（规则同 v3、`order: 99`、名字标「勿选」）。
+  全新安装不会多这一行；`--no-legacy-lite` 可显式关掉。
+- **脚本安装与插件卡不再能叠成重复预设**：profile 的 `package.json` 里 `dsh.profile.bundles` 已含本包时，两个安装器直接
+  `exit 4` 并给出二选一的做法，`--force` / `-Force` 才继续（以前只提示「都装不会报错」，实际预设会重复出现）。
+- **兼容性闸门真正生效**：`scripts/check-preset-compat.mjs` 在没有 git tag 时 `exit 2`（以前静默通过）、冻结 id
+  （`flash-lean-ptc-v3` / `-balance`）不许进例外表、例外必须是 `{ reason, fallback, since }` 且该 id 真的在历史里、
+  别名条目必须是 `{ rulesDiffer: boolean }`。CI 新增这一步，`actions/checkout` 改成 `fetch-depth: 0` + `fetch-tags: true`。
+- **`doctor` 不再误报**：历史 id 列表改成从 `legacy-preset-map.json` 读（以前写死三个，v1/v2 写进补丁也不报）；新增
+  「脚本安装 + 插件卡叠加」判定与「组合包里有没有 `flash-presets-alias` 行」自检；结论按问题类型给不同修法；
+  `DSH_JS_YAML` 优先；提示里的安装命令一律钉版本（不再给裸包名）。
+- **`publish.sh` 加四条前置守卫**（fail-closed）：工作区必须干净、`package.json` 版本必须等于标签、标签必须在当前分支历史上、
+  远端 `main` 不能有本地没有的提交。0.2.9 的标签一度打在不在 `main` 上的提交，这四条就是为此加的；`DRY_RUN=1` 只检查不推送。
+- **CI 断言安装器不碰会话**：装一次 + 卸一次，`sessions/` 下文件的校验和必须完全不变。
+- 校验与文档口径同步：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、`compose-bundle-patch`
+  的注释、安装器默认预设、CI 的 id 断言都跟着改；版本号统一到 0.2.9（`package.json`、`package-lock.json`、
+  `marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
 
-### 为什么发行包只留两张卡
+### 为什么是「全部映射」而不是「只映射规则相同的」
 
-三条判断标准，按顺序：
+0.2.8 时期的口径是「规则相同才映射，规则不同就让它 not-found」。第五轮审计指出这本身就是一个回归：0.2.8 能打开的
+v1/v2 会话，0.2.9 打不开了 —— 对用户来说「会话丢了」比「规则变了」严重得多，而且规则变化是可逆的（自己在补丁里加行），
+会话打不开是不可逆的体验损失。所以：
 
-1. **规则相同的历史 id 用别名**：0.2.7–0.2.8 的 `-lite` 与 v3 规则逐字相同，映射不改任何行为，所以它只是
-   `legacy-preset-map.json` 里的一条别名（连同更早的 `flash-lean`、`flash-lean-ptc`），不占卡片。
-2. **规则不同的历史 id 不映射、也不随包发行**：映射等于改写行为，随包发行等于让所有装了这个包的人背上
-   别人的历史包袱。它们进 `compat-exceptions.json` 留档，需要的人在自己的 profile 层加行。
-3. **正式发布的那张卡 id 永不变更**：`flash-lean-ptc-v3` 就是 lean-v3，改 id 等于让旧会话打不开（0.2.7 踩过）。
-
-### 实现逻辑复查（同版修掉）
-
-- **`compat-heal` 的历史 id 名单收敛到 3 个**（`flash-lean`、`flash-lean-ptc`、`flash-lean-ptc-v3-lite`）。
-  原来还列着 `flash-lean-ptc-v1` / `-v2` / `-v3`：前两个现在是真实兼容卡，一旦有人设了
-  `DSH_FLASH_PRESETS_HEAL=1`，它们会被改写成 `flash-lean-ptc-v3` —— 那就是强制对齐，会改掉旧会话的行为；
-  第三个等于 canonical 自己，纯空转。
-- **`prune-stale-presets.mjs` 的退役名单只有 `v3-1-high` / `v3-1-max`**：它清理的是升级残留行，不能把
-  真在用的预设当垃圾。
-- **`migrate-legacy-preset-ids.mjs` 的 `KEEP` = `{`flash-lean-ptc-v3`, `flash-lean-ptc-v3-balance`}`**：
-  它只做只读报告（`--apply` 早已停用），但报告里也不该把现役预设算成待迁移对象。
-- **`doctor` 回到「现役两行 + 历史三别名」**：第 8 节只判定 `preset-flash-lean-ptc-v3` /
-  `preset-flash-lean-ptc-v3-balance` 是否在合成配置里，其余 id 一律按「历史 id 不该出现」处理。
-- **`lint-presets` 不再有豁免名单**：包内只剩两张卡，都必须过写作规范检查；v1/v2 的「规则自相矛盾 /
-  POSIX 路径」豁免随卡片一起删掉了。
-- **启动期验证**：在临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主，两张卡都注册通过（没有
-  `agent-preset/invalid`），日志为 `[preset-alias] 已启用 3 个历史 preset id 的解析兜底` +
-  `[compat-heal] 未启用（默认关闭）`。
+1. **打得开优先**：所有历史 id 都进别名表，映射到 canonical。
+2. **变化必须可见**：规则不同的别名标 `rulesDiffer: true`，首次命中打 `[preset-alias] 注意：… 的规则与 … 不同`。
+3. **发行包只留两张卡**：正式发布的 `flash-lean-ptc-v3` 与新增的 `flash-lean-ptc-v3-balance`，其余历史 id 不占卡片
+   （不进 picker，也不随包发行）。
+4. **正式发布的 id 永不变更**：改 id 等于让旧会话打不开（0.2.7 踩过）。
 
 ### 安装流程会不会动会话
 
-不会。`install.sh` / `install.ps1` 里没有任何 `sessions` / `retarget` / `migrate` / `heal` 相关调用；包也没有
-`install` / `postinstall` 钩子（只有 `prepack` / `prepublishOnly`）；插件启动只挂 alias（纯内存解析）并打印
-`[compat-heal] 未启用（默认关闭；DSH_FLASH_PRESETS_HEAL=1 可开）`。唯一会写会话文件的是 `compat-heal`，需显式
-开环境变量，且只改 header、其余帧逐字节保留、写前写后各校验一次。
+不会，而且现在有断言。`install.sh` / `install.ps1` 里没有任何 `sessions` / `retarget` / `migrate` 相关调用；包没有
+`install` / `postinstall` 钩子（只有 `prepack` / `prepublishOnly`）；插件启动只把 `resolve/retain/acquireScope/readDocument`
+`/mount/select` 换成「先按原 id 解析、失败才用 canonical 重试一次」的包装函数（纯内存），`mount` / `select` 还会先用
+`service.definitions` 确认那个 id 到底有没有定义 —— 用户自己维护的同名预设不会被劫持。CI 里有一条 step 把装前装后的
+`sessions/` 校验和逐字节比对。
 
 ### 测试
 
-- `npm run verify`（129 项）、`selftest.sh`（39 项）、`selftest-integration.sh`（17 项）、插件测试（25 项）全绿。
-- 安装后 `dsh --profile web --dump-config` 出现 `id: preset-flash-lean-ptc-v3` 与 `-balance` 两条，
-  `legacy-preset-map.json` 的 3 个别名逐一解析到 `flash-lean-ptc-v3`。
-- **A/B 复现**：把同一个桌面端会话文件分别对着 0.2.8 与 0.2.9 的 roster 跑 `scripts/audit-compat.mjs`，
-  0.2.8 判为 `orphan`（打不开），0.2.9 判为 `defined`（可解析）。本机全部 1007 个桌面端会话里，
-  孤儿 id 一开始是 284 个（`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）。
-- **本机最终口径**（包内两张卡 + profile 层自加的 `v2` / `v3b` / `v3e` 三行）：
-  桌面端 1007 个会话 `defined` 505、`aliased` 0、`orphan` 0；WSL 1899 个会话 `defined` 449、
-  `aliased` 363（`-lite` 340 + `flash-lean-ptc` 15 + `flash-lean` 8）、`orphan` 8（`code` / `win-control`，
-  是更早的别的预设，未处理）。三个自加 id 只在本机 profile 补丁里，不随包发行。
+- `npm run verify`（127 项 + 21 项环境相关跳过；退出码 0）、`selftest.sh`（39 项）、`selftest-integration.sh`（17 项）、
+  插件测试（25 项）全绿。
+- 临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主：日志出现 `[preset-alias] 已启用 5 个历史 preset id 的解析兜底`
+  与 `（resolve/retain/acquireScope/readDocument/mount/select）`，两张卡都注册通过（没有 `agent-preset/invalid`），
+  并且自检把 `flash-lean-ptc-v3-lite` 解析成了 `flash-lean-ptc-v3`。
+- 安装后 `dsh --profile web --dump-config` 出现 `id: preset-flash-lean-ptc-v3` 与 `-balance` 两条；别名表 5 个 id 逐一
+  解析到 `flash-lean-ptc-v3`。
+- **A/B 复现**：把同一个桌面端会话文件分别对着 0.2.8 与 0.2.9 的 roster 跑 `scripts/audit-compat.mjs`，0.2.8 判为
+  `orphan`（打不开），0.2.9 判为 `defined` / `aliased`（可解析）。本机全部 1007 个桌面端会话里，孤儿 id 一开始是 284 个
+  （`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）。
+- **本机最终口径**（包内两张卡 + profile 层自加的 `v2` / `v3b` / `v3e` 三行）：桌面端 1007 个会话 `defined` 505、
+  `aliased` 0、`orphan` 0；WSL 1899 个会话 `defined` 449、`aliased` 363（`-lite` 340 + `flash-lean-ptc` 15 + `flash-lean` 8）、
+  `orphan` 8（`code` / `win-control`，是更早的别的预设，未处理）。三个自加 id 只在本机 profile 补丁里，不随包发行。
 
 ## 0.2.8（2026-11-06，发布）
 
