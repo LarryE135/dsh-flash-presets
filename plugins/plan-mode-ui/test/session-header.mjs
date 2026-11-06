@@ -16,7 +16,7 @@ const sessionDir = join(home, "sessions", projectDir, "session-" + uuid);
 mkdirSync(sessionDir, { recursive: true });
 const header = {
   type: "session", version: 4, id: "session-" + uuid, createdAt: Date.now(),
-  cwd, isSeeded: false, delegationDepth: 2, agentPreset: "flash-lean-ptc-v3-lite"
+  cwd, isSeeded: false, delegationDepth: 2, agentPreset: "flash-lean-ptc-v3"
 };
 writeFileSync(join(sessionDir, "session.v4.jsonl.zstd"), zlib.zstdCompressSync(Buffer.from(JSON.stringify(header) + "\n", "utf8")));
 

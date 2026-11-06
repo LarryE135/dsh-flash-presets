@@ -60,7 +60,7 @@ fi
 DSH_HOME="$TMP" node "$HERE/scripts/doctor.mjs" --profile web --all --warn-only >/dev/null 2>&1 \
   && ok "doctor --warn-only 不影响退出码" || bad "doctor --warn-only 仍退出非 0"
 # R3-9：第 3 节不得把历史 id 说成「由组合包提供」（组合包里没有这一行）
-if grep -q "flash-lean-ptc-v3：由组合包" <<<"$dout"; then
+if grep -q "flash-lean-ptc-v3-lite：由组合包" <<<"$dout"; then
   bad "第 3 节把历史 id 算成由组合包提供"
 else
   ok "第 3 节没有把历史 id 算成组合包提供"
@@ -70,9 +70,9 @@ grep -q "计划模式组件" <<<"$dout" && ok "doctor 有计划模式一节" || 
 grep -q "dsh --dump-config 是否认得这些预设" <<<"$dout" && ok "doctor --all 触发合成配置检查" || bad "doctor --all 未触发合成配置检查"
 if command -v dsh >/dev/null 2>&1; then
   # doctor 现在精确匹配整行：现役两个预设必须认得，历史 id 必须不被认成现役行。
-  grep -q "preset-flash-lean-ptc-v3-lite 出现在合成配置里" <<<"$dout" && \
+  grep -q "preset-flash-lean-ptc-v3 出现在合成配置里" <<<"$dout" && \
     grep -q "preset-flash-lean-ptc-v3-balance 出现在合成配置里" <<<"$dout" && ok "合成配置认得两个预设" || bad "合成配置不认新预设"
-  grep -q "preset-flash-lean-ptc-v3 未出现（历史 id" <<<"$dout" && ok "历史 id 没被误认成现役行" || bad "历史 id 被误认成现役行"
+  grep -q "preset-flash-lean-ptc-v3-lite 未出现（历史 id" <<<"$dout" && ok "历史 id 没被误认成现役行" || bad "历史 id 被误认成现役行"
 fi
 if command -v dsh >/dev/null 2>&1; then
   cons=$(sed -n "/结论：/p" <<<"$dout")

@@ -16,18 +16,21 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
-// 0.2.7 起只提供两个预设：轻量PTC-v3 lite（id flash-lean-ptc-v3，13 条，默认）
-// 与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。id 沿用 0.2.5 的身份，旧会话不需要迁移。
+// 只提供两个预设：轻量PTC-v3（id flash-lean-ptc-v3，13 条，默认）
+// 与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。
+// id 一旦发布就不再变动：DSH 把 preset id 写进会话日志，改名等于让旧会话报
+// agent-preset/not-found。0.2.7–0.2.8 把 lite 的 id 改成 -lite 是错的，0.2.9 起改回。
 const SOURCES = [
-  'presets/flash-lean-ptc-v3-lite.patch.yml',
+  'presets/flash-lean-ptc-v3.patch.yml',
   'presets/flash-lean-ptc-v3-balance.patch.yml',
 ];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
   '# 本文件叠加两个预设：',
-  '#   轻量PTC-v3 lite（flash-lean-ptc-v3-lite，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、',
-  '#   旧 id（flash-lean-ptc-v3 等）由 lib/preset-alias.js 运行时映射，不建兼容卡。',
+  '#   轻量PTC-v3（flash-lean-ptc-v3，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、',
+  '#   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；',
+  '#   更早的 id（flash-lean / flash-lean-ptc / -v1 / -v2 / v3-lite）由 lib/preset-alias.js 运行时映射。',
   '#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',

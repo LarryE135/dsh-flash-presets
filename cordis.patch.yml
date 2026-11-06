@@ -1,16 +1,19 @@
 # dsh-flash-presets —— 组合包补丁层（bundle patch）
 # 本文件叠加两个预设：
-#   轻量PTC-v3 lite（flash-lean-ptc-v3-lite，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、
-#   旧 id（flash-lean-ptc-v3 等）由 lib/preset-alias.js 运行时映射，不建兼容卡。
+#   轻量PTC-v3（flash-lean-ptc-v3，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、
+#   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；
+#   更早的 id（flash-lean / flash-lean-ptc / -v1 / -v2 / v3-lite）由 lib/preset-alias.js 运行时映射。
 #   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle
 # CI 会断言本文件与合成结果一致，请勿手工编辑。
 - insert:
-    - id: preset-flash-lean-ptc-v3-lite
+    # id 稳定为 flash-lean-ptc-v3：DSH 把 preset id 持久化在会话日志里，改 id 等于让旧会话失联。
+    # 规则文本可以随版本演进，但 id 不再变动（0.2.7–0.2.8 曾改成 -lite，0.2.9 起改回）。
+    - id: preset-flash-lean-ptc-v3
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: flash-lean-ptc-v3-lite
-        name: "轻量PTC-v3 lite"
-        description: "效率最高的轻量预设，适用于绝大部分日常工作。"
+        id: flash-lean-ptc-v3
+        name: "轻量PTC-v3"
+        description: "13 条硬约束的默认预设，适用于绝大部分日常工作；id 稳定，旧会话可直接打开。"
         order: 27
         plugins:
           - id: persona

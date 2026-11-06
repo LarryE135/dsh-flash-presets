@@ -43,16 +43,16 @@ const agentPresetProjectionDefinition = {
 |---|---|---|
 | 0.2.6 | 删掉 `flash-lean-ptc-v3` 等旧 id；`migrate-legacy-preset-ids.mjs` 用 `zstdDecompressSync` 整文件重写 | 多帧 zstd 只解出首帧 → 事件帧全丢；WSL 194 / Windows 273 个会话被截断 |
 | 0.2.8 | 启动时“自愈”改写 header | 只改 header 不改 `agent-preset/selected`，而且没清投影缓存 → 一部分会话仍旧 not-found（看起来“修了但没生效”） |
-| 0.2.9 | 删掉兼容卡 | 有效 preset 落在 roster 外的会话直接打不开（本机 193 个，含 0.25RE） |
+| 0.2.9 | 把 lite 的 id 从 `flash-lean-ptc-v3-lite` **改回** `flash-lean-ptc-v3`，并宣布此后不再改名 | 修好上一行：281 个桌面端会话的有效 preset 重新落进 roster，不再依赖兼容层；`-lite` 反过来变成历史 id |
 
 另外两个隐藏前提，出事时会让局面更难判断：
 
 - **首帧必须只有一行 header**，且**文件名里的代际必须等于 header 的 `version`**。否则 `readGenerationHeader()` 抛 `session generation filename identifies v4, but its header identifies v3`，整个 workspace 行激活失败 → GUI 里看起来“所有会话都没了”。
 - **投影缓存按 `seq` 续算**（`storages/session_projcache/`）。改写比缓存更早的事件而保留缓存，旧值会被继续沿用。
 
-## 4. 正确的升级姿势（本包 0.2.6 起）
+## 4. 正确的升级姿势（本包 0.2.9 起真正执行）
 
-1. **id 冻结**：任何发布过的 id 不再删除、不再改名。要改行为就改内容、改显示名、改 `description`。
+1. **id 冻结**：任何发布过的 id 不再删除、不再改名。要改行为就改内容、改显示名、改 `description`。现役两个 id 是 `flash-lean-ptc-v3`（13 条，默认）与 `flash-lean-ptc-v3-balance`（3 条）；0.2.7–0.2.8 期间的 `flash-lean-ptc-v3-lite` 是**一次违背本条的改名**，0.2.9 已改回，代价是那两版产生的会话要靠 alias 层兜底。
 2. **alias 层兜底**（`lib/preset-alias.js` + `presets/legacy-preset-map.json`）：历史 id 在解析时映射到当前 id。只拦 not-found，纯内存，不写用户数据，不加 picker 卡片，卸载即还原。
 3. **审计按 DSH 语义**（`npm run audit:sessions`）：有效 preset = header + 最后一条 selection；roster 取 `dsh --profile web --dump-config`。发现孤儿 id 就 `exit 1`。
 4. **CI 闸门**（`npm run verify:compat`，已进 `npm run verify`）：历史 tag 里的每个 id 必须“仍定义 / 在 alias 表 / 登记例外”三选一；alias 表的 canonical 必须是真实定义过的 id。
@@ -60,7 +60,7 @@ const agentPresetProjectionDefinition = {
 
 ## 4.1 已知限制（复查时确认、暂不修）
 
-1. **alias 层跟着 `plan-mode-ui` 这一行加载**，而该行的 `inject` 里有 `webServer`。所以它只在**装了本组合包、且该 profile 有 webServer（web）** 时生效；把本包装进 `tui` / `headless` 一类 profile 时，这一行会停在 pending，alias 也不会挂上。要覆盖那种场景，需要把 alias 拆成一个只 `inject: ['agentPresets']` 的独立 loader 行（改动面更大，暂不做，已在待办里）。
+1. **alias 层跟着 `plan-mode-ui` 这一行加载**，而该行的 `inject` 里有 `webServer`。桌面端（Electron）不走 web profile，这一行很可能停在 pending、alias 根本没装上 —— 所以**不要把兼容层当成「旧会话一定能开」的保证**；真正兜底的是 id 不再改名。所以它只在**装了本组合包、且该 profile 有 webServer（web）** 时生效；把本包装进 `tui` / `headless` 一类 profile 时，这一行会停在 pending，alias 也不会挂上。要覆盖那种场景，需要把 alias 拆成一个只 `inject: ['agentPresets']` 的独立 loader 行（改动面更大，暂不做，已在待办里）。
 2. **alias 是运行时的、不是永久的**：会话日志里仍然写着旧 id。若以后彻底清理（`retarget:sessions`），日志才真正改成新 id；在那之前删掉 alias 表等于让这些会话再次打不开。
 3. **注册表实例重建时包装会失效**（profile 热重载插件的场景）。进程重启会重新挂上；同一进程内重建不会。审计脚本随时可查（`orphan=0` 才健康）。
 ## 5. 升级后的自查流程

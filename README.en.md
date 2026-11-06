@@ -16,9 +16,9 @@ The idea is simple: compact the context earlier, keep only the head and tail of 
 
 Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. **Three things do apply to the whole profile at runtime**: the resident PTC runtime (the `ptc-runtime` override in the patch, which affects **every** preset in that profile — the only way to switch it off is to remove this plugin card), the `glob` / `grep` concurrency marks (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them), and legacy preset-id resolution (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.2.8 (2026-11-06) · presets v3 lite / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.2.9 (2026-11-07) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> When installing from npm, pin the version: `dsh-flash-presets@0.2.8`. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
+> When installing from npm, pin the version: `dsh-flash-presets@0.2.9`. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 
@@ -57,7 +57,7 @@ For the reasoning behind each setting, with source line references, see the [fou
 
 | Preset | id | Rules | Compaction | Use it when |
 |---|---|---:|---|---|
-| 轻量PTC-v3 lite (Lean PTC-v3 lite; formerly lean-v3) | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | Default. Covers most day-to-day work |
+| 轻量PTC-v3 (Lean PTC-v3; formerly lean-v3) | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | Default. Covers most day-to-day work; the id is fixed and never renamed again |
 | 轻量PTC-v3 balance (Lean PTC-v3 balance) | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | Fewer rules, more room for the model to work its own way |
 
 Both share the same compaction, trimming, plugin set, and PTC setup. Only the persona rules differ.
@@ -105,22 +105,22 @@ How to read it:
 The plugin manager installs the whole plugin card: both presets, the plan-mode component, the resident PTC runtime, and the legacy-id compatibility layer.
 
 ```console
-# 0.2.8 from npm, pinned to the version
-dsh plugin --profile web add dsh-flash-presets@0.2.8
+# 0.2.9 from npm, pinned to the version
+dsh plugin --profile web add dsh-flash-presets@0.2.9
 # or the same release as a tag, if you'd rather not use npm
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.8
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.9
 ```
 
 `--profile` is normally `web` or `desktop` (presets don't activate under `headless`, and `acp` is untested — see [Known limitations](#known-limitations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
 
-Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x; a `github:` install records a git ref (`#v0.2.8`) instead and won't drift.
+Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.2.x; a `github:` install records a git ref (`#v0.2.9`) instead and won't drift.
 
 ### Offline, or with the install script
 
 Download and unpack the archive from [Releases](https://github.com/LarryE135/dsh-flash-presets/releases), or clone the tag:
 
 ```bash
-git clone --depth 1 -b v0.2.8 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.9 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows: scripts\install.ps1 -Profile web
 ```
@@ -161,12 +161,12 @@ bash scripts/install.sh --uninstall --profile web     # if installed with the sc
 
 pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, and `remove` doesn't clear it. It has no effect on the composed configuration.
 
-### Upgrading from 0.2.5
+### Upgrading from an older release
 
-- Preset ids changed: the 13-rule preset moved from `flash-lean-ptc-v3` to `flash-lean-ptc-v3-lite`, and the former 3-rule `flash-lean-ptc-v3-lite` is now `flash-lean-ptc-v3-balance`.
-- Old sessions still open. A runtime compatibility layer resolves the 5 ids this package ever published (`flash-lean`, `flash-lean-ptc`, `-v1`, `-v2`, `-v3`) to lite; ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
+- **Preset ids no longer change.** The 13-rule preset is `flash-lean-ptc-v3`; the 3-rule preset is `flash-lean-ptc-v3-balance`. 0.2.7–0.2.8 renamed the first one to `flash-lean-ptc-v3-lite`; 0.2.9 reverts that and will not rename ids again — DSH persists the preset id inside the session log, so renaming it is what makes old sessions fail to open. Rule text may evolve; identifiers stay put.
+- Old sessions still open. A runtime compatibility layer resolves `flash-lean`, `flash-lean-ptc`, `-v1`, `-v2`, and the 0.2.7–0.2.8 `flash-lean-ptc-v3-lite` to `flash-lean-ptc-v3`; ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. It steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
-- If the profile's `selectedDefault` still points at an old id, new sessions fail with `Unknown agent preset`. Set it to `flash-lean-ptc-v3-lite`.
+- If the profile's `selectedDefault` points at `flash-lean-ptc-v3-lite`, set it to `flash-lean-ptc-v3` (the old value still resolves through the compatibility layer).
 
 ## Plan mode (optional component)
 
@@ -233,6 +233,12 @@ bash scripts/selftest.sh
 `cordis.patch.yml` is composed from `presets/*.patch.yml`; don't edit it by hand — CI asserts the two match. The measurement table in this README is generated from `docs/bench-office-results.json`. See [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md) for how to contribute.
 
 ## Version history
+
+### v0.2.9 (2026-11-07)
+
+- **Preset ids are back to stable values.** The lite preset's id returns from `flash-lean-ptc-v3-lite` to `flash-lean-ptc-v3` (the identity it shipped with through 0.2.5) and will not be renamed again. The 0.2.7 rename is what broke old desktop sessions after upgrading: their logs record `flash-lean-ptc-v3`, and a compatibility layer can only patch the resolution step, not every other check. The fix is to stop moving the identifier and let only the rule text and descriptions evolve.
+- The compatibility layer stays, pointing the other way: `flash-lean-ptc-v3-lite` (produced by 0.2.7–0.2.8) plus the older `flash-lean`, `flash-lean-ptc`, `-v1`, `-v2` all resolve to `flash-lean-ptc-v3`.
+- No migration needed for anyone who did not install `--with-runtime`: install the new version and every old session opens.
 
 ### v0.2.8 (2026-11-06)
 

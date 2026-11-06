@@ -16,9 +16,9 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.2.8（2026-11-06）· 预设 v3 lite / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.2.9（2026-11-07）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> 从 npm 安装请写死版本号：`dsh-flash-presets@0.2.8`。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> 从 npm 安装请写死版本号：`dsh-flash-presets@0.2.9`。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -57,7 +57,7 @@
 
 | 预设 | id | 规则 | 压缩 | 何时用 |
 |---|---|---:|---|---|
-| 轻量PTC-v3 lite（原 lean-v3） | `flash-lean-ptc-v3-lite` | 13 | 0.25 / 20k | 默认。适合绝大多数日常工作 |
+| 轻量PTC-v3（原 lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | 默认。适合绝大多数日常工作；id 固定，不再随版本改名 |
 | 轻量PTC-v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 规则更少，留给模型更多发挥空间 |
 
 两者共享同一套压缩、裁剪、插件与 PTC 配置，区别只在 persona 规则。
@@ -105,10 +105,10 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 插件管理器会装上整张插件卡：两个预设、计划模式组件、常驻 PTC 运行时，以及旧 id 兼容层。
 
 ```console
-# 0.2.8：npm 上按版本号装（锁死版本）
-dsh plugin --profile web add dsh-flash-presets@0.2.8
+# 0.2.9：npm 上按版本号装（锁死版本）
+dsh plugin --profile web add dsh-flash-presets@0.2.9
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.8
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.9
 ```
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
@@ -120,7 +120,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.8
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.2.8 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.9 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
@@ -161,12 +161,12 @@ bash scripts/install.sh --uninstall --profile web     # 脚本安装的（Window
 
 pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`remove` 不会清掉它。这一行不影响配置合成。
 
-### 从 0.2.5 升级
+### 从旧版本升级
 
-- 预设 id 变了：13 条规则版由 `flash-lean-ptc-v3` 改为 `flash-lean-ptc-v3-lite`，原来 3 条规则的 `flash-lean-ptc-v3-lite` 改名为 `flash-lean-ptc-v3-balance`。
-- 旧会话照常打开：运行时兼容层把 5 个本包发布过的历史 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`）解析到 lite；本机实验用的 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。它只在解析失败时介入，不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
+- **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
+- 旧会话照常打开：`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2` 以及 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 都由运行时兼容层解析到 `flash-lean-ptc-v3`；本机实验用的 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。它只在解析失败时介入，不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
-- 如果 profile 的 `selectedDefault` 还指向旧 id，新建会话会报 `Unknown agent preset`，改成 `flash-lean-ptc-v3-lite` 即可。
+- 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
 
 ## 计划模式（可选组件）
 
@@ -233,6 +233,12 @@ bash scripts/selftest.sh
 `cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 里的实测表由 `docs/bench-office-results.json` 生成。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
 
 ## 版本历史
+
+### v0.2.9（2026-11-07）
+
+- **把预设 id 改回稳定值**：lite 的 id 从 `flash-lean-ptc-v3-lite` 回归 `flash-lean-ptc-v3`（0.2.5 及更早发布时的身份），以后不再改名。0.2.7 那次改名让桌面端装上新版后，会话日志里记着 `flash-lean-ptc-v3` 的旧会话直接打不开；兼容层只能在解析这一步兜底，兜不住别处的校验，所以改为从根上不动标识符，只演进规则文本与描述。
+- 兼容层继续保留，方向反过来：0.2.7–0.2.8 产生的 `flash-lean-ptc-v3-lite` 与更早的 `flash-lean`、`flash-lean-ptc`、`-v1`、`-v2` 都解析到 `flash-lean-ptc-v3`。
+- 没装 `--with-runtime` 的用户无需任何迁移：装上新版即可打开全部旧会话。
 
 ### v0.2.8（2026-11-06）
 

@@ -36,8 +36,9 @@ const flag = n => argv.includes(n);
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
 // 现役两个预设由补丁层/组合包提供；历史 id 只由运行时兼容层解析，不写入补丁（R3-9）。
-const CURRENT = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
-const LEGACY_IDS = ['flash-lean-ptc-v3'];
+const CURRENT = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+// 0.2.9 起 lite 的 id 回归 flash-lean-ptc-v3；0.2.7–0.2.8 的 -lite 变成历史 id。
+const LEGACY_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3-lite'];
 const PRESETS = [...CURRENT, ...LEGACY_IDS];
 
 if (argv.includes('--help') || argv.includes('-h')) {
@@ -277,7 +278,7 @@ if (flag('--dump') || flag('--all')) {
     const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
     // 精确匹配整行，避免 `preset-flash-lean-ptc-v3` 命中 `-v3-lite` / `-v3-balance`。
     const hasRow = (id) => new RegExp('^\\s*-\\s*id:\\s*preset-' + id + '\\s*$', 'm').test(out);
-    const CURATED = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'];
+    const CURATED = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
     for (const id of CURATED) {
       if (hasRow(id)) ok('preset-' + id + ' 出现在合成配置里');
       else warn('preset-' + id + ' 不在合成配置里');

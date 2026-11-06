@@ -201,7 +201,7 @@ jobs:
           echo "dump 前 5 行："; head -5 "$RUNNER_TEMP/dump.txt" || true
           # 0.2.6 起只发两个预设：lite 与 balance。id 必须精确比对——`flash-lean-ptc-v3`
           # 是 `-v3-lite` / `-v3-balance` 的子串，用 grep 子串匹配等于什么都没断言。
-          for id in flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance; do
+          for id in flash-lean-ptc-v3 flash-lean-ptc-v3-balance; do
             n=$(grep -cE -- "$id([^-]|$)" "$RUNNER_TEMP/dump.txt" || true)
             grep -m2 -E -- "$id" "$RUNNER_TEMP/dump.txt" | sed "s/^/    /" || true
             echo "$id: $n"

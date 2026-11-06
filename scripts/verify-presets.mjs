@@ -40,7 +40,7 @@ const repoOnly = ARGV.includes('--repo-only');
 const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
-  'flash-lean-ptc-v3-lite': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
@@ -76,7 +76,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
   // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
   // （工作目录走 runtime context，不走占位符）。
   const PROMPT_VARS = new Set(['provider', 'model']);
-  for (const f of ['presets/flash-lean-ptc-v3-lite.patch.yml',
+  for (const f of ['presets/flash-lean-ptc-v3.patch.yml',
                    'presets/flash-lean-ptc-v3-balance.patch.yml',
                    'cordis.patch.yml',]) {
     const text = read(path.join(repo, f));
@@ -268,8 +268,8 @@ if (modernInstalled) {
   // 在整份补丁里定位预设切片：托管块只证明安装器跑过，预设行可能由 dsh plugin
   // 合并在块外（实测 profile 里两者可以并存），所以搜索范围是全文而不是块内。
   const sliceOf = n => {
-    // 必须按整行精确匹配：flash-lean-ptc-v3 是 flash-lean-ptc-v3-lite 的前缀，
-    // 用 indexOf 会落到 -lite 那一行上（0.2.7 加兼容别名时踩过）。
+    // 必须按整行精确匹配：preset-flash-lean-ptc-v3 是 preset-flash-lean-ptc-v3-balance 的前缀，
+    // 用 indexOf 会落到 -balance 那一行上（0.2.7 加兼容别名时踩过）。
     const m = new RegExp('^[ \\t]*- id: preset-' + n + '[ \\t]*$', 'm').exec(text);
     if (!m) return '';
     const b = text.indexOf('- id: preset-', m.index + m[0].length);

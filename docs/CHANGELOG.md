@@ -1,8 +1,48 @@
 # 变更日志
 
-> **版本口径（2026-11-06 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）
-> 与 **0.2.8**（GitHub tag + npm，当前版本）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
+> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
+
+## 0.2.9（2026-11-07，发布）
+
+**把预设 id 改回稳定值。** 桌面端装上新版 0.2.8 后，旧会话直接打不开 —— 根因是 0.2.7 把 13 条规则版的 id 从
+`flash-lean-ptc-v3` 改名成 `flash-lean-ptc-v3-lite`。DSH 把 preset id 持久化在会话日志里，改名之后那些会话
+在解析这一步就找不到预设。0.2.8 加过一层运行时兼容层，但它在桌面端靠不住：alias 跟着 `plan-mode-ui` 那一行
+加载，而该行的 `inject` 里有 `webServer`，桌面端（Electron）不走 web profile，这一行很容易停在 pending，
+于是「即便做了兼容层」仍旧打不开。修法改为不动标识符：**id 保持 `flash-lean-ptc-v3`，只演进规则文本与描述**，
+0.2.9 起不再改名。本版**不改预设规则文本、不改模型行为**。
+
+### 改动
+
+- **lite 的 id 回到 `flash-lean-ptc-v3`**：`presets/flash-lean-ptc-v3.patch.yml`（原 `-lite.patch.yml`）里条目 id 与
+  `config.id` 都是 `flash-lean-ptc-v3`，`name` 简化为「轻量PTC-v3」，`description` 注明 id 稳定、旧会话可直接打开。
+  规则文本一字未动（仍是 13 条），order 仍为 27。
+- **兼容层反向保留**：`presets/legacy-preset-map.json` 的 canonical 改为 `flash-lean-ptc-v3`，别名表收
+  `flash-lean` / `flash-lean-ptc` / `-v1` / `-v2` 与 0.2.7–0.2.8 产生的 `flash-lean-ptc-v3-lite`（5 个）。0.2.7–0.2.8
+  期间新建的会话因此照常打开，不需要任何迁移。
+- **自愈目标同步**：`lib/compat-heal.js` 的 `CURRENT_PRESET_ID` 改为 `flash-lean-ptc-v3`（默认关闭，需
+  `DSH_FLASH_PRESETS_HEAL=1`）。
+- **校验与文档口径同步**：`verify-presets` / `verify-yaml` / `verify-runtime` / `doctor` 的现役 id 表、
+  `compose-bundle-patch` 的注释、安装器默认预设、CI 的 id 断言都改到新 id；`doctor` 把 `-lite` 归入历史 id。
+- README（中英）、`docs/版本与兼容性.md`、`docs/技术文档-精简预设实现.md`、`docs/实测证据.md` 的命名口径同步；
+  版本号统一到 0.2.9（`package.json`、`package-lock.json`、`marketplace/plugin.json`、两个安装器的自检提示、两份 README）。
+
+### 为什么不用「保留旧 id 的兼容卡」
+
+注册一张 id 为 `flash-lean-ptc-v3` 的兼容预设卡会多出一张卡片与一份重复规则，且用户在选择器里会看到两个
+等价预设；把 id 改回去则既让旧会话可解析，也不新增任何条目。唯一代价是 0.2.7–0.2.8 期间产生的 `-lite` 会话
+要靠兼容层解析 —— 而这批会话数量少，且兼容层在 `resolve` 上确实有效。
+
+### 测试
+
+- `npm run verify`（129 项）、`selftest.sh`（39 项）、`selftest-integration.sh`（17 项）、插件测试（25 项）全绿。
+- 安装后 `dsh --profile web --dump-config` 出现 `id: preset-flash-lean-ptc-v3` 与 `-balance` 两条，
+  `legacy-preset-map.json` 的 5 个别名逐一解析到 `flash-lean-ptc-v3`。
+- **A/B 复现**：把同一个桌面端会话文件分别对着 0.2.8 与 0.2.9 的 roster 跑 `scripts/audit-compat.mjs`，
+  0.2.8 判为 `orphan`（打不开），0.2.9 判为 `defined`（可解析）。本机全部 1007 个桌面端会话里，
+  孤儿 id 从 284 个（`flash-lean-ptc-v3` 281 + 私有 id `flash-lean-ptc-v3b` 3）降到只剩那 3 个私有 id。
+  那 3 个属于个人实验 id（`flash-lean-ptc-v3b`），按既定策略不进发布映射表，需要时用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 指过去。
 
 ## 0.2.8（2026-11-06，发布）
 

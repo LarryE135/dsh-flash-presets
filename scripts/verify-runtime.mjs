@@ -15,14 +15,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const EXPECT = {
-  'flash-lean-ptc-v1': { order: 21, rules: 14, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v3-lite': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
-  'flash-lean-ptc-v3': { order: 28, rules: 13, thr: '0.25', retain: '20000' },
+  // 0.2.9 起只发两个预设，lite 的 id 稳定为 flash-lean-ptc-v3（不再有 -lite / order 28 那份）
+  'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { order: 26, rules: 3, thr: '0.25', retain: '20000' },
 };
 // 0.2.6 起 bundle 默认装两个：v3 lite / v3 balance。v1/v2/v3(max) 是对照版本，装了才校验。
 // 数量断言从 SHIPPED 推导，不写死 —— 增删预设时这里自动跟随，避免再出现「代码改了、断言没改」的假红。
-const SHIPPED = new Set(['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance']);
+const SHIPPED = new Set(['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance']);
 
 const arg = process.argv[2];
 let dump = '';

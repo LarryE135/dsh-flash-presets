@@ -129,7 +129,7 @@ eq("null id 安全", headerPresetOf(null), null);
   const sid = "session-heal-success";
   const dir = join(home, "sessions", "--tmp-x--", sid);
   mkdirSync(dir, { recursive: true });
-  const header = JSON.stringify({ type: "session", version: 4, id: sid, agentPreset: "flash-lean-ptc-v3-lite" });
+  const header = JSON.stringify({ type: "session", version: 4, id: sid, agentPreset: "flash-lean-ptc-v3" });
   const second = JSON.stringify({ type: "permission/preset", seq: 0, data: { preset: "danger-full-access" } });
   writeFileSync(join(dir, "session.v4.jsonl.zstd"),
     Buffer.concat([zstdCompressSync(Buffer.from(header + "\n", "utf8")), zstdCompressSync(Buffer.from(second + "\n", "utf8"))]));
@@ -137,7 +137,7 @@ eq("null id 安全", headerPresetOf(null), null);
   const before = process.env.DSH_HOME;
   process.env.DSH_HOME = home;
   try {
-    eq("首帧能读出 preset", headerPresetOf(sid), "flash-lean-ptc-v3-lite");
+    eq("首帧能读出 preset", headerPresetOf(sid), "flash-lean-ptc-v3");
     let healed = false;
     const child = fakeChild({
       agents: [agentOf(sid)],
@@ -148,7 +148,7 @@ eq("null id 安全", headerPresetOf(null), null);
     const st = state();
     const lines = capture(() => __internals.scan(child, cfg({ heal: true }), st));
     await new Promise((r) => setTimeout(r, 30));   // heal 是 promise 链路，等一拍
-    eq("heal 用首帧里的 preset", child.sel.calls, [[sid, "flash-lean-ptc-v3-lite"]]);
+    eq("heal 用首帧里的 preset", child.sel.calls, [[sid, "flash-lean-ptc-v3"]]);
     eq("heal 期间不重复报警", lines.filter((l) => l.startsWith("E ")), []);
   } finally {
     if (before === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = before;

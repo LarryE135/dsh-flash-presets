@@ -25,7 +25,7 @@ MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # 0.2.6 起只发两个预设：lite（13 条，默认）与 balance（3 条）
-PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance)
+PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance)
 # --with-runtime（旧名 --with-plan-mode，保留为别名）：额外往 profile 补丁层追加
 # ptc-runtime: persistent-in-memory。这是 profile 级覆盖，对该 profile 的所有预设生效，
 # --uninstall 会一并撤掉。计划模式组件不在脚本路径里，它只随插件管理器安装。
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
                  PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
-    --all-presets) PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance); shift ;;
+    --all-presets) PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance); shift ;;
     --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help)   sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;
@@ -103,9 +103,9 @@ install_modern() {
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
-  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.8"
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.9"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装不会报错，但预设会重复出现）。"
-  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
+  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"
   if [ "$WITH_RUNTIME" = "1" ]; then install_runtime; fi
