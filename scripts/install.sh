@@ -25,7 +25,7 @@ MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # 0.2.6 起只发两个预设：v3（默认）与 v3 max（解除预算限制）
-PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance)
+PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance)
 # --with-plan-mode：新装模式下无实际作用（计划模式已并入本包），保留参数以兼容旧脚本；
 # 两者互相独立，装失败不影响预设本身。
 PLAN_MODE=0
@@ -36,7 +36,7 @@ while [ $# -gt 0 ]; do
                  PROFILE="$2"; shift 2 ;;
     --legacy)    MODE="legacy"; shift ;;
     --modern)    MODE="modern"; shift ;;
-    --all-presets) PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance); shift ;;
+    --all-presets) PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance); shift ;;
     --with-plan-mode) PLAN_MODE=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help)   sed -n '2,19p' "$0"; exit 0 ;;
@@ -102,7 +102,7 @@ install_modern() {
   echo "「轻量PTC-v3 lite」与「轻量PTC-v3 balance」。"
   echo "  计划模式 plan-mode v1 已随本包提供（同一张卡的第三个组件），无需单独安装"
   echo "  装成插件卡：dsh plugin --profile $PROFILE add dsh-flash-presets（三个组件都在这张卡里）"
-  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
+  echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3-lite'"
   echo "  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
   echo "  卸载：bash scripts/install.sh --uninstall --profile $PROFILE"

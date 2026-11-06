@@ -40,7 +40,7 @@ const repoOnly = ARGV.includes('--repo-only');
 const requireAll = ARGV.includes('--all');
 
 const EXPECT = {
-  'flash-lean-ptc-v3': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3-lite': { rules: 13, ptc: true, order: 27, legacy: false, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { rules: 3, ptc: true, order: 26, legacy: false, thr: '0.25', retain: '20000' },
 };
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
@@ -61,21 +61,22 @@ console.log('DSH_HOME: ' + dshHome + '    profile: ' + profile);
 if (fs.existsSync(path.join(repo, 'presets'))) {
   console.log('\n[仓库]');
   for (const [name, exp] of Object.entries(EXPECT)) {
-    const modern = path.join(repo, 'presets', name + '.patch.yml');
+    const fileName = exp.file ?? name + '.patch.yml';
+    const modern = path.join(repo, 'presets', fileName);
     const legacy = path.join(repo, 'presets', 'legacy-0.1.5', name, 'agent.cordis.yml');
     check(read(modern) !== null && fs.statSync(modern).size > 5000,
-          'presets/' + name + '.patch.yml（0.1.7+ 插件行式，>5 KB）');
+          'presets/' + fileName + '（0.1.7+ 插件行式，>5 KB）');
     if (exp.legacy) check(read(legacy) !== null, 'presets/legacy-0.1.5/' + name + '/agent.cordis.yml（旧版回退）');
     const text = read(modern) || '';
-    check(!/\/(home|Users)\/[^ ]*\/|[A-Za-z]:\\\\/.test(text), name + '.patch.yml 不含本机绝对路径');
-    check(new RegExp('^- insert:$', 'm').test(text), name + '.patch.yml 含行首 - insert: 条目');
+    check(!/\/(home|Users)\/[^ ]*\/|[A-Za-z]:\\\\/.test(text), fileName + ' 不含本机绝对路径');
+    check(new RegExp('^- insert:$', 'm').test(text), fileName + ' 含行首 - insert: 条目');
   }
 
   // issue #5：DSH 的 system-prompt 插值是严格模式，{{var}} 必须是已注册变量，
   // 否则整轮对话直接抛 unknown prompt variable 并中止。DSH 目前只注册 provider / model
   // （工作目录走 runtime context，不走占位符）。
   const PROMPT_VARS = new Set(['provider', 'model']);
-  for (const f of ['presets/flash-lean-ptc-v3.patch.yml',
+  for (const f of ['presets/flash-lean-ptc-v3-lite.patch.yml',
                    'presets/flash-lean-ptc-v3-balance.patch.yml',
                    'cordis.patch.yml',]) {
     const text = read(path.join(repo, f));
@@ -135,7 +136,7 @@ if (fs.existsSync(path.join(repo, 'presets'))) {
 // 改了阈值或 id 也能过（CI 因为有安装步骤才挡住）。这里补一份不依赖 DSH_HOME 的版本。
 console.log('\n[仓库层取值]');
 for (const [name, exp] of Object.entries(EXPECT)) {
-  const file = path.join(repo, 'presets', name + '.patch.yml');
+  const file = path.join(repo, 'presets', exp.file ?? name + '.patch.yml');
   const text = read(file);
   check(text !== null, name + ' 预设文件存在');
   if (text === null) continue;
@@ -235,10 +236,12 @@ if (modernInstalled) {
   // 在整份补丁里定位预设切片：托管块只证明安装器跑过，预设行可能由 dsh plugin
   // 合并在块外（实测 profile 里两者可以并存），所以搜索范围是全文而不是块内。
   const sliceOf = n => {
-    const a = text.indexOf('- id: preset-' + n);
-    if (a < 0) return '';
-    const b = text.indexOf('- id: preset-', a + 1);
-    return text.slice(a, b < 0 ? text.length : b);
+    // 必须按整行精确匹配：flash-lean-ptc-v3 是 flash-lean-ptc-v3-lite 的前缀，
+    // 用 indexOf 会落到 -lite 那一行上（0.2.7 加兼容别名时踩过）。
+    const m = new RegExp('^[ \\t]*- id: preset-' + n + '[ \\t]*$', 'm').exec(text);
+    if (!m) return '';
+    const b = text.indexOf('- id: preset-', m.index + m[0].length);
+    return text.slice(m.index, b < 0 ? text.length : b);
   };
   for (const [name, exp] of Object.entries(EXPECT)) {
     const slice = sliceOf(name);

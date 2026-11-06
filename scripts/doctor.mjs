@@ -34,7 +34,7 @@ const flag = n => argv.includes(n);
 
 const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets) >>>';
 const END = '# <<< dsh-flash-presets: managed block <<<';
-const PRESETS = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+const PRESETS = ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3'];
 
 const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
 const profile = opt('--profile', 'web');

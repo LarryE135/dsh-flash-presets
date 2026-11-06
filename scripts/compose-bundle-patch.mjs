@@ -18,13 +18,17 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
 // 0.2.7 起只提供两个预设：轻量PTC-v3 lite（id flash-lean-ptc-v3，13 条，默认）
 // 与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。id 沿用 0.2.5 的身份，旧会话不需要迁移。
-const SOURCES = ['presets/flash-lean-ptc-v3.patch.yml', 'presets/flash-lean-ptc-v3-balance.patch.yml'];
+const SOURCES = [
+  'presets/flash-lean-ptc-v3-lite.patch.yml',
+  'presets/flash-lean-ptc-v3-balance.patch.yml',
+];
 const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
-  '# 本文件叠加两个预设：轻量PTC-v3 lite（id flash-lean-ptc-v3，13 条）与 轻量PTC-v3 balance（id flash-lean-ptc-v3-balance，3 条）。',
-  '# 源文件：presets/flash-lean-ptc-v3.patch.yml 与 presets/flash-lean-ptc-v3-balance.patch.yml。',
-  '#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle',
+  '# 本文件叠加两个正式预设 + 一个兼容别名：',
+  '#   轻量PTC-v3 lite（flash-lean-ptc-v3-lite，13 条，默认）、轻量PTC-v3 balance（flash-lean-ptc-v3-balance，3 条）、',
+  '#   兼容别名（flash-lean-ptc-v3，13 条，内容同 lite，只为让升级前记录的会话按 id 打开）。',
+  '#   node scripts/compose-bundle-patch.mjs          # 三者都进 bundle',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',
   '',
 ].join('\n');
@@ -62,8 +66,11 @@ function compose() {
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {
-    const id = rel.replace(/^presets\//, '').replace(/\.patch\.yml$/, '');
-    if (!out.includes(id)) throw new Error('合成结果里缺少预设 id: ' + id);
+    // 按文件里的 config id 断言，而不是文件名（别名的文件名与 config id 不同）
+    const text = fs.readFileSync(path.join(repo, rel), 'utf8');
+    const id = (text.match(/\n\s+id: (\S+)\n/) || [])[1];
+    if (!id) throw new Error('源文件里找不到 config id: ' + rel);
+    if (!out.includes('id: ' + id)) throw new Error('合成结果里缺少预设 id: ' + id);
   }
   return out;
 }

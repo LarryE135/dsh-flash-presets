@@ -19,7 +19,7 @@
 param(
   [string]   $DshHome,
   [string]   $Profile = 'web',
-  [string[]] $Presets = @('flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'),
+  [string[]] $Presets = @('flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance'),
   [switch]   $Help,
   [switch]   $Legacy,
   [switch]   $Uninstall,
@@ -30,7 +30,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 0.2.5 起默认只装 v3；-AllPresets 装 v1/v2/v3 三份（A/B 对照用）
-if ($AllPresets) { $Presets = @('flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance') }
+if ($AllPresets) { $Presets = @('flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance') }
 
 if ($Help) {
   $self = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
@@ -137,7 +137,7 @@ function Install-Modern {
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已安装：轻量PTC-v3 lite / 轻量PTC-v3 balance（选择器里就这两项）'
   Write-Host '  计划模式是独立包：加 -WithPlanMode（或 dsh plugin add dsh-plan-mode-ui）'
-  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
+  Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3-lite'"
   Write-Host '  重启宿主后 runcode 常驻运行时（persistent-in-memory）才生效；profile 配置在进程启动时读取，热装不会立刻生效'
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
   Write-Host "  卸载：powershell -NoProfile -File scripts\install.ps1 -Uninstall -Profile $Profile"

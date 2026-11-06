@@ -1,0 +1,70 @@
+{
+  "$comment": "历史 preset id → 当前 id 的解析映射。DSH 把 preset id 持久化在会话日志里（header.agentPreset 以及 agent-preset/selected 事件），上游没有任何改名/别名机制：id 一旦不在 roster 里，resume 直接抛 agent-preset/not-found，会话即“打不开”。本表由 lib/preset-alias.js 在运行时兜底解析（不写任何会话文件），并由 scripts/retarget-session-presets.mjs 用于可选的一次性迁移。新增条目：把野外出现过的 id 加进来即可。",
+  "canonical": "flash-lean-ptc-v3-lite",
+  "orderNote": "键名 = 野外出现过的历史 id；值为证据与说明。sessions 是本机两个 DSH_HOME 实测的有效 preset 会话数（2026-11-06 扫描）。",
+  "aliases": {
+    "flash-lean": {
+      "since": "v0.1.0",
+      "sessions": 16,
+      "note": "0.1.0 时代 id，09 月会话仍记录它"
+    },
+    "flash-lean-ptc": {
+      "since": "v0.1.0",
+      "sessions": 36,
+      "note": "0.1.0 时代 id"
+    },
+    "flash-lean-ptc-v1": {
+      "since": "v0.2.0",
+      "sessions": 0,
+      "note": "仅出现在会话日志的中间切换事件里（被后续事件覆盖），仍保留映射以防历史文件"
+    },
+    "flash-lean-ptc-v2": {
+      "since": "v0.2.0",
+      "sessions": 44,
+      "note": "0.2.x id；WSL 41 / Windows 3"
+    },
+    "flash-lean-ptc-v3": {
+      "since": "v0.2.1",
+      "sessions": 285,
+      "note": "lean-v3 本体；Windows 281（多为 0.2.6 截断后的空壳）+ WSL 4"
+    },
+    "flash-lean-ptc-v3b": {
+      "since": "local",
+      "sessions": 3,
+      "note": "本机实验变体（Windows）"
+    },
+    "flash-lean-ptc-v3-1": {
+      "since": "local",
+      "sessions": 2,
+      "note": "本机实验变体"
+    },
+    "flash-lean-ptc-v3-max": {
+      "since": "local",
+      "sessions": 3,
+      "note": "本机实验变体；含 0.25RE（1241 事件）"
+    },
+    "flash-lean-ptc-v3-none": {
+      "since": "local",
+      "sessions": 1,
+      "note": "无人格对照变体"
+    },
+    "code": {
+      "since": "legacy",
+      "sessions": 2,
+      "note": "早期实验 id；含 15287 事件的最大会话"
+    },
+    "win-control": {
+      "since": "legacy",
+      "sessions": 12,
+      "note": "早期 Windows 控制实验 id"
+    },
+    "codex-contract-v1": {
+      "since": "legacy",
+      "sessions": 76,
+      "note": "codex 契约实验（~/Codex-Sub）"
+    }
+  },
+  "exclude": {
+    "$comment": "刻意不映射的 id：上游内置预设（standard/minimal/ptc/cordis）本来就常驻 roster，列在这里只是给读者交代。"
+  }
+}

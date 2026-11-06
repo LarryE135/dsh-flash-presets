@@ -25,7 +25,18 @@ const only = (() => {
 })();
 
 const ROOT = path.join(os.homedir(), '.dsh', 'profiles');
-const FS_PKG = path.join('node_modules', '@deepseek-ai', 'dsh-tool-fs-search', 'lib', 'index.js');
+const FS_PKG = path.join('node_modules', '@deepseek-ai', 'dsh-tool-fs-search', 'lib', 'index.js'); // 旧落点，仅留作历史参考
+
+function semverAtLeast(version, min) {
+  const parse = (v) => String(v).split('.').map((x) => Number.parseInt(x, 10) || 0);
+  const a = parse(version);
+  const b = parse(min);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) > (b[i] ?? 0)) return true;
+    if ((a[i] ?? 0) < (b[i] ?? 0)) return false;
+  }
+  return true;
+}
 const MARK = '# >>> tune-runtime: PTC 常驻运行时';
 const BLOCK = `
 ${MARK}
@@ -88,28 +99,29 @@ function applyB(dir, st, profile) {
   return 'patched';
 }
 
+// A 已改由插件提供（0.2.6 起）：glob/grep 的定义对象由 plan-mode-ui 的
+// lib/tool-concurrency.js 在运行期补 isConcurrencySafe。以前的实现是改 profile 里的
+// node_modules/@deepseek-ai/dsh-tool-fs-search/lib/index.js，但 0.2.2-rc.1 起该包不再
+// 是 profile 依赖（从全局 dsh 安装解析），那条路径不存在，补丁静默失效。
+const PLUGIN_PKG = path.join('node_modules', 'dsh-flash-presets', 'package.json');
+const PLUGIN_MOD = path.join('node_modules', 'dsh-flash-presets', 'lib', 'tool-concurrency.js');
+const MIN_PLUGIN = '0.2.6';
+
 function checkA(dir) {
-  const f = path.join(dir, FS_PKG);
-  if (!fs.existsSync(f)) return { ok: false, reason: 'fs-search 未安装' };
-  const text = fs.readFileSync(f, 'utf8');
-  const n = (text.match(/isConcurrencySafe/g) || []).length;
-  return { ok: n >= 2, count: n, file: f, text };
+  const pkg = path.join(dir, PLUGIN_PKG);
+  if (!fs.existsSync(pkg)) return { ok: false, reason: '未安装 dsh-flash-presets', version: null };
+  let version = null;
+  try { version = JSON.parse(fs.readFileSync(pkg, 'utf8')).version ?? null; } catch { version = null; }
+  const hasModule = fs.existsSync(path.join(dir, PLUGIN_MOD));
+  const ok = hasModule && typeof version === 'string' && semverAtLeast(version, MIN_PLUGIN);
+  return { ok, version, hasModule, file: pkg };
 }
 
 function applyA(dir, st) {
-  if (st.ok) return 'already';
-  if (!st.file || !fs.existsSync(st.file)) return 'skip（该 profile 未装 fs-search）';
-  let text = fs.readFileSync(st.file, 'utf8');
-  for (const name of ['glob', 'grep']) {
-    const re = new RegExp('(\\n\\t\\tname: "' + name + '",\\n)');
-    if (!re.test(text)) continue;
-    text = text.replace(re, '$1\t\tisConcurrencySafe: () => true,   // tune-runtime：只读，原生多调用可并行\n');
-  }
-  const n = (text.match(/isConcurrencySafe/g) || []).length;
-  if (n < 2) return 'failed (锚点未命中，未写入)';
-  backup(st.file);
-  fs.writeFileSync(st.file, text);
-  return 'patched';
+  if (st.ok) return 'already（插件 ' + st.version + '）';
+  if (st.version === null) return 'skip（未安装 dsh-flash-presets）';
+  if (!st.hasModule) return 'needs-upgrade（插件 ' + st.version + ' 无 tool-concurrency.js）';
+  return 'needs-upgrade（插件 ' + st.version + ' < ' + MIN_PLUGIN + '）';
 }
 
 if (!fs.existsSync(ROOT)) {
@@ -134,14 +146,14 @@ for (const dir of dirs) {
   const b = checkB(dir, name);
   const a = checkA(dir);
   const bAction = APPLY ? applyB(dir, b, name) : (b.ok ? 'ok' : 'MISSING');
-  const aAction = APPLY ? applyA(dir, a) : (a.ok ? 'ok' : (a.count === undefined ? 'n/a' : 'MISSING'));
+  const aAction = APPLY ? applyA(dir, a) : (a.ok ? 'ok（插件 ' + (a.version ?? '?') + '）' : (a.version === null ? 'n/a（未装插件）' : 'MISSING'));
   if (!b.ok) missing++;
-  if (!a.ok && a.count !== undefined) missing++;   // 该 profile 根本没装 fs-search 时不计入缺口
-  rows.push({ name, B: bAction, A: aAction, aCount: a.count ?? 0 });
+  if (!a.ok && a.version !== null) missing++;   // 该 profile 根本没装 fs-search 时不计入缺口
+  rows.push({ name, B: bAction, A: aAction, aCount: a.ok ? 2 : 0 });
 }
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(pad('profile', 12) + pad('B 常驻运行时', 16) + pad('A 只读并发', 14) + 'isConcurrencySafe');
+console.log(pad('profile', 12) + pad('B 常驻运行时', 16) + pad('A 只读并发', 26) + 'isConcurrencySafe');
 for (const r of rows) console.log(pad(r.name, 12) + pad(r.B, 16) + pad(r.A, 14) + r.aCount);
 if (!APPLY && missing) {
   console.log('\n有 ' + missing + ' 项未就位；加 --apply 落地（会先备份）。');

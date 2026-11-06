@@ -1,8 +1,8 @@
 - insert:
-    - id: preset-flash-lean-ptc-v3
+    - id: preset-flash-lean-ptc-v3-lite
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: flash-lean-ptc-v3
+        id: flash-lean-ptc-v3-lite
         name: "轻量PTC-v3 lite"
         description: "效率最高的轻量预设，适用于绝大部分日常工作。"
         order: 27

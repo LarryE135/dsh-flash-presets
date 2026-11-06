@@ -11,7 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const srcDir = path.join(root, 'plugins', 'plan-mode-ui', 'lib');
 const dstDir = path.join(root, 'lib');
-const FILES = ['index.js', 'client.js', 'progress.js'];
+const FILES = ['index.js', 'client.js', 'progress.js', 'compat-heal.js', 'preset-alias.js', 'composition-check.js', 'tool-concurrency.js'];
 const checkOnly = process.argv.includes('--check');
 
 const missing = FILES.filter((f) => !fs.existsSync(path.join(srcDir, f)));

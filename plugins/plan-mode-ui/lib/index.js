@@ -14,6 +14,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { deriveProgress, syncLine } from "./progress.js";
+import { scheduleCompatHeal } from "./compat-heal.js";
+import { schedulePresetAliases } from "./preset-alias.js";
+import { scheduleCompositionCheck } from "./composition-check.js";
+import { installToolConcurrency } from "./tool-concurrency.js";
 
 const API = "/api/plan-mode";
 const TIERS = new Set(["off", "light", "full"]);
@@ -324,18 +328,25 @@ function sessionHeader(session) {
   let head = null;
   try {
     const root = join(dshHome(), "sessions");
-    for (const dir of readdirSync(root)) {
-      const file = join(root, dir, "session-" + String(id), "session.v4.jsonl.zstd");
-      if (!existsSync(file)) continue;
-      const text = firstFrameText(file);
-      if (text === null) continue;
-      const first = text.split("\n")[0];
-      const meta = JSON.parse(first);
-      head = {
-        cwd: typeof meta.cwd === "string" && meta.cwd.length > 0 ? meta.cwd : null,
-        delegationDepth: typeof meta.delegationDepth === "number" ? meta.delegationDepth : 0
-      };
-      break;
+    // 目录名就是会话 id（"session-<uuid>"）。DSH 的 ids 自带 "session-" 前缀，
+    // 直接把前缀再拼一次会得到 "session-session-…" 而永远落空；老布局里也有裸
+    // uuid 的写法，所以两种都试（与 composition-check 的取样口径一致）。
+    const raw = String(id);
+    const names = raw.startsWith("session-") ? [raw] : ["session-" + raw, raw];
+    outer: for (const dir of readdirSync(root)) {
+      for (const name of names) {
+        const file = join(root, dir, name, "session.v4.jsonl.zstd");
+        if (!existsSync(file)) continue;
+        const text = firstFrameText(file);
+        if (text === null) continue;
+        const first = text.split("\n")[0];
+        const meta = JSON.parse(first);
+        head = {
+          cwd: typeof meta.cwd === "string" && meta.cwd.length > 0 ? meta.cwd : null,
+          delegationDepth: typeof meta.delegationDepth === "number" ? meta.delegationDepth : 0
+        };
+        break outer;
+      }
     }
   } catch (error) { head = null; }
   // 命中才长缓存；没找到时 30 秒内不再重试（会话头可能稍后才落盘）
@@ -343,6 +354,8 @@ function sessionHeader(session) {
   else capSet(headerMiss, k, Date.now());
   return head;
 }
+// 仅供回归测试：会话头解析（会话 id 自带 "session-" 前缀，目录名就是它）
+export { sessionHeader as __sessionHeaderForTest };
 // ── todo 同步监测 ────────────────────────────────────────────────
 // 列表本身由 DSH 原生 TodoDock 渲染（数据源 = 会话投影 todos）；这里只管两件事：
 // ① 把「写没写、写晚没有」算成健康度并通过 /progress 暴露给客户端；
@@ -1123,6 +1136,26 @@ export default {
       if (Number.isFinite(fromEnv) && fromEnv >= 1) lagTurnsThreshold = Math.floor(fromEnv);
     }
     try { console.info("[plan-mode-ui] host ready (two-phase)"); } catch (e) {}
+    // 历史 preset id 的解析兜底：纯内存映射，不写任何会话文件（见 preset-alias.js 与
+    // presets/legacy-preset-map.json）。这是旧会话“升级后还能打开”的主通道。
+    try { schedulePresetAliases(ctx); } catch (error) { try { console.error("[preset-alias] 调度失败（已忽略）:", error); } catch (e2) {} }
+    // 组合自检（0.2.6）：插件热重载会让**已挂载**会话的预设组合（tool executor / compaction /
+    // command-compact / command-goal / plan-mode）失效且不自动重挂 —— 体感就是「压缩、计划消失，
+    // 一说话就报 tool executor unavailable」。这里每 2 分钟只读地探一次，发现即报警；
+    // 需要自动重挂时开 DSH_FLASH_PRESETS_SELFCHECK_HEAL=1（会写一条 agent-preset/selected）。
+    try { scheduleCompositionCheck(ctx, cfg.compositionCheck); } catch (error) { try { console.error("[composition-check] 调度失败（已忽略）:", error); } catch (e2) {} }
+    // run_code 优化 A（0.2.6）：上游 glob/grep 没声明 isConcurrencySafe，调度器因此把原生多调用
+    // 逐条串行（dsh-tools/lib/pipeline.js 只认 === true）。这里在**已注册的定义对象**上补一个分类
+    // 函数——不碰 node_modules、不需要同名重注册（register 会拒绝），插件卸载时撤掉。
+    try { installToolConcurrency(ctx, cfg.toolConcurrency); } catch (error) { try { console.error("[tool-concurrency] 启动失败（已忽略）:", error); } catch (e2) {} }
+    // 旧 preset id 自愈（改写会话首帧）默认**关闭**：有了 alias 层就不需要动用户数据，
+    // 而启动时改写会话正是 0.2.6 截断事故与 0.2.9 误判的同一类动作。需要时显式开：
+    //   DSH_FLASH_PRESETS_HEAL=1 dsh web
+    if (process.env.DSH_FLASH_PRESETS_HEAL === "1") {
+      try { scheduleCompatHeal(); } catch (error) { try { console.error("[compat-heal] 调度失败（已忽略）:", error); } catch (e2) {} }
+    } else {
+      try { console.info("[compat-heal] 未启用（默认关闭；DSH_FLASH_PRESETS_HEAL=1 可开）"); } catch (e) {}
+    }
     ctx.effect(() => {
       const dispose = ctx.webServer.register({ kind: "exact", path: API + "/state", handler: (req, res) => handleState(req, res, ctx) });
       return () => { if (typeof dispose === "function") dispose(); };

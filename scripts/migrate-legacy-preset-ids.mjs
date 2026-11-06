@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * 旧会话的预设 id 迁移：把 lean 系列的历史 id 统一替换成现在的 lite 预设。
+ * 旧会话的预设 id 迁移（**已停用写盘**）：本脚本曾把会话 id 原地改写，但 DSH 的会话日志是
+ * **多帧 zstd**（header 一帧、之后每次追加一帧），Node 的 zstdDecompressSync/流式解码都只返回
+ * 第一帧；rewriteHeader 用第一帧重写整个文件，等于把事件流全部丢掉。2026-11-06 那次运行因此
+ * 截断了 273 个会话文件（其中 83 个原本有内容）。现在 --apply / --revert 一律拒绝执行，只保留
+ * 只读扫描（doctor --sessions 用）。要做兼容请改预设层（别名定义），不要动会话数据。
  *
  * 为什么需要：0.2.5 之前的 lean 系列还有一批退役 id（`flash-lean-ptc-v1`、`-v2`、`-v3b`），
  * 0.2.7 起现役的 13 条预设沿用 `flash-lean-ptc-v3`（旧 lean-v3 的 id），所以这类会话本来就能开；
@@ -80,16 +84,73 @@ function parseHeader(line) {
   return header;
 }
 
-/** 只重写首行的 agentPreset，其余字节原样保留，并恢复 mtime。 */
+/**
+ * 只重写首行的 agentPreset；**首帧之后的所有 zstd 帧按字节原样保留**，并恢复 mtime。
+ *
+ * 关键坑（2026-11-06 事故）：会话日志是多帧 zstd —— header 一帧，之后每次追加一帧。
+ * Node 的 zstdDecompressSync 只解出**第一帧**；用它读全文再压缩写回，会抹掉首帧之后的
+ * 全部事件帧，文件退化成 ~170 B 的空壳，而 utimes 又把 mtime 还原，事后完全看不出来。
+ * 所以这里只重新编码首帧，其余帧直接拼接原始字节。
+ */
+function firstFrameLength(buf) {
+  let off = 0;
+  for (;;) {
+    if (off + 8 > buf.length) throw new Error('zstd: frame header truncated');
+    const magic = buf.readUInt32LE(off);
+    if ((magic & 0xfffffff0) === 0x184d2a50) { off += 8 + buf.readUInt32LE(off + 4); continue; }
+    if (magic !== 0xfd2fb528) throw new Error('zstd: bad frame magic at ' + off);
+    break;
+  }
+  const start = off;
+  const fhd = buf[off + 4];
+  off += 5;
+  const fcsFlag = fhd >> 6;
+  const singleSegment = (fhd >> 5) & 1;
+  const checksum = (fhd >> 2) & 1;
+  const dictFlag = fhd & 3;
+  if (!singleSegment) off += 1;
+  off += [0, 1, 2, 4][dictFlag];
+  off += fcsFlag === 0 ? (singleSegment ? 1 : 0) : [0, 2, 4, 8][fcsFlag];
+  for (;;) {
+    if (off + 3 > buf.length) throw new Error('zstd: block header truncated');
+    const bh = buf.readUIntLE(off, 3);
+    off += 3;
+    const last = bh & 1;
+    const type = (bh >> 1) & 3;
+    const size = bh >> 3;
+    off += type === 1 ? 1 : size;
+    if (last) break;
+  }
+  if (checksum) off += 4;
+  if (off > buf.length) throw new Error('zstd: frame overruns file');
+  return off;
+}
+
 function rewriteHeader(file, presetId) {
   const st = fs.statSync(file);
-  const text = zlib.zstdDecompressSync(fs.readFileSync(file)).toString('utf8');
-  const nl = text.indexOf('\n');
-  const header = parseHeader(nl >= 0 ? text.slice(0, nl) : text);
-  header.agentPreset = presetId;
-  const body = nl >= 0 ? text.slice(nl) : '';
+  const buf = fs.readFileSync(file);
   const tmp = file + '.tmp-presetid-' + process.pid;
-  fs.writeFileSync(tmp, zlib.zstdCompressSync(Buffer.from(JSON.stringify(header) + body, 'utf8')));
+  const magic = buf.length >= 4 ? buf.readUInt32LE(0) : 0;
+  const isZstd = magic === 0xfd2fb528 || (magic & 0xfffffff0) === 0x184d2a50;
+  if (!isZstd) {
+    // 明文 jsonl：按行拼接，其余行原样保留
+    const text = buf.toString('utf8');
+    const nl = text.indexOf('\n');
+    const header = parseHeader(nl >= 0 ? text.slice(0, nl) : text);
+    header.agentPreset = presetId;
+    const rest = nl >= 0 ? text.slice(nl) : '';
+    fs.writeFileSync(tmp, JSON.stringify(header) + rest);
+  } else {
+    const firstLen = firstFrameLength(buf);
+    const first = zlib.zstdDecompressSync(buf.subarray(0, firstLen)).toString('utf8');
+    const nl = first.indexOf('\n');
+    const header = parseHeader(nl >= 0 ? first.slice(0, nl) : first);
+    header.agentPreset = presetId;
+    const rest = nl >= 0 ? first.slice(nl) : '';
+    const newFirst = zlib.zstdCompressSync(Buffer.from(JSON.stringify(header) + rest, 'utf8'));
+    // ← 关键：首帧之后的所有帧原样拼接回去
+    fs.writeFileSync(tmp, Buffer.concat([newFirst, buf.subarray(firstLen)]));
+  }
   fs.renameSync(tmp, file);
   fs.utimesSync(file, st.atime, st.mtime);
 }
@@ -117,6 +178,10 @@ export function listSessionFiles(root) {
 }
 
 async function revert(manifestPath) {
+  console.error('✖ --revert 已停用：本工具的重写路径会截断多帧会话日志（见文件头说明）。');
+  console.error('  要恢复 2026-11-06 的损失，请用系统还原/影子副本还原 ~/.dsh/sessions。');
+  return 3;
+  // eslint-disable-next-line no-unreachable
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   // 清单里记着当轮写入的目标 id；用它判断"这条是否仍是本脚本写的"，而不是当前 TARGET
   // （版本迭代后 TARGET 会变，旧清单仍必须能回滚）。
@@ -170,9 +235,12 @@ async function main() {
     return 0;
   }
   if (!APPLY) {
-    log('\n这是 dry-run；加 --apply 真改（会先写可回滚清单）。');
+    log('\n只读报告结束。--apply 已停用：重写会截断多帧会话日志（见文件头说明）。');
     return 0;
   }
+  console.error('✖ --apply 已停用：本工具的重写路径会截断多帧会话日志（见文件头说明）。');
+  console.error('  兼容旧会话请改预设层（别名定义），不要改会话数据。');
+  return 3;
 
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const backupDir = path.join(HOME, 'backups');

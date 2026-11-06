@@ -15,7 +15,7 @@ Flash-tier agent presets for the DeepSeek V4.1 Flash route in DSH, shipped as a 
 The presets control three things: the budget and round limit (counted by rounds, not steps), tool-output folding and trimming, and the criteria used to decide when a task is complete. They do not increase model capability; they determine how many rounds a session uses, when it stops, and how it closes out a task.
 
 > [!IMPORTANT]
-> Current version: v0.2.7 (released 2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot).
+> Current version: v0.2.6 (2026-11-06; the previous npm release was 0.2.5). One card carries three components: the presets `lean-ptc-v3 lite` (13 rules, default) and `lean-ptc-v3 balance` (3 rules), plus plan mode **plan-mode v1** (1.0.0; the 0.7.x line was internal-only). Each component can be toggled on its own. Historical preset ids are resolved at runtime by an alias layer (`presets/legacy-preset-map.json`) that never rewrites session files; the startup self-heal is opt-in (`DSH_FLASH_PRESETS_HEAL=1`). New **composition self-check** (`lib/composition-check.js`): after a plugin hot reload, an already-mounted session can silently lose its preset composition (the `compact`/`plan`/`goal` slash commands vanish and the next turn fails with `tool executor is unavailable`); the plugin now probes every mounted agent read-only every two minutes and logs the remedy, with `DSH_FLASH_PRESETS_SELFCHECK_HEAL=1` for automatic remount. Verified on DSH 0.2.1-rc.5 and 0.2.2-rc.1 (v41flash 1017 snapshot). **Alignment audit** `npm run audit:align` reports all four layers at once (generation filename ⇄ header.version ⇄ directory identity, alias coverage, sessions still recording historical ids, and which preset each session will actually run), exiting 1 on any violation.
 > 
 > Verified: installer regression on three platforms; simulated installation with a temporary `DSH_HOME` (installing through `dsh 0.2.1 --dump-config`, confirming all three presets, idempotent re-installation, and clean removal of dependencies, bundle selection, and patch layers); and bundle composition consistency.
 > 
@@ -28,7 +28,8 @@ The presets control three things: the budget and round limit (counted by rounds,
 | Preset | id | order | Rules | Compaction | Intended use |
 |---|---|---:|---:|---|---|
 | lean-ptc-v3 lite | `flash-lean-ptc-v3` | 27 | 13 | 0.25 / 20k | **Installed by default**. Highest-efficiency preset for everyday work (id kept from the 0.2.5 lean-v3 preset, so old sessions resolve without migration) |
-| lean-ptc-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | Looser constraints, for work where the model needs room to think |
+| lean-ptc-v3 balance | `flash-lean-ptc-v3-balance` | 26 | 3 | 0.25 / 20k | Weaker-constraint preset for tasks that need room to think |
+| lean-ptc-v3 (lean-v3 compat) | `flash-lean-ptc-v3` | 28 | 13 | 0.25 / 20k | **Compatibility alias**: identical to lite; kept so sessions recorded before 0.2.6 still resolve by id |
 
 **This version ships two presets** (v1/v2, the v3.1 variants, v3 max and v3 none are all gone): `lean-ptc-v3 lite` (13 rules, highest efficiency, installed by default) and `lean-ptc-v3 balance` (3 rules, loosest constraints).
 
@@ -187,7 +188,7 @@ Note: the preset patch only defines the agent-side plugin set (persona + tools +
 
 6. Every plugin name in a preset must resolve on the target DSH. Since DSH 0.2.2-rc.1, `list_agents` ships inside `@deepseek-ai/dsh-tool-subagent-control`, and the `./list-agents` subpath export is gone; declaring that row marks the whole preset broken (the GUI shows it as failing to load).
 
-7. Since 0.2.7 the preset ids line up with history again: the 13-rule preset uses `flash-lean-ptc-v3` (the old lean-v3 id) and the 3-rule preset is `flash-lean-ptc-v3-balance`. Sessions store the id, so **no session migration is needed**; only sessions recording the retired `-v1` / `-v2` / `-v3b` ids still need a new preset choice (or the optional `scripts/migrate-legacy-preset-ids.mjs --apply`).
+7. Since 0.2.7 the picker shows two real presets plus one compatibility alias: `flash-lean-ptc-v3-lite` (13 rules, default), `flash-lean-ptc-v3-balance` (3 rules), and `flash-lean-ptc-v3` (alias with the same content as lite). **Never rewrite the preset id stored in a session**: DSH keeps `session.v4.jsonl.zstd` as multi-frame zstd, and rewriting the whole file drops the event stream (that is why the 0.2.7 draft migration script no longer writes). Old lean-v3 sessions resolve through the alias; sessions recording `-v1` / `-v2` / `-v3b` still need a new preset choice.
 
 8. Restart the host after installing (desktop, headless, acp); the web profile only needs a page refresh, because the patch layer is composed at startup.
 
@@ -195,7 +196,8 @@ Note: the preset patch only defines the agent-side plugin set (persona + tools +
 
 ```text
 presets/
-  flash-lean-ptc-v3.patch.yml          Default preset (lean-v3 id, 13 rules)
+  flash-lean-ptc-v3-lite.patch.yml     Default preset (13 rules)
+  flash-lean-ptc-v3-alias.patch.yml    Compatibility alias (id flash-lean-ptc-v3, same content)
   flash-lean-ptc-v3-balance.patch.yml  Weaker-constraint preset (3 rules)
 cordis.patch.yml                  Generated from presets/*; do not edit manually
 scripts/
@@ -220,11 +222,11 @@ marketplace/                      Plugin marketplace submission material
 
 ### v0.2.6 (2026-11-06)
 
-- Presets narrowed to two: `lean-ptc-v3 lite` (13 rules, order 27, default; 0.2.6 temporarily used `flash-lean-ptc-v3`, restored to `flash-lean-ptc-v3` in 0.2.7) and `lean-ptc-v3 balance` (`flash-lean-ptc-v3-balance`, 3 rules, order 26); v1 / v2 / `v3 max` / `v3 none` leave the published package.
+- Presets narrowed to two: `lean-ptc-v3 lite` (`flash-lean-ptc-v3-lite`, 13 rules, order 27, default) and `lean-ptc-v3 balance` (`flash-lean-ptc-v3-balance`, 3 rules, order 26); v1 / v2 / `v3 max` / `v3 none` leave the published package.
 - Plan mode ships inside the same package as a third component (plan-mode v1); the internal 0.7.x numbering is no longer published.
 - Runtime tuning ships with the package: `ptc-runtime: persistent-in-memory` removes the fixed `run_code` startup cost (108 ms to 0) and nested bash calls drop from 44 ms to 15 ms.
-- **Preset ids align with history:** the 13-rule preset's id went back from `flash-lean-ptc-v3` to `flash-lean-ptc-v3` (display name and description unchanged, still "lean-ptc-v3 lite"). Both presets have identical rules, plugins, and compaction settings and differ only in name, so restoring the id makes 0.2.5-era lean-v3 sessions open again without touching any session data; the earlier automatic migration script is now an optional manual tool.
-- **Upgrade notes:** 0.2.6 temporarily used `flash-lean-ptc-v3` for the 13-rule preset (0.2.7 restored `flash-lean-ptc-v3`) and renamed the 3-rule preset to `flash-lean-ptc-v3-balance`; desktop / headless / acp require a restart.
+- **Old-session compatibility without touching data:** preset ids stay `flash-lean-ptc-v3-lite` / `flash-lean-ptc-v3-balance`, and a compatibility alias `flash-lean-ptc-v3` (same content as lite, order 28) lets sessions recorded before 0.2.6 resolve by id. The draft session-migration script no longer writes: rewriting the multi-frame zstd log truncates the event stream.
+- **Upgrade notes:** 0.2.6 no longer used `flash-lean-ptc-v3` as a real preset id (0.2.7 restores it as a compatibility alias) and `flash-lean-ptc-v3-lite` went from 3 rules to 13; desktop / headless / acp require a restart.
 - The legacy directory-style entry point now fails explicitly (exit 3) instead of being skipped.
 
 ### v0.2.5 (2026-10-30)

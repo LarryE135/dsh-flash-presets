@@ -16,11 +16,12 @@ import { execFileSync } from 'node:child_process';
 
 const EXPECT = {
   'flash-lean-ptc-v1': { order: 21, rules: 14, thr: '0.3', retain: '50000' },
-  'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3-lite': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
+  'flash-lean-ptc-v3': { order: 28, rules: 13, thr: '0.25', retain: '20000' },
   'flash-lean-ptc-v3-balance': { order: 26, rules: 3, thr: '0.25', retain: '20000' },
 };
 // 0.2.8 起 bundle 默认装四个：v3 / v3 max / v3 lite / v3 none。v1/v2 是对照版本，装了才校验。
-const SHIPPED = new Set(['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance']);
+const SHIPPED = new Set(['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3']);
 
 const arg = process.argv[2];
 let dump = '';
@@ -46,7 +47,7 @@ const check = (cond, msg) => {
 };
 
 const sliceOf = (name) => {
-  const a = dump.indexOf('- id: preset-' + name);
+  const a = dump.indexOf('- id: preset-' + name + '\n');
   if (a < 0) return '';
   const b = dump.indexOf('- id: preset-', a + 1);
   return dump.slice(a, b < 0 ? dump.length : b);
@@ -67,7 +68,7 @@ for (const [name, exp] of Object.entries(EXPECT)) {
   check(/mode: ptc/.test(slice), 'PTC 展示层');
 }
 const installed = (dump.match(/id: preset-flash-lean-ptc-v/g) || []).length;
-check(installed === 2, '预设行数 ' + installed + '（v3 / v3 lite，期望 2）');
+check(installed === 3, '预设行数 ' + installed + '（lite / balance / 兼容别名，期望 3）');
 
 console.log('');
 if (failed === 0) { console.log('运行时合成断言通过'); process.exit(0); }
