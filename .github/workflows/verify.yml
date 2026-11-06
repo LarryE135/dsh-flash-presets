@@ -61,9 +61,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$h/profiles/web" | Out-Null
           pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome $h -WithRuntime
           $p = "$h/profiles/web/cordis.patch.yml"
-          if (-not (Select-String -Path $p -Pattern 'ptc-runtime: persistent-in-memory' -Quiet)) { throw "-WithRuntime 没有写入 ptc-runtime" }
+          if (-not (Select-String -Path $p -Pattern 'executionMode: persistent-in-memory' -Quiet)) { throw "-WithRuntime 没有写入 ptc-runtime" }
           pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome $h -Uninstall
-          if (Select-String -Path $p -Pattern 'ptc-runtime: persistent-in-memory' -Quiet) { throw "-Uninstall 没有撤掉 ptc-runtime" }
+          if (Select-String -Path $p -Pattern 'executionMode: persistent-in-memory' -Quiet) { throw "-Uninstall 没有撤掉 ptc-runtime" }
           if (-not (Select-String -Path $p -Pattern '^\[\]$' -Quiet)) { throw "卸载后补丁不是空数组" }
           Write-Host "  -WithRuntime 往返 ok"
 
