@@ -39,7 +39,7 @@ while [ $# -gt 0 ]; do
     --all-presets) PRESETS=(flash-lean-ptc-v3-lite flash-lean-ptc-v3-balance); shift ;;
     --with-runtime|--with-plan-mode) WITH_RUNTIME=1; shift ;;
     --uninstall) ACTION="uninstall"; shift ;;
-    -h|--help)   sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help)   sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "未知参数: $1（用 --help 看用法）" >&2; exit 2 ;;
   esac
 done
