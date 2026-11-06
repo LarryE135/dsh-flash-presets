@@ -37,6 +37,8 @@ const BEGIN = '# >>> dsh-flash-presets: managed block (0.1.7+ plugin-row presets
 const END = '# <<< dsh-flash-presets: managed block <<<';
 // 现役两个预设由补丁层/组合包提供；历史 id 只由运行时兼容层解析，不写入补丁（R3-9）。
 const CURRENT = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
+// 兼容卡：0.2.5 原规则的两张卡，合法地出现在补丁层里（不算历史 id，也不算现役）
+const COMPAT_CARDS = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2'];
 // 0.2.9 起 lite 的 id 回归 flash-lean-ptc-v3；0.2.7–0.2.8 的 -lite 变成历史 id。
 // v1/v2 已作为真实兼容卡进补丁层，不再算历史 id；真正靠别名解析的只剩这三个。
 const LEGACY_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v3-lite'];
@@ -283,6 +285,10 @@ if (flag('--dump') || flag('--all')) {
     for (const id of CURATED) {
       if (hasRow(id)) ok('preset-' + id + ' 出现在合成配置里');
       else warn('preset-' + id + ' 不在合成配置里');
+    }
+    for (const id of COMPAT_CARDS) {
+      if (hasRow(id)) ok('preset-' + id + ' 是兼容卡（0.2.5 原规则），出现在合成配置里属正常');
+      else info('preset-' + id + ' 兼容卡不在合成配置里（装的是没有兼容卡的旧版？）');
     }
     for (const id of PRESETS.filter((x) => !CURATED.includes(x))) {
       if (hasRow(id)) warn('preset-' + id + ' 是历史 id，不应出现在合成配置里');

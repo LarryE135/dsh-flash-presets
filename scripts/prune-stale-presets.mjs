@@ -16,7 +16,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const RETIRED = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3-1-high', 'flash-lean-ptc-v3-1-max'];
+// 0.2.9 起 v1/v2 是真实兼容卡（0.2.5 原规则），不再算退役 id —— 清掉它们会让旧会话失联。
+const RETIRED = ['flash-lean-ptc-v3-1-high', 'flash-lean-ptc-v3-1-max'];
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
 const pi = A.indexOf('--profile');

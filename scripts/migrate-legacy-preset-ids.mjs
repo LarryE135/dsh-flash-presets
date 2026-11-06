@@ -31,7 +31,9 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 const TARGET = 'flash-lean-ptc-v3';
-const KEEP = new Set([TARGET, 'flash-lean-ptc-v3-balance']);
+// 真实预设一律不动：v1/v2 有它们自己的定义（0.2.9 起的兼容卡），v3/balance 是现役。
+// 只剩「孤儿 id」需要映射，改写它们才不等于替用户改预设。
+const KEEP = new Set([TARGET, 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2']);
 const SKIP_MS = Number(process.env.PRESET_MIGRATE_SKIP_MS ?? 120000);
 const SESSION_FILES = ['session.v4.jsonl.zstd', 'session.v4.jsonl', 'session.jsonl.zstd', 'session.jsonl'];
 

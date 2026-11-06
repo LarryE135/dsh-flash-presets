@@ -39,6 +39,21 @@ v3 不需要兼容卡：把 lite 的 id 直接改回 `flash-lean-ptc-v3` 就让 
 两个等价预设。只有 v1/v2 例外 —— 它们的规则与 v3 不同，**映射过去就等于改写了这些会话的行为**，所以必须
 用真卡把它们自己的规则带回来。
 
+### 实现逻辑复查（同版修掉）
+
+- **`compat-heal` 的历史 id 名单收敛到 3 个**（`flash-lean`、`flash-lean-ptc`、`flash-lean-ptc-v3-lite`）。
+  原来还列着 `flash-lean-ptc-v1` / `-v2` / `-v3`：前两个现在是真实兼容卡，一旦有人设了
+  `DSH_FLASH_PRESETS_HEAL=1`，它们会被改写成 `flash-lean-ptc-v3` —— 那就是强制对齐，会改掉旧会话的行为；
+  第三个等于 canonical 自己，纯空转。
+- **`prune-stale-presets.mjs` 不再把 v1/v2 当退役 id**（清理会把兼容卡连根拔掉）。
+- **`migrate-legacy-preset-ids.mjs` 的 `KEEP` 加上 v1/v2**：它只做只读报告（`--apply` 早已停用），但报告里
+  也不该把真实预设算成待迁移对象。
+- **`doctor` 认识兼容卡**：第 8 节对 `preset-flash-lean-ptc-v1/v2` 单独判定（在合成配置里 = 正常），
+  不再和「历史 id 不该出现」混在一起。
+- **启动期验证**：在临时 `DSH_HOME` 里 `dsh web --port 0` 起一次宿主，四张卡全部注册通过（没有
+  `agent-preset/invalid`），日志为 `[preset-alias] 已启用 3 个历史 preset id 的解析兜底` +
+  `[compat-heal] 未启用（默认关闭）`。
+
 ### 安装流程会不会动会话
 
 不会。`install.sh` / `install.ps1` 里没有任何 `sessions` / `retarget` / `migrate` / `heal` 相关调用；包也没有

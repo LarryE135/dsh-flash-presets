@@ -16,7 +16,11 @@ import { join, dirname, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { zstdCompressSync, zstdDecompressSync, constants as zc } from 'node:zlib';
 
-export const LEGACY_PRESET_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc-v3'];
+// 只能列出「没有自己的预设定、需要映射到 canonical 才打得开」的 id。
+// v1/v2 在 0.2.9 起是真实预设（0.2.5 原规则），绝不能出现在这里：
+// 把它们 heal 成 flash-lean-ptc-v3 就等于强制对齐，会改掉那些会话的行为。
+// flash-lean-ptc-v3 本身是 canonical，列进来只是空转，一并去掉。
+export const LEGACY_PRESET_IDS = ['flash-lean', 'flash-lean-ptc', 'flash-lean-ptc-v3-lite'];
 export const CURRENT_PRESET_ID = 'flash-lean-ptc-v3';
 // 帧切分照抄 DSH 自己的 scanZstdFrames（dsh-session-persistence-jsonl）：按帧头逐块走，
 // 绝不能靠扫描 magic 字节 —— 压缩数据里出现同样的 4 个字节就会切错，DSH 读会话时会报
