@@ -30,8 +30,8 @@
   },
   "install": {
     "target": "npm",
-    "spec": "dsh-flash-presets@0.3.1",
-    "command": "dsh plugin --profile {profile} add dsh-flash-presets@0.3.1",
+    "spec": "dsh-flash-presets@0.3.0",
+    "command": "dsh plugin --profile {profile} add dsh-flash-presets@0.3.0",
     "git": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets#v0.3.1"
   },
   "verified": false,
