@@ -136,7 +136,7 @@ for (const doc of [...DOCS.filter((d) => d !== 'docs/CHANGELOG.md'), 'README.en.
     if (/lite\s*[（(]\s*(默认|default)\s*[）)]/i.test(line)) {
       problems.push(doc + ':' + no + ': 把 lite 说成默认卡 —— 默认卡是 精简·PTC v3（flash-lean-ptc-v3）');
     }
-    if (/(待发|未发布|not yet published)/i.test(line) && line.includes(VERSION)) {
+    if (PUBLISHED === VERSION && /(待发|未发布|not yet published)/i.test(line) && line.includes(VERSION)) {
       problems.push(doc + ':' + no + ': 把当前版本 ' + VERSION + ' 说成未发布（现查 npm view dsh-flash-presets version）');
     }
   });

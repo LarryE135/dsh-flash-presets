@@ -75,13 +75,20 @@ if (existsSync(join(REPO, "dist"))) {
   check(badBundle.length === 0, "dist/ 组合包附件文件名带版本 " + base, badBundle.join(", "));
 }
 
-// ⑦ 安装器 / marketplace / README 里写死的 tag 必须等于当前版本（第三轮审计 R3-4）
+// ⑦ 安装器 / marketplace / README 里写死的引用（第三轮审计 R3-4）
+//    git tag 引用必须等于当前版本；npm 包号允许是「当前版本」或「已发布版本」——
+//    版本号先落地、npm 后发时，文档里的 npm 命令必须指向真正装得到的那个版本。
 const tagSources = ["scripts/install.sh", "scripts/install.ps1", "marketplace/plugin.json", "README.md", "README.en.md"];
+const npmOk = new Set([base, pub].filter(Boolean));
 for (const f of tagSources) {
   if (!existsSync(join(REPO, f))) continue;
-  const tags = [...read(f).matchAll(/dsh-flash-presets(?:@|#v)(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
-  const wrong = [...new Set(tags.filter((v) => v !== base))];
-  check(wrong.length === 0, f + " 里写死的版本 = " + base, "出现 " + wrong.join(", "));
+  const text = read(f);
+  const npmRefs = [...text.matchAll(/dsh-flash-presets@(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  const gitRefs = [...text.matchAll(/dsh-flash-presets#v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  const badNpm = [...new Set(npmRefs.filter((v) => !npmOk.has(v)))];
+  const badGit = [...new Set(gitRefs.filter((v) => v !== base))];
+  check(badNpm.length === 0, f + " 的 npm 引用 ∈ {" + [...npmOk].join(", ") + "}", "出现 " + badNpm.join(", "));
+  check(badGit.length === 0, f + " 的 git tag 引用 = " + base, "出现 " + badGit.join(", "));
 }
 
 if (problems.length > 0) {
