@@ -40,9 +40,21 @@ if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$TAG^{commit}")" ]; then
 fi
 
 # ③b 标签那次 CI 必须是绿的（0.2.9 的 tag run 是红的，npm 仍在 1 分钟后发出去了；没装 gh 时跳过）
+# 本机 GitHub 访问统一走 v2rayN 的 10808：gh 偶发的 TLS handshake timeout 来自代理链路抖动。
+# 只给 gh 这一条命令加环境前缀（不 export、不写 ~/.bashrc）；10808 没人监听时退回继承环境
+# （例如 v2rayN 没开，就照旧走系统已经配好的路）。
+GH_PROXY="${GH_PROXY:-http://127.0.0.1:10808}"
+gh_() {
+  if (exec 3<>/dev/tcp/127.0.0.1/10808) 2>/dev/null; then
+    HTTPS_PROXY="$GH_PROXY" HTTP_PROXY="$GH_PROXY" gh "$@"
+  else
+    gh "$@"
+  fi
+}
+
 if command -v gh >/dev/null 2>&1; then
   RUNS_JSON="$(mktemp)"
-  if gh run list --commit "$(git rev-parse "$TAG^{commit}")" --limit 30 --json conclusion,event >"$RUNS_JSON" 2>/dev/null; then
+  if gh_ run list --commit "$(git rev-parse "$TAG^{commit}")" --limit 30 --json conclusion,event >"$RUNS_JSON" 2>/dev/null; then
     if grep -q '"conclusion":"failure"' "$RUNS_JSON" || grep -q '"conclusion":"cancelled"' "$RUNS_JSON"; then
       rm -f "$RUNS_JSON"
       fail "标签提交的 CI 有失败或取消的 run" "等 main 的 CI 绿了再打标签；红灯下发版正是 0.2.9 犯过的错"
@@ -79,15 +91,15 @@ if [ -n "$remote_tags" ]; then
   exit 1
 fi
 
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  gh repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
-    gh repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (lite 13 rules / balance 3 rules)"
+if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
+  gh_ repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
+    gh_ repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (lite 13 rules / balance 3 rules)"
   git push -u origin main
   git push origin "$TAG"
   mkdir -p dist
   # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
   [ -f "dist/dsh-flash-presets-$TAG.zip" ] || git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
-  gh release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
+  gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
   echo "完成：https://github.com/$GH_USER/$REPO"
 else
   cat <<MSG

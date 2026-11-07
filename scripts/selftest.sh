@@ -221,6 +221,22 @@ grep -q "id: flash-lean-ptc-v1" "$UP5/profiles/web/cordis.patch.yml" \
 grep -q "id: preset-flash-lean-ptc-v3$" "$UP5/profiles/web/cordis.patch.yml" \
   && ok "保留 v1 行的同时照常装上 v3 卡" || bad "保留 v1 行时没装上 v3 卡"
 
+step "发布脚本的 gh 代理包装"
+grep -q 'GH_PROXY="${GH_PROXY:-http://127.0.0.1:10808}"' scripts/publish.sh \
+  && ok "publish.sh 的 gh 默认走 v2rayN 10808（不写全局）" || bad "publish.sh 缺 GH_PROXY 默认值"
+grep -q '/dev/tcp/127.0.0.1/10808' scripts/publish.sh \
+  && ok "10808 不通时退回继承环境（v2rayN 没开也不会把 gh 弄断）" || bad "没有端口探测"
+grep -q 'function Invoke-Gh' scripts/publish.ps1 \
+  && ok "publish.ps1 有同样的 Invoke-Gh 包装" || bad "publish.ps1 缺 Invoke-Gh"
+# 行为验证：用假的 gh 看它拿到的 HTTPS_PROXY 是否符合「开则加前缀、关则不加」
+STUBG="$TMP/ghbin"; mkdir -p "$STUBG"
+printf '#!/bin/sh\necho "proxy=$HTTPS_PROXY"\n' > "$STUBG/gh"; chmod +x "$STUBG/gh"
+FUNC="$(sed -n '/^GH_PROXY=/,/^}$/p' scripts/publish.sh)"
+GOT="$(PATH="$STUBG:$PATH" bash -c "$FUNC; gh_ ping" 2>/dev/null)"
+if (exec 3<>/dev/tcp/127.0.0.1/10808) 2>/dev/null; then WANT="proxy=http://127.0.0.1:10808"; else WANT="proxy="; fi
+[ "$GOT" = "$WANT" ] && ok "gh_ 的环境前缀随端口有无切换（当前期望 ${WANT}）" \
+  || bad "gh_ 环境前缀不对：拿到 [$GOT]，期望 [$WANT]"
+
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then
   bad "publish.sh 对不存在的 tag 竟然放行"; tail -3 "$TMP/pub.log"

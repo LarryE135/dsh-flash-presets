@@ -67,6 +67,8 @@ git config --global http.https://github.com.proxy http://127.0.0.1:10808
 git config --global --unset http.https://github.com.proxy   # 用完撤掉
 ```
 
+**发版脚本已经按这个口径接好**：`scripts/publish.sh` 的 `gh_()` 与 `scripts/publish.ps1` 的 `Invoke-Gh` 默认给 gh 加 `HTTPS_PROXY=http://127.0.0.1:10808`（可用环境变量 `GH_PROXY` 覆盖），并且先探测 10808 —— 端口没人监听就退回继承环境，不会因为 v2rayN 没开把发布弄断。`git push` / `npm` 等其它命令不受影响；`selftest.sh` 有两条断言锁住这个行为（含用假 gh 验证环境前缀随端口切换）。
+
 **不要做的事**：把 `http_proxy` 写进 `~/.bashrc` / `/etc/environment`（会让本来直连的地址也失效）；
 改 `.wslconfig` 的 `networkingMode` / `autoProxy`；给 Windows 加 TUN —— 三者都会把「按需」变成「全局」。
 **本机状态注意（0.3.0 期间）**：Windows 桌面 profile 的依赖仍写着 `"dsh-flash-presets": "0.2.9"`（registry 规格），而 `profiles/desktop/node_modules/dsh-flash-presets` 是手工刷进去的 0.3.0 目录 —— 在 npm 上出现 0.3.0 之前不要在那个 profile 里跑 `pnpm install`，否则会被拉回 0.2.9（显示名与描述都会回退）。npm 上架后再把这一条改成 `0.3.0`。

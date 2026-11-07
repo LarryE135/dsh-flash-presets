@@ -57,9 +57,23 @@ try {
 
   $gh = Get-Command gh -ErrorAction SilentlyContinue
   if ($gh) {
-    gh repo view "$GhUser/$Repo" 2>$null | Out-Null
+  # 本机 GitHub 访问统一走 v2rayN 的 10808：只影响本进程环境，不改系统设置；
+  # 10808 没人监听时照旧继承环境（v2rayN 没开也不会把 gh 弄断）。
+  function Invoke-Gh {
+    $probe = New-Object System.Net.Sockets.TcpClient
+    $reachable = $false
+    try { $reachable = $probe.ConnectAsync('127.0.0.1', 10808).Wait(300) } catch { $reachable = $false }
+    finally { $probe.Dispose() }
+    if ($reachable) {
+      $oldHttps = $env:HTTPS_PROXY; $oldHttp = $env:HTTP_PROXY
+      $env:HTTPS_PROXY = 'http://127.0.0.1:10808'; $env:HTTP_PROXY = 'http://127.0.0.1:10808'
+      try { & gh @args } finally { $env:HTTPS_PROXY = $oldHttps; $env:HTTP_PROXY = $oldHttp }
+    } else { & gh @args }
+  }
+
+    Invoke-Gh repo view "$GhUser/$Repo" 2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) {
-      gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)'
+      Invoke-Gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)'
     }
     git push -u origin main
     if ($LASTEXITCODE -ne 0) { throw 'git push main 失败' }
@@ -72,7 +86,7 @@ try {
       # 打 tag 而不是 HEAD：两者不一致时附件会对不上（第三轮审计 R1-1 之⑤）
       git archive --format=zip -o $zip $Tag
     }
-    gh release create $Tag $zip --title $Tag --notes '见 README 版本历史'
+    Invoke-Gh release create $Tag $zip --title $Tag --notes '见 README 版本历史'
     Write-Host "完成：https://github.com/$GhUser/$Repo"
   }
   else {
