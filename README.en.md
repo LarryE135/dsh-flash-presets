@@ -18,7 +18,7 @@ Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a p
 
 > Current version: 0.3.0 (2026-11-07) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> When installing from npm, pin the version: `dsh-flash-presets@0.3.0` (**0.3.0 is not on npm yet** — `npm view dsh-flash-presets version` still reports 0.2.9; use `github:...#v0.3.0` or the script installer until it is published). **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
+> When installing from npm, pin the version: `dsh-flash-presets@0.3.0` (published to npm on 2026-11-07 — `npm view dsh-flash-presets version` reports 0.3.0, and the tarball `gitHead` matches tag `v0.3.0`). **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 

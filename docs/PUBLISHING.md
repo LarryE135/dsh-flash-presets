@@ -33,7 +33,7 @@
 | GitHub `main` | 已推 | `gh api repos/LarryE135/dsh-flash-presets/commits/main --jq .sha` |
 | GitHub tag | 已推 | `git rev-parse --short v0.3.0` → `5449ecb`。发布后想把它移到带文档订正的提交，被仓库的 tag 规则集拒绝（`push --force` 报 repository rule violations），所以 tag 留在 `5449ecb`，订正在 `main`（`f6ec4d7`）上——**发 npm 时从 tag 检出**，保证 npm == Release == tag |
 | GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.3.0.zip`，sha256 与 `git archive v0.3.0` 一致 |
-| npm | **待发** | `npm view dsh-flash-presets version` → 0.2.9；`npm publish --dry-run` 通过 |
+| npm | **已发**（2026-11-07） | `npm view dsh-flash-presets version` → 0.3.0；`gitHead` = `5449ecb`（= tag）；39 个文件 / 解包 613 629 B / shasum `c276c00d`（现查：`npm view dsh-flash-presets@0.3.0 dist.*`） |
 
 **npm 认证现状（2026-11-07 实测）**：`npm whoami` 返回 `E401 Unauthorized` —— `~/.npmrc` 里的 `npm_…` token 已失效（Windows 侧 `%USERPROFILE%` 下没有 `.npmrc`）。所以发布前必须先 `npm login`（浏览器授权 + 账号 PIN；本机账号没有 TOTP），之后再 `npm publish`。非 TTY 里 `npm publish` 会以 `EOTP` 失败、授权 URL 被脱敏成 `***`，这一步只能人在真终端做。
 
@@ -71,7 +71,7 @@ git config --global --unset http.https://github.com.proxy   # 用完撤掉
 
 **不要做的事**：把 `http_proxy` 写进 `~/.bashrc` / `/etc/environment`（会让本来直连的地址也失效）；
 改 `.wslconfig` 的 `networkingMode` / `autoProxy`；给 Windows 加 TUN —— 三者都会把「按需」变成「全局」。
-**本机状态注意（0.3.0 期间）**：Windows 桌面 profile 的依赖仍写着 `"dsh-flash-presets": "0.2.9"`（registry 规格），而 `profiles/desktop/node_modules/dsh-flash-presets` 是手工刷进去的 0.3.0 目录 —— 在 npm 上出现 0.3.0 之前不要在那个 profile 里跑 `pnpm install`，否则会被拉回 0.2.9（显示名与描述都会回退）。npm 上架后再把这一条改成 `0.3.0`。
+**本机状态（已收尾）**：Windows 桌面 profile 的依赖原来是 registry 规格 `0.2.9`，而 `node_modules` 里是手工刷进去的 0.3.0；npm 上出现 0.3.0 之后已把该依赖改成 `0.3.0`，并同步改了 `pnpm-lock.yaml` 的 importers / packages（integrity 取 `npm view dsh-flash-presets@0.3.0 dist.integrity`）/ snapshots 三处（备份为 `package.json.bak-0.3.0-*` / `pnpm-lock.yaml.bak-0.3.0-*`）。现在 `pnpm install` 不会再回退。
 
 剩下两步，按顺序（`--dry-run` 会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
 
