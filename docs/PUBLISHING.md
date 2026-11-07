@@ -35,6 +35,10 @@
 | GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.3.0.zip`，sha256 与 `git archive v0.3.0` 一致 |
 | npm | **待发** | `npm view dsh-flash-presets version` → 0.2.9；`npm publish --dry-run` 通过 |
 
+**npm 认证现状（2026-11-07 实测）**：`npm whoami` 返回 `E401 Unauthorized` —— `~/.npmrc` 里的 `npm_…` token 已失效（Windows 侧 `%USERPROFILE%` 下没有 `.npmrc`）。所以发布前必须先 `npm login`（浏览器授权 + 账号 PIN；本机账号没有 TOTP），之后再 `npm publish`。非 TTY 里 `npm publish` 会以 `EOTP` 失败、授权 URL 被脱敏成 `***`，这一步只能人在真终端做。
+
+**本机状态注意（0.3.0 期间）**：Windows 桌面 profile 的依赖仍写着 `"dsh-flash-presets": "0.2.9"`（registry 规格），而 `profiles/desktop/node_modules/dsh-flash-presets` 是手工刷进去的 0.3.0 目录 —— 在 npm 上出现 0.3.0 之前不要在那个 profile 里跑 `pnpm install`，否则会被拉回 0.2.9（显示名与描述都会回退）。npm 上架后再把这一条改成 `0.3.0`。
+
 剩下两步，按顺序（`--dry-run` 会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
 
 ```bash

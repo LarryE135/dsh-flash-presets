@@ -39,6 +39,7 @@
 - **发布**：GitHub tag `v0.3.0` + Release `v0.3.0`（附件 `dsh-flash-presets-v0.3.0.zip`，由 `git archive` 打出）——
   预设 id / 规则 / 模型行为与 0.2.9 一致，只有显示名、描述与安装器/诊断行为的修正。**npm 上架前 `latest` 仍是 0.2.9**，
   所以两份 README 同时给出 `github:…#v0.3.0` 形式；tag 指向 `5449ecb`；发布后的文档订正（README 的 npm 时效说明、PUBLISHING 状态表、本节发布说明）留在 `main` 上，移动 tag 被仓库的 tag 规则集拒绝（`push --force` 报 repository rule violations），所以**发 npm 时从 tag 检出**，保证 npm / Release / tag 三者一致。
+  发布前还需先 `npm login`：实测 `npm whoami` 返回 `E401`，`~/.npmrc` 里的 token 已失效（本机账号用 passkey / PIN，没有 TOTP）。
 - 顺手修掉两处 0.2.9 遗留的事实错误（不发版也能修的那种已经在仓库里改）：`package.json` 的 `publishedVersion`
   仍是 0.2.8（现同步为 0.2.9）；0.2.9 的随包文档写着「npm 待发」，而它已于 2026-11-07 02:23 CST 发布到 npm。
 
