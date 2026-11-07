@@ -172,7 +172,7 @@ function Install-Modern {
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已写入：两行预设 —— 精简·PTC v3（lean-v3）/ 精简·PTC v3 balance。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
-  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.1"
+  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.0"
   Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装会被默认拒绝：预设会重复注册）。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
