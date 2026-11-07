@@ -36,6 +36,10 @@
   - **U2-3**：`check-preset-compat` 的「有定义」改成「随包发出去的定义」（读 `package.json` 的 `files` 白名单，不再认仓库里随手放的 yml），
     并断言组合包里有 `flash-presets-alias` 行、`exports["./alias"]` 存在、`lib/alias-plugin.js` 在；这道闸门同时进 `prepublishOnly`。
   - **U3-1**：别名自检不再借 `note()` 打「旧会话继续可用」（全新装、没有任何旧会话时也打，纯噪音），探测 id 固定挑 `rulesDiffer: false` 的那条。
+- **发布**：GitHub tag `v0.3.0` + Release `v0.3.0`（附件 `dsh-flash-presets-v0.3.0.zip`，由 `git archive` 打出）——
+  预设 id / 规则 / 模型行为与 0.2.9 一致，只有显示名、描述与安装器/诊断行为的修正。**npm 上架前 `latest` 仍是 0.2.9**，
+  所以两份 README 同时给出 `github:…#v0.3.0` 形式；发布后 tag 因一处文档订正从 `5449ecb` 移到最终提交（此时 npm 还没发布，
+  按 0.3.0 名义原地重发，Release 附件同步重打），此后不再移动。
 - 顺手修掉两处 0.2.9 遗留的事实错误（不发版也能修的那种已经在仓库里改）：`package.json` 的 `publishedVersion`
   仍是 0.2.8（现同步为 0.2.9）；0.2.9 的随包文档写着「npm 待发」，而它已于 2026-11-07 02:23 CST 发布到 npm。
 

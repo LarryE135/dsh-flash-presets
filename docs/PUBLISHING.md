@@ -26,25 +26,25 @@
 
   **不要把 token 写进仓库或贴在聊天里**。
 
-## 0.5 0.2.9 的发布状态（2026-11-07）
+## 0.5 0.3.0 的发布状态（2026-11-07）
 
 | 通道 | 状态 | 证据（可复跑） |
 |---|---|---|
-| GitHub `main` | 已推 | `gh api repos/LarryE135/dsh-flash-presets/commits/main --jq .sha` → `5174d57` |
-| GitHub tag | 已推 | `v0.2.9` → `77a3dbe`（`git rev-parse --short v0.2.9`） |
-| GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.2.9.zip` 1856659 B，下载后 sha256 与 `git archive v0.2.9` 一致（`e379b080…`） |
-| npm | **待发** | `npm whoami` → `larrye`；`npm view dsh-flash-presets version` → 0.2.8；`npm publish --dry-run` 通过（39 个文件；体积与 shasum 现查，别抄） |
+| GitHub `main` | 已推 | `gh api repos/LarryE135/dsh-flash-presets/commits/main --jq .sha` |
+| GitHub tag | 已推 | `git rev-parse --short v0.3.0`（发布后因一处文档订正从 `5449ecb` 移到最终提交；npm 尚未发布，故仍以 0.3.0 名义，之后不再移动） |
+| GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.3.0.zip`，sha256 与 `git archive v0.3.0` 一致 |
+| npm | **待发** | `npm view dsh-flash-presets version` → 0.2.9；`npm publish --dry-run` 通过 |
 
-剩下三步，按顺序（`--dry-run` 已在本机跑通，它会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
+剩下两步，按顺序（`--dry-run` 会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
 
 ```bash
-npm publish --dry-run                        # 只打包不发布；确认 total files: 39
-npm publish --otp=<6 位码>                    # 走 bypass token 时可直接 npm publish
-node scripts/sync-published-version.mjs      # publishedVersion: 0.2.8 → 0.2.9
+git checkout v0.3.0                          # 让 npm 包的 gitHead 与 Release 完全对齐
+npm publish                                  # 本机账号用 passkey / PIN，必须在真终端跑
+node scripts/sync-published-version.mjs      # publishedVersion: 0.2.9 -> 0.3.0
+git checkout main
 ```
 
-最后一步别省：`publishedVersion` 不跟进，文档里把版本锁回旧号也不会被 `lint-presets.mjs` 拦（白名单还是 0.2.8）。
-发完按 §8 复核，再把 CHANGELOG / 审计索引里的「npm 待发」改成已发（附 `npm view` 的实测输出）。
+发完按 §8 复核，再把 CHANGELOG、审计索引、`版本与兼容性.md`、两份 README 里的「npm 待发」改成已发（附 `npm view` 的实测输出）。
 
 ## 1. 改预设并重新合成
 
