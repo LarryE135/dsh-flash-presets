@@ -126,6 +126,22 @@ if (fs.existsSync(marketPath)) {
   }
 }
 
+// ---- 2.5 陈述对账（第六轮审计 U2-2 的残留） --------------------------------
+// 随包文档会原样出现在 npm 页面：不能把「当前版本」说成还没发布，也不能继续把 lite 当成默认卡。
+// 变更日志按时间记录历史状态，「待发」在那里是合法的过去时叙述，所以不扫它。
+for (const doc of [...DOCS.filter((d) => d !== 'docs/CHANGELOG.md'), 'README.en.md']) {
+  const text = fs.readFileSync(path.join(ROOT, doc), 'utf8');
+  text.split(/\r?\n/).forEach((line, i) => {
+    const no = i + 1;
+    if (/lite\s*[（(]\s*(默认|default)\s*[）)]/i.test(line)) {
+      problems.push(doc + ':' + no + ': 把 lite 说成默认卡 —— 默认卡是 精简·PTC v3（flash-lean-ptc-v3）');
+    }
+    if (/(待发|未发布|not yet published)/i.test(line) && line.includes(VERSION)) {
+      problems.push(doc + ':' + no + ': 把当前版本 ' + VERSION + ' 说成未发布（现查 npm view dsh-flash-presets version）');
+    }
+  });
+}
+
 // ---- 3. 白名单折叠 ----------------------------------------------------------
 const allowPath = path.join(ROOT, 'scripts', 'lint-allowlist.json');
 const allow = fs.existsSync(allowPath) ? JSON.parse(fs.readFileSync(allowPath, 'utf8')).entries ?? [] : [];

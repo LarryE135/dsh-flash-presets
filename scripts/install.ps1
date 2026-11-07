@@ -52,7 +52,14 @@ if (-not $DshHome) {
 
 # -DshHome 只是脚本参数，子进程（tune-runtime）读的是环境变量 DSH_HOME：这里统一一下。
 # 不统一的话 `-DshHome X -WithRuntime` 会把 ptc-runtime 覆盖写进真实的用户目录（第四轮审计新发现）。
+$prevDshHome = $env:DSH_HOME
 $env:DSH_HOME = $DshHome
+
+# 退出时还原：否则 dot-source 或交互式调用会把 DSH_HOME 泄漏给整个会话（第六轮审计 U3-7）。
+function Restore-DshHome {
+  if ($null -eq $prevDshHome) { Remove-Item Env:\DSH_HOME -ErrorAction SilentlyContinue }
+  else { $env:DSH_HOME = $prevDshHome }
+}
 
 # profile 只能是单层目录名：挡掉 "a/b"、".." 之类，避免把补丁写到预期目录之外
 if ([string]::IsNullOrWhiteSpace($Profile) -or $Profile -in @('.', '..') -or
@@ -86,8 +93,8 @@ function Invoke-Merge([string[]]$ExtraArgs) {
   $only = ($Presets -join ',')
   $argv = @($merge, '--patch', $patch, '--only', $only) + $ExtraArgs
   & node @argv
-  if ($LASTEXITCODE -eq 3) { exit 3 }
-  if ($LASTEXITCODE -ne 0) { exit 1 }
+  if ($LASTEXITCODE -eq 3) { Restore-DshHome; exit 3 }
+  if ($LASTEXITCODE -ne 0) { Restore-DshHome; exit 1 }
 }
 
 # ── 旧版：目录式 ──────────────────────────────────────────────────────────────
@@ -96,7 +103,7 @@ function Install-Legacy {
     $src = Join-Path $here "presets\legacy-0.1.5\$p"
     if (-not (Test-Path $src)) {
       [Console]::Error.WriteLine('0.2.6 起不再提供旧式目录（presets/legacy-0.1.5 已移除）。旧版机制请装 0.2.5；新版机制用：scripts/install.ps1 -Profile <p>')
-      exit 3
+      Restore-DshHome; exit 3
     }
     $dst = Join-Path $legacyDir $p
     if (Test-Path $dst) {
@@ -143,7 +150,7 @@ function Install-Modern {
     Write-Host '    ① 只留插件卡：什么都不用做（插件卡已经带两个预设 + 旧 id 兼容 + 计划模式）'
     Write-Host "    ② 只留脚本安装：dsh plugin --profile $Profile remove dsh-flash-presets"
     Write-Host "  确实要叠加（不推荐）：install.ps1 -Profile $Profile -Force"
-    exit 4
+    Restore-DshHome; exit 4
   }
   Copy-Item $patch "$patch.bak-$stamp"
   Write-Host "已备份 $patch → cordis.patch.yml.bak-$stamp"
@@ -165,7 +172,7 @@ function Install-Modern {
   Write-Host '安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到'
   Write-Host '  已写入：两行预设 —— 精简·PTC v3（lean-v3）/ 精简·PTC v3 balance。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
-  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.0"
+  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.1"
   Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装会被默认拒绝：预设会重复注册）。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"
@@ -236,3 +243,6 @@ if ($mode -eq 'modern') {
 } else {
   if ($Uninstall) { Uninstall-Legacy } else { Install-Legacy }
 }
+
+# 正常退出也还原 DSH_HOME（见脚本顶部说明）。
+Restore-DshHome

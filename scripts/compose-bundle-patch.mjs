@@ -31,7 +31,7 @@ const HEADER = [
   '# 本文件叠加两个预设行（发行包的全部内容）：',
   '#   精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条，默认）、精简·PTC v3 balance（flash-lean-ptc-v3-balance，3 条）。',
   '#   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；',
-  '#   历史 id（flash-lean / flash-lean-ptc / v3-lite）由 lib/preset-alias.js 运行时映射到 flash-lean-ptc-v3；',
+  '#   历史 id（v3-lite / v1 / v2 / flash-lean-ptc / flash-lean，共 5 个）由 lib/preset-alias.js 运行时映射到 flash-lean-ptc-v3；',
   '#   v1 / v2 / v3b / v3e 不随包发行，需要的人在自己的 profile 补丁里加行。',
   '#   node scripts/compose-bundle-patch.mjs          # 两个预设都进 bundle',
   '# CI 会断言本文件与合成结果一致，请勿手工编辑。',

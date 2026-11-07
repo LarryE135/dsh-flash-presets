@@ -39,6 +39,21 @@ jobs:
         shell: bash
         run: npm install --no-save --silent js-yaml@4
 
+      # 权威闸门：`npm run verify` 是 10 个检查串联的唯一入口（sync-lib 一致性 / YAML / 结构 / 文本审计 /
+      # 基准防泄漏 / 版本一致 / 兼容闸门 / 基准表 / bash3.2 / ps1）。第六轮审计 U2-4：以前 CI 是逐项手抄，
+      # 漏了 sync-lib --check、guard-bench-leak、verify-versions、render-bench-table --check 四个，
+      # 于是「lib/ 忘了同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里是绿的。
+      - name: 权威闸门（npm run verify）
+        shell: bash
+        run: npm run verify
+
+      # 发布面卫生 + 办公基准复核清单：prepublishOnly 会跑，但 CI 之前一次都没跑过（同样属于「本地过、CI 不过」的盲区）。
+      - name: 发布面卫生与基准复核清单
+        shell: bash
+        run: |
+          node scripts/verify-release-hygiene.mjs
+          node scripts/bench-release-checklist.mjs
+
       # A DSH home that looks like 0.1.7+: the profile patch layer exists, so the
       # installers take the plugin-row path instead of the legacy directory path.
       - name: Prepare a DSH home (0.1.7 layout)
@@ -164,7 +179,8 @@ jobs:
           else
             DSH_HOME="$RUNNER_TEMP/dsh" bash scripts/install.sh --uninstall
           fi
-          if grep -q 'preset-flash-lean-ptc-v2' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"; then
+          # 断言安装器真正会写的那个 id（0.2.6 起安装器不再写 v2，原来的断言永远成立 = 没测）。
+          if grep -q 'preset-flash-lean-ptc-v3' "$RUNNER_TEMP/dsh/profiles/web/cordis.patch.yml"; then
             echo "managed block still present after uninstall"; exit 1
           fi
           echo "uninstalled cleanly"

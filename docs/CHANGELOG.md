@@ -1,8 +1,47 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）与 **0.3.0**（当前版本，2026-11-07 发布；原计划名为 0.2.10）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）与 **0.3.1**（当前版本，GitHub tag + Release + npm，2026-11-08 发布）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
+
+## 0.3.1（2026-11-08，发布）
+
+**只改 CI、脚本细节与随包文档：预设 id、规则文本、别名表、模型行为一律不动。**
+
+这一版是 0.3.0 的「对账版」—— 把第六轮审计里那些「本地过、CI 不过」和「文档写的不是事实」的条目一次清掉。
+
+### CI 收口（以前 CI 绿，不等于仓库闸门绿）
+
+- `verify` job 现在直接跑 `npm run verify`（10 个检查的唯一入口）。此前 CI 是逐项手抄，**漏了 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check` 四个** —— 也就是「`lib/` 忘了从 `plugins/plan-mode-ui/lib/` 同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里完全看不见。
+- 新增一步「发布面卫生与基准复核清单」：`verify-release-hygiene.mjs` + `bench-release-checklist.mjs`，这两个以前只挂在 `prepublishOnly` 上。
+- 修掉一条**永远成立**的断言：卸载后检查的是 `preset-flash-lean-ptc-v2`，而安装器从 0.2.6 起就不写 v2 了；现在改查 `preset-flash-lean-ptc-v3`。
+
+### 新 lint 规则：随包文档的陈述对账
+
+`scripts/lint-presets.mjs` 增加「2.5 陈述对账」：把 lite 说成默认卡的说法直接判红；同一行里既有「待发 / 未发布」又出现**当前版本号**也判红（历史章节与变更日志本身不受影响）。
+
+规则上线当场抓到一条：`docs/审计索引-0.2.9.md` 还写着「0.3.0 待发」，已改成三通道发齐。
+
+### 文档对账
+
+- `README.en.md`：「today's lite」改成「today's `flash-lean-ptc-v3` (lean-v3)」；`-lite` 的区间由「0.2.7–0.2.8」改成「0.2.6–0.2.8」（`git ls-tree v0.2.6 presets/` 可复现）。
+- `cordis.patch.yml` 与 `scripts/compose-bundle-patch.mjs` 的注释：「历史 id」由 3 个改成 **5 个**（`v3-lite / v1 / v2 / flash-lean-ptc / flash-lean`），与 `lib/preset-alias.js` 的别名表一致。
+- `CHANGELOG` 里关于 `npm deprecate` 的旧叙述订正：标记早已补上（`npm view dsh-flash-presets@0.2.5 deprecated` 可复现），原文依赖的 Automation token 已随 npm 收紧 bypass-2FA 失效。
+- `CONTRIBUTING.md`：删掉「本仓库是纯补丁层，没有运行时代码」这句错话 —— 仓库确实带运行时（`lib/`），且**真源在 `plugins/plan-mode-ui/lib/`**，改运行时只能改真源。
+- `plugins/plan-mode-ui/NOTICE.md`：「64 项自测」改成「26 个测试文件」（`bash test/run.sh` 的实测输出）。
+- `README` 的「更新与卸载」写清升级语义：用精确版本安装后 `dsh plugin update` **不会**自动升级，升级 = 再 `add` 一次新版本；并说明 pnpm 留下的 `minimumReleaseAgeExclude` 行是正常的。
+
+### 脚本小修
+
+- `tune-runtime --check` 以前会被当成未知参数拒绝（而它自己的用法行就写着 `[--check]`），现在接受；与 `--apply` / `--revert` 同时给出时明确报错退出 2。
+- `install.ps1` 退出时还原 `$env:DSH_HOME`（dot-source 或交互式调用不再污染调用者会话）。
+- `publish.sh`：Release 附件**每次重打**（以前 `dist/` 里有同名 zip 就直接复用，容易传上旧内容）；删掉「临时放宽 tag 规则集 → `git tag -f`」的错误指引，与「已发布的 tag 永不移动」保持一致。
+- `publish.ps1`：仓库描述文案由「v1/v2 预设」改成「v3 十三条 / v3 balance 三条」。
+
+### 兼容性
+
+- 预设 id、规则文本、描述、别名表：**与 0.3.0 完全相同**。老会话、老配置不需要任何迁移。
+- 装过 0.3.0 的直接 `add dsh-flash-presets@0.3.1` 覆盖即可；留在 0.3.0 也能用，差别只在文档与 CI。
 
 ## 0.3.0（2026-11-07，发布）
 
@@ -220,7 +259,7 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
   `package.json` 的 `publishedVersion` 同步为 0.2.8（该字段记录「已上 npm 的版本」，与本仓库当前版本区分）。
 - **0.2.5 没有打 `deprecated` 标记**，这是作者的明确选择：账号 `tfa.mode = auth-and-writes`，废弃标记属于写操作，需要一次性验证码；
   而收益有限 —— `latest` 已是 0.2.8，`npm i dsh-flash-presets` 默认装到的就是修好的版本，只有显式钉 `@0.2.5` 的人受影响，
-  且 README 与安装说明都指向 0.2.8。以后要补这条标记，用 Automation token 跑 `npm deprecate` 即可（不受 2FA 拦截）。
+  且 README 与安装说明都指向 0.2.8。**订正（2026-11-07）**：这条标记后来确实补了 —— `npm deprecate` 已对 `0.2.2`–`0.2.5` 生效，文案是「0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话，请用 0.3.0」（`npm view dsh-flash-presets@0.2.5 deprecated` 可复现）；原文说的 Automation token 已随 npm 收紧 bypass-2FA 一并失效，不要再依赖它。
 - 顺带收紧了 `lint-presets` 的版本号检查：只判**代码块里**的安装命令（照抄会踩空的那种），正文里的历史叙述（「0.2.5 那版有回归」）不再误报 ——
   原来把 `publishedVersion` 同步成 0.2.8 之后，0.2.6 一节里那句历史说明就把 CI 判红了。负例已验证：代码块里写 `npm i dsh-flash-presets@0.2.5` 仍会被拦。
 

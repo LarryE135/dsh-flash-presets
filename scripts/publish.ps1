@@ -73,7 +73,7 @@ try {
 
     Invoke-Gh repo view "$GhUser/$Repo" 2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) {
-      Invoke-Gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (Flash 精简·PTC v1/v2 预设)'
+      Invoke-Gh repo create "$GhUser/$Repo" "--$Visibility" --description 'DSH agent presets tuned for token efficiency (精简·PTC v3 十三条 / v3 balance 三条)'
     }
     git push -u origin main
     if ($LASTEXITCODE -ne 0) { throw 'git push main 失败' }
