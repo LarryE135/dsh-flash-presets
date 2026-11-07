@@ -16,9 +16,9 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.3.1（2026-11-08）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.3.0（2026-11-07）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> 从 npm 安装请写死版本号：`dsh-flash-presets@0.3.0`（**npm 上当前就是 0.3.0**，`npm view dsh-flash-presets version` 可复核；0.3.1 只在 GitHub 上，用下面的 tag 装）。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> 从 npm 安装请写死版本号：`dsh-flash-presets@0.3.0`（`npm view dsh-flash-presets version` 可复核）。`main` 上还陆续修正了 CI 与随包文档，**没有升版号、也没有发 Release** —— 对外发布的仍是同一个 0.3.0。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -111,7 +111,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 # 0.2.9：npm 上按版本号装（锁死版本）
 dsh plugin --profile web add dsh-flash-presets@0.3.0
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.0
 ```
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
@@ -123,7 +123,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.3.1 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.3.0 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
@@ -148,7 +148,7 @@ node scripts/doctor.mjs --profile web                                # 版本、
 
 更新就是**重新执行同一条 `add`**，换上新版本号（或先 `remove` 再 `add`）。
 
-> 用**精确版本**安装（`…@0.3.1`，不带 `^`）时，profile 的依赖会被钉死，之后 `dsh plugin update` **不会**自动升级；
+> 用**精确版本**安装（`…@0.3.0`，不带 `^`）时，profile 的依赖会被钉死，之后 `dsh plugin update` **不会**自动升级；
 > 升级只认「再 add 一次新版本」。另外 pnpm 会在 profile 的 `pnpm-workspace.yaml` 里留一行 `minimumReleaseAgeExclude`，
 > 这是正常的（新发的包还没过冷却期）。
 
@@ -166,7 +166,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
 - 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
-- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.1`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.0`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
@@ -237,12 +237,9 @@ bash scripts/selftest.sh
 
 ## 版本历史
 
-### v0.3.1（2026-11-08）
-
-- **只改 CI、脚本细节与随包文档**：预设 id、规则文本、别名表、模型行为与 0.3.0 完全一致，不需要任何迁移。
-- CI 的 `verify` job 现在直接跑 `npm run verify`（补上以前没在 CI 跑的 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check`），并加跑发布面卫生与基准清单。
-- 新增「随包文档陈述对账」lint 规则；修掉 `tune-runtime --check` 不被识别、`install.ps1` 泄漏 `DSH_HOME`、`publish.sh` 复用旧附件与「临时放宽规则集 → `tag -f`」的错误指引。
 ### v0.3.0（2026-11-07）
+
+- 之后在 `main` 上陆续修正 CI 与随包文档（**不升版号、不发 Release**）：`verify` job 改跑 `npm run verify`、新增「文档陈述对账」lint、修 `tune-runtime --check` 与 `install.ps1` 的 `DSH_HOME` 泄漏、`publish.sh` 每次重打附件。预设 id / 规则 / 行为一律未变。
 
 - **只改显示名与描述，id、规则、行为都不动**：`flash-lean-ptc-v3` 描述改成「效率最高的版本，适合绝大多数日常工作。」；
   `flash-lean-ptc-v3-balance` 显示名改成「精简·PTC v3 balance」，描述去掉内部约定。DSH 只认 `config.id`，`config.name` 只是 picker 里的文字，
