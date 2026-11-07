@@ -1,10 +1,29 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）与 **0.2.9**（当前版本；已推 GitHub `main`、已发 `v0.2.9` Release，**npm 待发：`npm publish --dry-run` 已通过，只差 OTP**）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）与 **0.2.10**（当前版本，准备中）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 
-## 0.2.9（2026-11-07，GitHub Release `v0.2.9`；npm 待发）
+## 0.2.10（准备中）
+
+**只改显示名与描述，不改任何 id、规则文本或行为。**
+
+- `flash-lean-ptc-v3` 的描述改成「效率最高的版本，适合绝大多数日常工作。」—— 原来那句「id 一直是 `flash-lean-ptc-v3`，
+  不再改名，旧会话可直接打开」是在向用户解释我们自己的内部约定，picker 里占一行还答非所问。
+- `flash-lean-ptc-v3-balance` 的显示名从「精简·PTC balance」改成「精简·PTC v3 balance」（与 v3 同一族、一眼看出配对），
+  描述去掉「id 固定为 `flash-lean-ptc-v3-balance`」那句。
+- **改名为什么不影响兼容**：DSH 解析预设和会话记录用的是 `config.id`；`config.name` 只是 picker 里显示的文字。
+  本包的别名层、`presets/legacy-preset-map.json`、会话文件全都只认 id，因此改名后 `--dump-config` 里两行的
+  `config.id` 与 0.2.9 逐字节相同，`-lite` / v1 / v2 等旧 id 照旧解析到 `flash-lean-ptc-v3`。
+- 兼容行（`-lite`，脚本安装升级时才会写）的描述不再照抄 v3 的新文案，改为说明它只用于打开旧 lite 会话。
+- `package.json` 与 `marketplace/plugin.json` 的描述不再自称「轻量PTC-v3 lite」；两个安装器的完成文案同步改名
+  （`scripts/check-ps1.mjs` 断言两侧逐字一致）。
+- 文档：删掉 README 里那条「原 lean-v3 现改名为『轻量PTC-v3 lite』」的过期说明；`-lite` 的历史区间统一写成
+  **0.2.6–0.2.8**（`v0.2.6` 这个 tag 的 `presets/` 里就已经是 lite，不是 0.2.7 才改的）。
+- 顺手修掉两处 0.2.9 遗留的事实错误（不发版也能修的那种已经在仓库里改）：`package.json` 的 `publishedVersion`
+  仍是 0.2.8（现同步为 0.2.9）；0.2.9 的随包文档写着「npm 待发」，而它已于 2026-11-07 02:23 CST 发布到 npm。
+
+## 0.2.9（2026-11-07，GitHub Release `v0.2.9` + npm）
 
 **把预设 id 改回稳定值，并让「旧会话能不能打开」不再是运气。** 桌面端装上新版 0.2.8 后旧会话直接打不开 —— 根因是
 0.2.7 把 13 条规则版的 id 从 `flash-lean-ptc-v3` 改名成 `flash-lean-ptc-v3-lite`。DSH 把 preset id 持久化在会话日志里，

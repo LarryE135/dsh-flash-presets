@@ -68,6 +68,8 @@ function buildLiteCompatBody() {
   body = body.replace(/^(\s*)id: flash-lean-ptc-v3\s*$/m, '$1id: flash-lean-ptc-v3-lite');
   body = body.replace(/^(\s*)name: "精简·PTC v3（lean-v3）"\s*$/m, '$1name: "兼容行 · 旧 lite 会话（flash-lean-ptc-v3-lite，勿选）"');
   body = body.replace(/^(\s*)order: 27\s*$/m, '$1order: 99');
+  // 描述不能照抄 v3 的（这一行的 id 是 -lite）：写成它真正的用途
+  body = body.replace(/^(\s*)description: ".*"\s*$/m, '$1description: "兼容行：只为了让旧 lite 会话还能打开，规则与 精简·PTC v3 相同；新建会话请选「精简·PTC v3（lean-v3）」。"');
   if (body === before || !body.includes('flash-lean-ptc-v3-lite')) throw new Error('兼容行生成失败：v3 源文件的结构变了');
   return body;
 }

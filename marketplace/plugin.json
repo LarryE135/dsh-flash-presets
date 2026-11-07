@@ -1,9 +1,9 @@
 {
   "id": "dsh-flash-presets",
   "name": "DSH Flash 精简预设",
-  "version": "0.2.9",
-  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. lite keeps 13 rules (default); balance keeps only the 3 rules the harness cannot enforce.",
-  "descriptionZh": "面向 flash 级路由的 token 效率预设，只发两个：lite（13 条规则，默认）与 balance（3 条规则）。旧 id 由运行时兼容层解析到 lite，不改写任何会话文件。",
+  "version": "0.2.10",
+  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. 精简·PTC v3 (lean-v3, flash-lean-ptc-v3) keeps 13 rules (default); 精简·PTC v3 balance (flash-lean-ptc-v3-balance) keeps only the 3 rules the harness cannot enforce.",
+  "descriptionZh": "面向 flash 级路由的 token 效率预设，只发两个：精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条规则，默认）与 精简·PTC v3 balance（flash-lean-ptc-v3-balance，3 条规则）。旧 id 由运行时兼容层解析到 flash-lean-ptc-v3，不改写任何会话文件。",
   "author": {
     "name": "LarryE135",
     "url": "https://github.com/LarryE135"
@@ -30,9 +30,9 @@
   },
   "install": {
     "target": "npm",
-    "spec": "dsh-flash-presets@0.2.9",
-    "command": "dsh plugin --profile {profile} add dsh-flash-presets@0.2.9",
-    "git": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets#v0.2.9"
+    "spec": "dsh-flash-presets@0.2.10",
+    "command": "dsh plugin --profile {profile} add dsh-flash-presets@0.2.10",
+    "git": "dsh plugin --profile {profile} add github:LarryE135/dsh-flash-presets#v0.2.10"
   },
   "verified": false,
   "maintainers": [

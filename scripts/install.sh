@@ -120,10 +120,10 @@ install_modern() {
   validate_patch
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
-  echo "「精简·PTC v3（lean-v3）」与「精简·PTC balance」。"
+  echo "「精简·PTC v3（lean-v3）」与「精简·PTC v3 balance」。"
   echo "  已写入：两行预设（lite / balance）。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
-  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.9"
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.2.10"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装会被默认拒绝：预设会重复注册）。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"

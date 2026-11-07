@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
 // 发行包只装两个预设：精简·PTC v3（lean-v3，id flash-lean-ptc-v3，13 条，默认）
-// 与 精简·PTC balance（id flash-lean-ptc-v3-balance，3 条）。
+// 与 精简·PTC v3 balance（id flash-lean-ptc-v3-balance，3 条）。
 // id 一旦发布就不再变动：DSH 把 preset id 写进会话日志，改名等于让旧会话报
 // agent-preset/not-found。0.2.7–0.2.8 把 lite 的 id 改成 -lite 是错的，0.2.9 起改回。
 // 0.2.5 的 v1/v2 与自建的 v3b/v3e **不随包发行**：谁需要就在自己的 profile 补丁里加行。
@@ -29,7 +29,7 @@ const TARGET = 'cordis.patch.yml';
 const HEADER = [
   '# dsh-flash-presets —— 组合包补丁层（bundle patch）',
   '# 本文件叠加两个预设行（发行包的全部内容）：',
-  '#   精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条，默认）、精简·PTC balance（flash-lean-ptc-v3-balance，3 条）。',
+  '#   精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条，默认）、精简·PTC v3 balance（flash-lean-ptc-v3-balance，3 条）。',
   '#   id 固定为 flash-lean-ptc-v3 / flash-lean-ptc-v3-balance，不再随版本改名；',
   '#   历史 id（flash-lean / flash-lean-ptc / v3-lite）由 lib/preset-alias.js 运行时映射到 flash-lean-ptc-v3；',
   '#   v1 / v2 / v3b / v3e 不随包发行，需要的人在自己的 profile 补丁里加行。',

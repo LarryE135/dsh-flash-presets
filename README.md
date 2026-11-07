@@ -16,9 +16,9 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.2.9（2026-11-07）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.2.10（2026-11-07）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> 从 npm 安装请写死版本号：`dsh-flash-presets@0.2.9`。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> 从 npm 安装请写死版本号：`dsh-flash-presets@0.2.10`。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -43,7 +43,7 @@
 | 轮次压缩 | 上下文存量过大时 | `thresholdRatio: 0.25`，`retainTokens: 20000`（官方默认 0.8） | 历史换成摘要，长会话才触发 |
 | 工具输出裁剪 | 工具结果进入上下文时 | 头 4096 / 尾 1024 字符 | 每条过长输出只留两端 |
 | 关闭插件 | 组装系统提示时 | 6 个插件 `disabled: true` | 这些工具的 schema 不进提示，固定省一笔 |
-| 行为纪律 | 模型每一步决策时 | persona 规则（lite 13 条，balance 3 条） | 引导少读、批量调用、增量改写 |
+| 行为纪律 | 模型每一步决策时 | persona 规则（lean-v3 13 条，balance 3 条） | 引导少读、批量调用、增量改写 |
 
 另外两项随包生效：
 
@@ -56,8 +56,8 @@
 
 | 预设 | id | 规则 | 压缩 | 何时用 |
 |---|---|---:|---|---|
-| 精简·PTC v3（lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | 默认。lean-v3 的正式身份；id 固定，不再改名 |
-| 精简·PTC balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 规则更少，留给模型更多发挥空间 |
+| 精简·PTC v3（lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | **默认**。效率最高的版本，适合绝大多数日常工作 |
+| 精简·PTC v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 约束更弱，适合需要模型发挥的场景 |
 
 两张卡共享同一套压缩/裁剪框架与插件配置，区别只在 persona 规则文本。
 
@@ -66,14 +66,14 @@
 - `flash-lean-ptc-v1`（14 条 / 0.3·50k）、`flash-lean-ptc-v2`（12 条 / 0.25·20k）：0.2.5 的规则。
   规则与 v3 不同，但**仍然映射**到 `flash-lean-ptc-v3`（打得开优先），标 `rulesDiffer` 并在首次命中时打印
   警告；要原规则的就在自己的 profile 补丁里加行，源文件见 tag `v0.2.5`。
-- 0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite`、更早的 `flash-lean` / `flash-lean-ptc`：同样由别名层解析到
+- 0.2.6–0.2.8 的 `flash-lean-ptc-v3-lite`、更早的 `flash-lean` / `flash-lean-ptc`：同样由别名层解析到
   `flash-lean-ptc-v3`，不占卡片。
 
 lean-v3 的 13 条规则分五组：预算（按轮而不是按步计，目标 20 轮以内，超过约 60 轮就停下重新规划）、动手顺序（短判断加一次廉价探测，提交型任务先交最小可行产物）、验证（验收一次通过即交付，不追加随机测试与压测）、工具与输出（用 read/glob/grep 读文件，批量调用，增量改写）、交付与范围（按用户语言作答，守住范围，不把密钥写进会话，同一路子失败两次就换）。
 
 balance 只保留引擎替代不了的三条：守住语言与范围、不写密钥、连败两次就换路子并报告确切的命令和输出，适合需要模型发挥的特殊场景，如攻坚和oneshot。
 
-> 为方便理解，新版本中调整了命名，原lean-v3现改名为“轻量PTC-v3 lite”，并新增对应更均衡的“轻量PTC-v3 balance”。
+> 说明：0.2.6–0.2.8 期间这两张卡曾叫「轻量PTC-v3 lite / balance」，0.2.9 起显示名回到「精简·PTC v3（lean-v3）」与「精简·PTC v3 balance」；**id 从头到尾没变**，旧会话无需重选。
 
 ## 实测
 
@@ -106,9 +106,9 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 
 ```console
 # 0.2.9：npm 上按版本号装（锁死版本）
-dsh plugin --profile web add dsh-flash-presets@0.2.9
+dsh plugin --profile web add dsh-flash-presets@0.2.10
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.9
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.10
 ```
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
@@ -120,7 +120,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.9
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.2.9 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.2.10 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
@@ -159,7 +159,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
 - 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
-- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.2.9`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.2.10`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
@@ -229,6 +229,13 @@ bash scripts/selftest.sh
 `cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 里的实测表由 `docs/bench-office-results.json` 生成。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
 
 ## 版本历史
+
+### v0.2.10（2026-11-07）
+
+- **只改显示名与描述，id、规则、行为都不动**：`flash-lean-ptc-v3` 描述改成「效率最高的版本，适合绝大多数日常工作。」；
+  `flash-lean-ptc-v3-balance` 显示名改成「精简·PTC v3 balance」，描述去掉内部约定。DSH 只认 `config.id`，`config.name` 只是 picker 里的文字，
+  所以旧会话、旧 id 一律照旧解析。
+- 顺手修掉 0.2.9 的两处记录错误（`publishedVersion` 仍是 0.2.8；随包文档写着「npm 待发」）。
 
 ### v0.2.9（2026-11-07）
 
