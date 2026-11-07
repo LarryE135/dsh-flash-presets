@@ -37,6 +37,38 @@
 
 **npm 认证现状（2026-11-07 实测）**：`npm whoami` 返回 `E401 Unauthorized` —— `~/.npmrc` 里的 `npm_…` token 已失效（Windows 侧 `%USERPROFILE%` 下没有 `.npmrc`）。所以发布前必须先 `npm login`（浏览器授权 + 账号 PIN；本机账号没有 TOTP），之后再 `npm publish`。非 TTY 里 `npm publish` 会以 `EOTP` 失败、授权 URL 被脱敏成 `***`，这一步只能人在真终端做。
 
+## 0.6 本机的代理与网络（2026-11-07 实测，供发布时排障）
+
+这台机器同时跑着两套代理，互不相干：
+
+| 出口 | 监听 | 说明 |
+|---|---|---|
+| v2rayN（xray 核心） | `127.0.0.1:10808` | HTTP 与 SOCKS 同一端口都能用；**Windows 系统代理就是它**（`ProxyEnable=1`、`ProxyServer=127.0.0.1:10808`） |
+| Clash Verge（verge-mihomo） | `127.0.0.1:7897` | WSL 里这些进程的 `http_proxy` / `https_proxy` 指向它 |
+
+WSL 是 `networkingMode=mirrored` + `autoProxy=true`，所以 WSL 里的 `127.0.0.1` 就是 Windows 的 `127.0.0.1`；
+但环境变量里写的是 7897（Clash）而不是 Windows 系统代理的 10808 —— 那是 WSL 启动那一刻的快照，后来系统代理换成 v2rayN 也不会跟着变。
+
+**实测结论**：`api.github.com`、`github.com`、`registry.npmjs.org`、`raw.githubusercontent.com` 在「直连 / 7897 / 10808」三条路上都返回 200，
+所以发布流程不需要为了网络去改全局代理；`gh.exe` 偶发的 `TLS handshake timeout` 是代理链路瞬时抖动（重试即可），不是配置错。
+
+**按需桥接（都不动全局配置）**：
+
+```bash
+# 单条命令走 v2rayN；其它命令照常（不 export、不写 ~/.bashrc）
+HTTPS_PROXY=http://127.0.0.1:10808 HTTP_PROXY=http://127.0.0.1:10808 gh run list
+
+# 单条命令绕开代理（国内镜像、本来就直连的地址）
+curl --noproxy '*' https://registry.npmmirror.com/dsh-flash-presets
+npm view dsh-flash-presets version --noproxy=registry.npmmirror.com
+
+# 只给 GitHub 这一个 URL 配 git 代理（不要用 git config --global http.proxy）
+git config --global http.https://github.com.proxy http://127.0.0.1:10808
+git config --global --unset http.https://github.com.proxy   # 用完撤掉
+```
+
+**不要做的事**：把 `http_proxy` 写进 `~/.bashrc` / `/etc/environment`（会让本来直连的地址也失效）；
+改 `.wslconfig` 的 `networkingMode` / `autoProxy`；给 Windows 加 TUN —— 三者都会把「按需」变成「全局」。
 **本机状态注意（0.3.0 期间）**：Windows 桌面 profile 的依赖仍写着 `"dsh-flash-presets": "0.2.9"`（registry 规格），而 `profiles/desktop/node_modules/dsh-flash-presets` 是手工刷进去的 0.3.0 目录 —— 在 npm 上出现 0.3.0 之前不要在那个 profile 里跑 `pnpm install`，否则会被拉回 0.2.9（显示名与描述都会回退）。npm 上架后再把这一条改成 `0.3.0`。
 
 剩下两步，按顺序（`--dry-run` 会把 `prepublishOnly` 整条链跑一遍，含 `selftest.sh`）：
