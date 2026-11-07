@@ -331,8 +331,13 @@ jobs:
           if ! node "$P/doctor.mjs" --profile web --all --warn-only > /tmp/doctor2.out 2>&1; then
             echo "::error::doctor --warn-only 不应退出非 0"; cat /tmp/doctor2.out; exit 1
           fi
-          if ! grep -q '旧 id 由运行时兼容层解析' /tmp/doctor.out; then
-            echo "::error::doctor 第 7 节没有兼容层说明"; cat /tmp/doctor.out; exit 1
+          if ! grep -qE '旧 id 由运行时兼容层解析|本形态没有兼容层' /tmp/doctor.out; then
+            echo "::error::doctor 第 7 节没有说明旧 id 的解析路径"; cat /tmp/doctor.out; exit 1
+          fi
+          # 这个 job 从解包目录直跑（没装插件卡）→ 没有别名层，doctor 必须说实话（第六轮 U1-3），
+          # 不能再说「由运行时兼容层解析 ✓」。
+          if ! grep -q '本形态没有兼容层' /tmp/doctor.out; then
+            echo "::error::解包直跑没有别名层，doctor 却没说「本形态没有兼容层」"; cat /tmp/doctor.out; exit 1
           fi
           # 打包件里 tune-runtime 要能真写进去、再撤干净（R1-2 那道回归的防线）
           node "$P/tune-runtime.mjs" --apply --profile web
