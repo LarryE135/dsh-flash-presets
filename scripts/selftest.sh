@@ -211,6 +211,16 @@ else
 fi
 DSH_HOME="$UP4" bash scripts/install.sh --profile web --force >/dev/null 2>&1 \
   && ok "--force 可以显式叠加" || bad "--force 也没能叠加"
+# (e) 使用者照 README 自己加回的 v1 行不能被安装器吞掉（第六轮 U1-2）
+UP5="$TMP/up5"; mkdir -p "$UP5/profiles/web"
+printf -- "- insert:\n    - id: preset-flash-lean-ptc-v1\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: flash-lean-ptc-v1\n        name: my-v1\n        order: 22\n" > "$UP5/profiles/web/cordis.patch.yml"
+DSH_HOME="$UP5" bash scripts/install.sh --profile web >"$TMP/up5.log" 2>&1
+grep -q "id: flash-lean-ptc-v1" "$UP5/profiles/web/cordis.patch.yml" \
+  && ok "使用者自加的 v1 行被保留（U1-2）" \
+  || bad "使用者自加的 v1 行被安装器删掉了（U1-2 回归）"
+grep -q "id: preset-flash-lean-ptc-v3$" "$UP5/profiles/web/cordis.patch.yml" \
+  && ok "保留 v1 行的同时照常装上 v3 卡" || bad "保留 v1 行时没装上 v3 卡"
+
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then
   bad "publish.sh 对不存在的 tag 竟然放行"; tail -3 "$TMP/pub.log"

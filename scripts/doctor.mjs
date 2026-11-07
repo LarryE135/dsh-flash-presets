@@ -290,7 +290,14 @@ if (!flag('--sessions') && !flag('--all')) {
   if (typeof scanSessions !== 'function') {
     const ids = (() => { try { return Object.keys(loadAliasMap().aliases); } catch { return []; } })();
     info('本份安装没有带旧会话扫描器（随包只发布只读组件）');
-    info('旧 id 由运行时兼容层解析，会话无需迁移：' + (ids.length ? ids.join('、') : '见 presets/legacy-preset-map.json'));
+    if (bundleInstalled) {
+      info('旧 id 由运行时兼容层解析，会话无需迁移：' + (ids.length ? ids.join('、') : '见 presets/legacy-preset-map.json'));
+    } else {
+      // 脚本安装只往补丁里写托管块，没有 flash-presets-alias 这一行 —— 别名层根本不存在（第六轮 U1-3）。
+      bad('本形态没有兼容层（脚本安装不装 flash-presets-alias）：这些历史 id 的会话打不开');
+      problems.push('脚本安装形态下存在无法解析的历史 preset id');
+      info('两条路：① 改装插件卡（自带别名层）；② 在自己的 profile 补丁里加回原预设行');
+    }
   } else {
     const scan = await scanSessions(home);
     const pending = [...scan.legacy].map(([id, files]) => [id, files.length]);
@@ -299,7 +306,13 @@ if (!flag('--sessions') && !flag('--all')) {
     else {
       const total = pending.reduce((n, [, c]) => n + c, 0);
       info(total + '/' + scan.files + ' 个会话仍记着旧 id：' + pending.map(([id, c]) => id + ' ×' + c).join('、'));
-      ok('无需处理：这些 id 由运行时兼容层解析（presets/legacy-preset-map.json），不改写任何会话文件');
+      if (bundleInstalled) {
+        ok('无需处理：这些 id 由运行时兼容层解析（presets/legacy-preset-map.json），不改写任何会话文件');
+      } else {
+        bad('本形态没有兼容层：上面这些会话打不开（脚本安装只写托管块）');
+        problems.push('脚本安装形态下有打不开的历史 preset 会话');
+        info('两条路：① 改装插件卡；② 在 profile 补丁里加回原预设行（见 docs/版本与兼容性.md）');
+      }
     }
   }
 }
@@ -321,7 +334,8 @@ if (flag('--dump') || flag('--all')) {
         // 有定义 = 该行优先，别名层对它是死代码。可能是刻意保留的本机行（例如自己维护 v1/v2），
         // 也可能是升级时忘了删 —— 提醒但不计入 problems。
         info('preset-' + id + ' 在补丁层里有定义：该行优先，别名对它不生效（刻意保留可忽略）');
-      } else ok('preset-' + id + ' 未出现（历史 id，由兼容层解析）');
+      } else if (bundleInstalled) ok('preset-' + id + ' 未出现（历史 id，由兼容层解析）');
+      else warn('preset-' + id + ' 未出现，且本形态没有兼容层 → 记着这个 id 的会话打不开');
     }
   } catch (e) {
     bad('dump-config 失败：' + String(e.message).split('\n')[0]);

@@ -20,6 +20,20 @@
   （`scripts/check-ps1.mjs` 断言两侧逐字一致）。
 - 文档：删掉 README 里那条「原 lean-v3 现改名为『轻量PTC-v3 lite』」的过期说明；`-lite` 的历史区间统一写成
   **0.2.6–0.2.8**（`v0.2.6` 这个 tag 的 `presets/` 里就已经是 lite，不是 0.2.7 才改的）。
+- **修掉第六轮审计的 5 条**（U1-2 / U1-3 / U2-1 / U2-3 / U3-1）：
+  - **U1-2**：`install.sh` / `install.ps1` 会把使用者照 README 自己加回的 `preset-flash-lean-ptc-v1` / `-v2` 行当「历史残留」删掉，
+    还打印「已并入托管块」。现在认领只针对安装器真正写过的 id（v3 / balance / `-lite`），且要先比对结构
+    （`name: '@deepseek-ai/dsh-agent-preset'` + `config.id` 与行 id 一致）；v1 / v2 这类自加行原样保留，并打印「已保留你自己加的预设行」。
+    selftest 增用例（装一次后 v1 行仍在、v3 卡照常装上）。
+  - **U1-3**：脚本安装形态下 doctor 与 audit-compat 都说「旧 id 由兼容层解析 ✓」，可脚本安装根本没有别名层。现在两者按安装形态分叉：
+    `audit-compat` 加 `--no-alias` / `--alias-layer` 与自动探测（看 profile 的 `dsh.profile.bundles`，再退到 `lib/alias-plugin.js` 是否存在），
+    没有别名层时把 aliased 记成 `unresolved` 并 exit 1；doctor 第 7、8 节在脚本形态下改成「本形态没有兼容层 → 打不开」并计入 problems。
+    两处「跑 `retarget-session-presets.mjs`」的建议删掉（那个脚本不随包，而且与「本包不写会话」相反）。
+  - **U2-1**：`publish.sh` 守卫 ③ 从「tag 是 HEAD 的祖先」改成「`HEAD == tag^{commit}`」，并加一条「tag 那次 CI 不能有 failure / cancelled」
+    （只在装了 `gh` 时检查）。0.2.9 正是在 tag CI 红着、且 npm 包来自 tag 之后的提交的情况下发出去的。
+  - **U2-3**：`check-preset-compat` 的「有定义」改成「随包发出去的定义」（读 `package.json` 的 `files` 白名单，不再认仓库里随手放的 yml），
+    并断言组合包里有 `flash-presets-alias` 行、`exports["./alias"]` 存在、`lib/alias-plugin.js` 在；这道闸门同时进 `prepublishOnly`。
+  - **U3-1**：别名自检不再借 `note()` 打「旧会话继续可用」（全新装、没有任何旧会话时也打，纯噪音），探测 id 固定挑 `rulesDiffer: false` 的那条。
 - 顺手修掉两处 0.2.9 遗留的事实错误（不发版也能修的那种已经在仓库里改）：`package.json` 的 `publishedVersion`
   仍是 0.2.8（现同步为 0.2.9）；0.2.9 的随包文档写着「npm 待发」，而它已于 2026-11-07 02:23 CST 发布到 npm。
 

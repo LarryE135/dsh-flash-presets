@@ -68,18 +68,24 @@ for (const t of tags) {
   }
 }
 
+// 「有定义」必须是「随包发出去的定义」：仓库里放一份不随包的 yml，用户装上照样解析不到（第六轮 U2-3）。
+// 判据取 package.json 的 files 白名单（它才是 npm 真正打包的范围）。
+const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8'));
 const current = new Set();
-const walk = (dir) => {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) { walk(p); continue; }
-    if (!/\.ya?ml$/.test(e.name)) continue;
-    if (/\.bak|disabled\.|\.removed|archive/.test(e.name)) continue;
-    for (const id of idsInText(fs.readFileSync(p, 'utf8'))) current.add(id);
+const collectYaml = (p) => {
+  if (!fs.existsSync(p)) return;
+  if (fs.statSync(p).isDirectory()) {
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      collectYaml(path.join(p, e.name));
+    }
+    return;
   }
+  if (!/\.ya?ml$/.test(p)) return;
+  for (const id of idsInText(fs.readFileSync(p, 'utf8'))) current.add(id);
 };
-walk(path.join(repo, 'presets'));
+for (const f of (pkg.files || [])) collectYaml(path.join(repo, f));
+
 // 冻结 id 必须来自 presets/*.patch.yml 这个「源」，光在合成出来的 cordis.patch.yml 里出现不算：
 // 否则删掉一个源文件时，脚本会因为陈旧产物而假装通过（compose --check 会拦，但那是另一道闸门）。
 const sourceIds = new Set();
@@ -87,6 +93,14 @@ for (const id of idsInText(fs.readdirSync(path.join(repo, 'presets'))
   .filter((f) => /\.ya?ml$/.test(f) && !/\.bak|disabled|\.removed/.test(f))
   .map((f) => fs.readFileSync(path.join(repo, 'presets', f), 'utf8')).join('\n'))) sourceIds.add(id);
 const bundle = path.join(repo, 'cordis.patch.yml');
+// 别名层丢掉 = 旧会话在插件卡形态下也解析不了，这是 0.2.8 → 0.2.9 想消灭的事故本身（第六轮 U2-3）。
+const aliasRowRe = /name:\s*['"]dsh-flash-presets\/alias['"]/;
+if (fs.existsSync(bundle) && !aliasRowRe.test(fs.readFileSync(bundle, 'utf8'))) {
+  failures.push('cordis.patch.yml 缺少 flash-presets-alias 行（旧 id 将无法解析）');
+}
+const exportsMap = (pkg && pkg.exports) || {};
+if (!(exportsMap['./alias'] && exportsMap['./alias'].default)) failures.push('package.json 缺少 exports["./alias"]');
+if (!fs.existsSync(path.join(repo, 'lib', 'alias-plugin.js'))) failures.push('缺少 lib/alias-plugin.js');
 if (fs.existsSync(bundle)) for (const id of idsInText(fs.readFileSync(bundle, 'utf8'))) current.add(id);
 
 const excPath = path.join(repo, 'presets', 'compat-exceptions.json');

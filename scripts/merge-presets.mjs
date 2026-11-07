@@ -115,12 +115,26 @@ function stripBlock(raw) {
  * 这里把它们整条摘掉（只摘"整条都由我们的预设行组成"的条目，别人的行一个不碰），
  * 随后由托管块统一重建 —— 结果就是"装几次都只有一份"。
  */
-const OUR_ROW = /^preset-flash-lean-ptc-v[0-9]+(-lite)?$/;
+// 安装器真正写过的行：v3、balance，以及升级时才补的 -lite 兼容行。
+// v1 / v2 是 0.2.5 及更早的孤立行，0.2.6 起安装器不再写它们 —— 那是用户照 README 自己加回来的，
+// 认领等于静默删除（第六轮审计 U1-2）。
+const INSTALLER_IDS = new Set(['preset-flash-lean-ptc-v3', 'preset-flash-lean-ptc-v3-balance', 'preset-flash-lean-ptc-v3-lite']);
+
+// 认领前先比对结构：必须是「preset-<id> 包装行 + config.id 与之一致」的完整预设条目；
+// 对不上（用户改过，或从旧版本整段拷来）就原样保留，并如实说明。
+function isInstallerRow(presetId, blockText) {
+  if (!INSTALLER_IDS.has(presetId)) return false;
+  const id = presetId.replace(/^preset-/, '');
+  const hasWrap = /^\s*name:\s*'@deepseek-ai\/dsh-agent-preset'\s*$/m.test(blockText);
+  const hasConfig = new RegExp('^\\s*id:\\s*' + id + '\\s*$', 'm').test(blockText);
+  return hasWrap && hasConfig;
+}
 
 function adoptForeignRows(text) {
   const lines = text.split(/(?<=\n)/);
   const out = [];
   const removed = [];
+  const kept = [];
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -128,15 +142,13 @@ function adoptForeignRows(text) {
       let j = i + 1;
       const body = [];
       while (j < lines.length && !/^-\s/.test(lines[j])) { body.push(lines[j]); j++; }
-      // 只认"直接子行"（同一缩进层）——预设条目里还嵌着 persona/tool-fs 等二级 id，
-      // 把它们也算进来就会永远判定为"别人的条目"
       const hits = body
         .map(l => l.match(/^(\s*)-\s*id:\s*(\S+)\s*$/))
         .filter(Boolean)
         .map(m => ({ indent: m[1].length, id: m[2] }));
       const minIndent = hits.length > 0 ? Math.min(...hits.map(h => h.indent)) : Infinity;
       const ids = hits.filter(h => h.indent === minIndent).map(h => h.id);
-      if (ids.length > 0 && ids.every(id => OUR_ROW.test(id))) {
+      if (ids.length > 0 && ids.every(id => isInstallerRow(id, body.join('')))) {
         removed.push(...ids);
         while (j < lines.length && lines[j].trim() === '') j++;
         i = j;
@@ -144,18 +156,23 @@ function adoptForeignRows(text) {
       }
     } else {
       const m = line.match(/^-\s*id:\s*(\S+)\s*$/);
-      if (m && OUR_ROW.test(m[1])) {
-        removed.push(m[1]);
-        i++;
-        while (i < lines.length && /^\s+\S/.test(lines[i])) i++;
-        while (i < lines.length && lines[i].trim() === '') i++;
-        continue;
+      if (m) {
+        const blockLines = [line];
+        let j = i + 1;
+        while (j < lines.length && /^\s+\S/.test(lines[j])) { blockLines.push(lines[j]); j++; }
+        if (isInstallerRow(m[1], blockLines.join(''))) {
+          removed.push(m[1]);
+          i = j;
+          while (i < lines.length && lines[i].trim() === '') i++;
+          continue;
+        }
+        if (/^preset-flash-lean-ptc/.test(m[1])) kept.push(m[1]);
       }
     }
     out.push(line);
     i++;
   }
-  return { text: out.join(''), removed };
+  return { text: out.join(''), removed, kept };
 }
 
 let raw = fs.existsSync(patchPath) ? fs.readFileSync(patchPath, 'utf8') : '[]\n';
@@ -172,11 +189,13 @@ const isEmptyArray = s => /^\[\s*\]$/.test(s.trim());
 
 let out;
 let adopted = [];
+let keptCustom = [];
 try {
   raw = stripBlock(raw);
   const adopt = adoptForeignRows(raw);
   raw = adopt.text;
   adopted = adopt.removed;
+  keptCustom = adopt.kept;
   if (flag('--remove')) {
     const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
     if (body.length === 0) {
@@ -205,7 +224,10 @@ try {
 
 const rows = [...out.matchAll(/^\s+- id: (preset-\S+)$/gm)].map(m => m[1]);
 if (adopted.length > 0) {
-  console.log('已认领托管块外的历史残留: ' + adopted.join(', ') + '（旧安装方式留下的裸行，已并入托管块）');
+  console.log('已认领托管块外的历史残留: ' + adopted.join(', ') + '（内容与安装器写入的一致，已由托管块取代）');
+}
+if (keptCustom.length > 0) {
+  console.log('已保留你自己加的预设行: ' + keptCustom.join(', ') + '（不在安装器管理的 id 内，或内容被改过；不动它）');
 }
 if (flag('--check')) {
   console.log('将写入的预设行: ' + (rows.length ? rows.join(', ') : '（无）'));

@@ -119,6 +119,22 @@ function rosterIds() {
 const roster = rosterIds();
 const defined = roster.ids;
 const map = aliasMap();
+
+// 别名层只在插件卡形态里存在（组合包自带那一行 flash-presets-alias）。脚本安装（install.sh 写的托管块）没有这一行，
+// 所以「在 alias 表里」不等于「这台机器上打得开」（第六轮 U1-3）。
+function aliasLayerInstalled() {
+  if (argv.includes('--no-alias')) return false;
+  if (argv.includes('--alias-layer')) return true;
+  const prof = arg('--profile', 'web');
+  const pj = path.join(HOME, 'profiles', prof, 'package.json');
+  try {
+    const j = JSON.parse(fs.readFileSync(pj, 'utf8'));
+    const bundles = (j.dsh && j.dsh.profile && j.dsh.profile.bundles) || [];
+    if (bundles.includes('dsh-flash-presets')) return true;
+  } catch { /* 没有 profile 清单就继续探 */ }
+  return fs.existsSync(path.join(HOME, 'profiles', prof, 'node_modules', 'dsh-flash-presets', 'lib', 'alias-plugin.js'));
+}
+const aliasLayer = aliasLayerInstalled();
 const rows = [];
 const damaged = [];
 let files = 0;
@@ -179,11 +195,14 @@ function walk(dir) {
 const sessionsRoot = path.join(HOME, 'sessions');
 if (fs.existsSync(sessionsRoot)) walk(sessionsRoot);
 
-const buckets = { none: [], defined: [], aliased: [], orphan: [] };
+const buckets = { none: [], defined: [], aliased: [], unresolved: [], orphan: [] };
 for (const r of rows) {
   if (r.effective === null) { buckets.none.push(r); continue; }
   if (defined.has(r.effective)) { buckets.defined.push(r); continue; }
-  if (Object.prototype.hasOwnProperty.call(map.aliases, r.effective)) { buckets.aliased.push(r); continue; }
+  if (Object.prototype.hasOwnProperty.call(map.aliases, r.effective)) {
+    (aliasLayer ? buckets.aliased : buckets.unresolved).push(r);
+    continue;
+  }
   buckets.orphan.push(r);
 }
 const groupBy = (list) => {
@@ -199,9 +218,11 @@ const result = {
   rosterSource: roster.source,
   aliasCanonical: map.canonical,
   aliasIds: Object.keys(map.aliases).sort(),
-  counts: { none: buckets.none.length, defined: buckets.defined.length, aliased: buckets.aliased.length, orphan: buckets.orphan.length },
+  counts: { none: buckets.none.length, defined: buckets.defined.length, aliased: buckets.aliased.length, unresolved: buckets.unresolved.length, orphan: buckets.orphan.length },
+  aliasLayer,
   headerVsEffectiveMismatch: headerVsEffective,
   aliasedBy: groupBy(buckets.aliased),
+  unresolvedBy: groupBy(buckets.unresolved),
   orphanBy: groupBy(buckets.orphan),
   orphanSessions: buckets.orphan.sort((a, b) => b.events - a.events).slice(0, LIMIT),
   damaged: damaged.slice(0, LIMIT),
@@ -217,6 +238,10 @@ if (AS_JSON) {
   console.log('alias 表：' + Object.keys(map.aliases).length + ' 个历史 id → ' + map.canonical);
   console.log('分布：' + JSON.stringify(result.counts) + '   header≠有效 preset：' + headerVsEffective);
   if (Object.keys(result.aliasedBy).length) console.log('经 alias 层可解析：' + JSON.stringify(result.aliasedBy));
+  if (Object.keys(result.unresolvedBy).length) {
+    console.log('✖ 本形态没有别名层（没装插件卡，或用了 --no-alias），这些历史 id 此时解析不到：' + JSON.stringify(result.unresolvedBy));
+    console.log('   修法：改装插件卡（自带 flash-presets-alias 行），或在 profile 补丁里加回原预设行；本包不改写任何会话文件。');
+  }
   if (buckets.orphan.length) {
     console.log('');
     console.log('✖ 孤儿 id（既不在 roster 也不在 alias 表 → 这些会话一定打不开）：' + JSON.stringify(result.orphanBy));
@@ -234,4 +259,4 @@ if (AS_JSON) {
     console.log('✓ 首帧单行 header、帧链可解');
   }
 }
-process.exit(buckets.orphan.length || damaged.length ? 1 : 0);
+process.exit(buckets.orphan.length || buckets.unresolved.length || damaged.length ? 1 : 0);

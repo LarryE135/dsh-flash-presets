@@ -72,7 +72,9 @@ if command -v dsh >/dev/null 2>&1; then
   # doctor 现在精确匹配整行：现役两个预设必须认得，历史 id 必须不被认成现役行。
   grep -q "preset-flash-lean-ptc-v3 出现在合成配置里" <<<"$dout" && \
     grep -q "preset-flash-lean-ptc-v3-balance 出现在合成配置里" <<<"$dout" && ok "合成配置认得两个预设" || bad "合成配置不认新预设"
-  grep -q "preset-flash-lean-ptc-v3-lite 未出现（历史 id" <<<"$dout" && ok "历史 id 没被误认成现役行" || bad "历史 id 被误认成现役行"
+  # 措辞按安装形态分叉（第六轮 U1-3）：插件卡形态说「由兼容层解析」，脚本形态说「没有兼容层 → 打不开」。
+  # 这里只断言「没被误认成现役行」，两种形态都成立。
+  grep -q "preset-flash-lean-ptc-v3-lite 未出现" <<<"$dout" && ok "历史 id 没被误认成现役行" || bad "历史 id 被误认成现役行"
 fi
 if command -v dsh >/dev/null 2>&1; then
   cons=$(sed -n "/结论：/p" <<<"$dout")

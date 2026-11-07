@@ -36,7 +36,7 @@
     "ab:overlay": "node scripts/ab-overlay.mjs",
     "verify:bench-table": "node scripts/render-bench-table.mjs --check",
     "render:bench-table": "node scripts/render-bench-table.mjs --write",
-    "prepublishOnly": "node scripts/sync-lib.mjs --check && node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && bash scripts/selftest.sh",
+    "prepublishOnly": "node scripts/sync-lib.mjs --check && node scripts/compose-bundle-patch.mjs --check && node scripts/verify-yaml.mjs && node scripts/verify-presets.mjs --repo-only && node scripts/check-preset-compat.mjs && node scripts/lint-presets.mjs && node scripts/guard-bench-leak.mjs && node scripts/bench-release-checklist.mjs && node scripts/verify-release-hygiene.mjs && node scripts/verify-versions.mjs && node scripts/render-bench-table.mjs --check && bash scripts/selftest.sh",
     "lint": "node scripts/lint-presets.mjs",
     "guard:bench": "node scripts/guard-bench-leak.mjs",
     "bench:office": "node benchmarks/office/tools/check.mjs",

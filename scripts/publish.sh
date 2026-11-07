@@ -32,8 +32,24 @@ fail() { echo "✖ $1" >&2; shift; for line in "$@"; do echo "  $line" >&2; done
 PKG_VERSION="$(node -p 'require("./package.json").version' 2>/dev/null || echo '')"
 [ "$PKG_VERSION" = "${TAG#v}" ] || fail "package.json 版本（$PKG_VERSION）与标签（$TAG）不一致" "改 package.json / README / CHANGELOG 后重新打标签"
 
-# ③ 标签必须指在当前分支上（否则推上去的是孤儿提交）
-git merge-base --is-ancestor "$TAG" HEAD || fail "标签 $TAG 不在当前分支（$(git rev-parse --abbrev-ref HEAD)）的历史上" "重新打标签：git tag -d $TAG && git tag $TAG HEAD"
+# ③ 标签必须正好指在 HEAD 上（不是「祖先」）：0.2.9 就是从 tag 之后的提交发的 npm（第六轮 U2-1）。
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$TAG^{commit}")" ]; then
+  fail "标签 ${TAG}（$(git rev-parse --short "$TAG^{commit}")）不是当前 HEAD（$(git rev-parse --short HEAD)）" \
+    "要在新提交上发版：升版本号 + 重新打标签（git tag -a ${TAG}）；不要移动已发布的 tag" \
+    "已经发过 npm 的版本，包内容不可改 —— 出问题就升版本号"
+fi
+
+# ③b 标签那次 CI 必须是绿的（0.2.9 的 tag run 是红的，npm 仍在 1 分钟后发出去了；没装 gh 时跳过）
+if command -v gh >/dev/null 2>&1; then
+  RUNS_JSON="$(mktemp)"
+  if gh run list --commit "$(git rev-parse "$TAG^{commit}")" --limit 30 --json conclusion,event >"$RUNS_JSON" 2>/dev/null; then
+    if grep -q '"conclusion":"failure"' "$RUNS_JSON" || grep -q '"conclusion":"cancelled"' "$RUNS_JSON"; then
+      rm -f "$RUNS_JSON"
+      fail "标签提交的 CI 有失败或取消的 run" "等 main 的 CI 绿了再打标签；红灯下发版正是 0.2.9 犯过的错"
+    fi
+  fi
+  rm -f "$RUNS_JSON"
+fi
 
 # ④ 远端 main 不能有本地没有的提交（否则 Release 与用户拉到的 main 不一致）
 if git remote get-url origin >/dev/null 2>&1; then
