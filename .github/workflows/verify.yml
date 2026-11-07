@@ -47,6 +47,11 @@ jobs:
         shell: bash
         run: npm run verify
 
+      # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
+      - name: 别名表 × 合成配置
+        shell: bash
+        run: node tools/probe/alias-vs-config.mjs --composed
+
       # 发布面卫生 + 办公基准复核清单：prepublishOnly 会跑，但 CI 之前一次都没跑过（同样属于「本地过、CI 不过」的盲区）。
       - name: 发布面卫生与基准复核清单
         shell: bash
@@ -256,6 +261,10 @@ jobs:
             echo "$id: $n（期望 0）"
             [ "$n" -eq 0 ] || { echo "::error::$id 不应进组合配置"; exit 1; }
           done
+
+      # 装到真实 DSH 上的组合配置：别名表指向的 id 必须真的在里面（0.2.8→0.2.9 那次事故的形状）。
+      - name: 别名层 × 真实组合配置
+        run: node tools/probe/alias-vs-config.mjs "$RUNNER_TEMP/dump.txt"
 
       # 只断言"id 出现过"还不够：order / 阈值 / 规则条数 / PTC 才是预设真正的行为参数
       - name: 断言合成结果里的取值
