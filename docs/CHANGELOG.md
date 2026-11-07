@@ -15,6 +15,8 @@
 - `verify` job 现在直接跑 `npm run verify`（10 个检查的唯一入口）。此前 CI 是逐项手抄，**漏了 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check` 四个** —— 也就是「`lib/` 忘了从 `plugins/plan-mode-ui/lib/` 同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里完全看不见。
 - 新增一步「发布面卫生与基准复核清单」：`verify-release-hygiene.mjs` + `bench-release-checklist.mjs`，这两个以前只挂在 `prepublishOnly` 上。
 - 修掉一条**永远成立**的断言：卸载后检查的是 `preset-flash-lean-ptc-v2`，而安装器从 0.2.6 起就不写 v2 了；现在改查 `preset-flash-lean-ptc-v3`。
+- 新增探针 `tools/probe/alias-vs-config.mjs`（也可 `npm run verify:alias`）：把别名表与**真实组合配置**对一遍 —— CI 里喂 `dsh --profile ci --dump-config` 的输出，断言别名指向的 id 真的在配置里、`flash-presets-alias` 行真的在。0.2.8 → 0.2.9 那次事故的形状（会话里的 id 解析到包内不存在的定义）从此有闸门。
+- 仍然不能自动化的：真实「建会话 → 升级 → resume」需要能跑模型的 provider，CI 没有凭据，继续留在人工检查单（见《审计索引》第 7 节）。
 
 ### 新 lint 规则：随包文档的陈述对账
 

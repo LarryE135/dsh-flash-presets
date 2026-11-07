@@ -48,7 +48,8 @@
     "retarget:sessions": "node scripts/retarget-session-presets.mjs",
     "verify:release": "node scripts/verify-release-hygiene.mjs",
     "pack:plugin": "node scripts/pack-plugin.mjs",
-    "prepack": "node scripts/sync-lib.mjs && node scripts/compose-bundle-patch.mjs"
+    "prepack": "node scripts/sync-lib.mjs && node scripts/compose-bundle-patch.mjs",
+    "verify:alias": "node tools/probe/alias-vs-config.mjs --composed"
   },
   "files": [
     "lib/",
