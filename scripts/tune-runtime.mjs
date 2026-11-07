@@ -22,10 +22,13 @@ const REVERT = A.includes('--revert');
 // --no-backup：安装器卸载时已经整份备份过补丁文件，撤块不必再留一份 .bak-tune-*
 // （否则每装一次就多两个备份文件，永久累积）。
 const NO_BACKUP = A.includes('--no-backup');
+// --check 是默认行为（只体检不落盘）的显式写法：用法行一直写着它，但以前会被当成未知参数拒绝。
+const CHECK = A.includes('--check');
+if (CHECK && (APPLY || REVERT)) { console.error('--check 不能与 --apply / --revert 同时使用'); process.exit(2); }
 // 不认识的参数直接报错退出：`-Profile web`（PowerShell 写法）曾被静默忽略，
 // 于是 --apply 落到了每一个 profile 上（第三轮审计 R2-2）。
 {
-  const KNOWN = new Set(['--apply', '--revert', '--profile', '--no-backup']);
+  const KNOWN = new Set(['--check', '--apply', '--revert', '--profile', '--no-backup']);
   const stray = [];
   for (let i = 0; i < A.length; i++) {
     if (A[i] === '--profile') { i++; continue; }

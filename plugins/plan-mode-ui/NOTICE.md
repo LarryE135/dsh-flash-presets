@@ -14,7 +14,7 @@
 ## 目录内容
 
 - `lib/`：宿主半（`index.js`）+ 客户端半（`client.js`）
-- `test/run.sh`：64 项自测（`bash test/run.sh`）
+- `test/run.sh`：26 个测试文件（`bash test/run.sh`；每个文件一组断言）
 - `cordis.patch.yml`：插件自身的 profile 补丁层
 - `兼容性-rc5.md`：DSH 0.2.1-rc.5 的兼容性实测记录
 

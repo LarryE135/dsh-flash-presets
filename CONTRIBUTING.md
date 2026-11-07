@@ -1,6 +1,6 @@
 # 贡献指南
 
-本仓库是**纯补丁层**（`dsh.bundle`）：没有运行时代码，产物就是几个 YAML 预设。因此评审重点不是"能不能跑"，而是**规则文本是否一致、可移植、可复现**。
+本仓库是**组合包 + 一小块运行时**：产物主要是 `presets/*.patch.yml` 合成出的 `cordis.patch.yml`（`dsh.bundle`），另有一份运行时 `lib/`（别名层 `preset-alias.js` / `alias-plugin.js`、计划模式组件、只读并发标记），其**真源在 `plugins/plan-mode-ui/lib/`**，由 `scripts/sync-lib.mjs` 拷进 `lib/` —— 改运行时只能改真源，`npm run verify` 会断言两边字节一致。因此评审重点是：**预设 id 与规则文本是否一致、可移植、可复现**，以及运行时改动是否只拦「解析失败」这一条边界。
 
 ## 提交前必须本地跑通
 

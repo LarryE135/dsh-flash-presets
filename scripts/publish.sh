@@ -86,8 +86,8 @@ fi
 if [ -n "$remote_tags" ]; then
   echo "✖ 远端已存在标签 $TAG —— 版本号一经发布不得复用。" >&2
   echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑本脚本。" >&2
-  echo "  真的需要同号补一处修正：在 GitHub 上临时放宽 tag 规则集 → 手工 git tag -f + git push -f →" >&2
-  echo "  在 CHANGELOG 与 Release 里如实记录移动路径 → 立刻恢复规则集。本脚本不提供这个入口。" >&2
+  echo "  已发布的 tag 一律不移动（GitHub 的 tag 规则集也会拒绝 force push）。本脚本不提供移动入口，" >&2
+  echo "  要修就升版本号。" >&2
   exit 1
 fi
 
@@ -98,7 +98,9 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
   git push origin "$TAG"
   mkdir -p dist
   # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
-  [ -f "dist/dsh-flash-presets-$TAG.zip" ] || git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
+  # 每次重打：复用 dist/ 里的旧附件会让 Release 内容与 tag 悄悄不一致（第六轮审计 U3-7）。
+  rm -f "dist/dsh-flash-presets-$TAG.zip"
+  git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
   gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
   echo "完成：https://github.com/$GH_USER/$REPO"
 else
