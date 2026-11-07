@@ -31,7 +31,7 @@
 | 通道 | 状态 | 证据（可复跑） |
 |---|---|---|
 | GitHub `main` | 已推 | `gh api repos/LarryE135/dsh-flash-presets/commits/main --jq .sha` |
-| GitHub tag | 已推 | `git rev-parse --short v0.3.0`（发布后因一处文档订正从 `5449ecb` 移到最终提交；npm 尚未发布，故仍以 0.3.0 名义，之后不再移动） |
+| GitHub tag | 已推 | `git rev-parse --short v0.3.0` → `5449ecb`。发布后想把它移到带文档订正的提交，被仓库的 tag 规则集拒绝（`push --force` 报 repository rule violations），所以 tag 留在 `5449ecb`，订正在 `main`（`f6ec4d7`）上——**发 npm 时从 tag 检出**，保证 npm == Release == tag |
 | GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.3.0.zip`，sha256 与 `git archive v0.3.0` 一致 |
 | npm | **待发** | `npm view dsh-flash-presets version` → 0.2.9；`npm publish --dry-run` 通过 |
 
