@@ -168,6 +168,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
 - **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.0`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
+- **脚本路径升级会移除旧卡**：托管块是整块替换的，0.2.5 时代的三卡（`flash-lean-ptc-v1` / `-v2` / `-v3`）升级后只剩 `flash-lean-ptc-v3` 与 `-balance`。这条路径**没有旧 id 兜底**（别名层只随插件卡发行），引用 `-v1` / `-v2` 的旧会话升级后会 `agent-preset/not-found`。升级脚本会打印警告；需要旧会话继续可打开，请改装插件卡（`dsh plugin --profile <名称> add dsh-flash-presets`），它带兼容层。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
 
@@ -232,6 +233,11 @@ npm run verify          # 合成一致性、YAML、预设结构、文本审计�
 npm run bench:office    # 办公基准的结构与完整性校验（只在仓库里可用，npm 包不含 benchmarks/）
 bash scripts/selftest.sh
 ```
+
+> 这三条都要求**完整克隆**（`git clone` 下来的仓库）。npm 发行包只带运行需要的那部分脚本与两份预设：
+> `scripts/` 里有一部分文件、`benchmarks/`、`tools/`、插件源码与测试都不随包，所以包内
+> `npm run verify`、`prepublishOnly`、`bench:*` 等 15 个 script 会因缺文件失败 —— 那是发行包本来
+> 就不含开发面，不是坏了。要在装好的包旁边跑这些，请另克隆仓库。
 
 `cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 里的实测表由 `docs/bench-office-results.json` 生成。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
 

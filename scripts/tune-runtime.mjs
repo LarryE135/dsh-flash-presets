@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
 const REVERT = A.includes('--revert');
@@ -81,7 +82,7 @@ function backup(file) {
 /** 权威判据：dsh --dump-config 里 ptc-runtime 的实际取值（能看见 bundle 层）。 */
 function dumpSaysPersistent(profile) {
   try {
-    const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], {
+    const out = runDsh( ['--profile', profile, '--dump-config'], {
       encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'ignore'],
     });
     const i = out.indexOf('id: ptc-runtime');

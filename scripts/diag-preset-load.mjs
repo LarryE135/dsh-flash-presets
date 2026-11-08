@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 const args = process.argv.slice(2);
 const opt = (name, def) => {
   const i = args.indexOf('--' + name);
@@ -72,7 +73,10 @@ say('bundles : ' + (bundles.length ? bundles.join(', ') : '(无)'));
 
 // DSH 自身安装目录里的插件包也算“能找到”
 try {
-  const dshBin = execFileSync('node', ['-e', 'process.stdout.write(require("path").dirname(require("fs").realpathSync(require("child_process").execSync("command -v dsh").toString().trim())))'], { encoding: 'utf8' }).trim();
+  // 以前这里用 `node -e` + `command -v dsh`：command -v 是 POSIX 内建，Windows 的 cmd 下必然失败。
+  // 现在直接复用 run-dsh 的解析结果（Windows 上会给出 dsh.cmd 的绝对路径）。
+  const dshBin = dshBinDir();
+  if (!dshBin) throw new Error('dsh 路径未知');
   const root = path.resolve(dshBin, '..');
   for (const base of [path.join(root, 'node_modules'), path.join(root, '..', 'node_modules')]) {
     if (!fs.existsSync(base)) continue;
@@ -83,6 +87,11 @@ try {
   }
 } catch {}
 
+// dsh 所在目录（找不到就返回空串，调用方按“未知”处理）。
+function dshBinDir() {
+  const file = resolveDsh().file;
+  return file === 'dsh' ? '' : path.dirname(file);
+}
 const baseName = (n) => n.split('/').slice(0, 2).join('/'); // 去掉 /tools 之类的子路径
 const inAsar = /app\.asar/.test(fs.realpathSync(pkgDir));
 const haveBase = new Set([...have].map(baseName));
@@ -110,7 +119,7 @@ if (fs.existsSync(client)) {
 
 // 5) 组合配置能否解析
 try {
-  const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const out = runDsh( ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const rows = (out.match(/id: preset-flash-lean-ptc-v[\w-]+/g) || []);
   ok('--dump-config 解析成功，预设行 ' + rows.length + ' 条：' + [...new Set(rows)].join(', '));
   const warns = out.split(/\r?\n/).filter((l) => /not found|mismatch|unknown/i.test(l));

@@ -22,6 +22,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback; };
@@ -106,7 +107,7 @@ function rosterFromDump(text) {
 }
 function loadRoster() {
   try {
-    const out = execFileSync('dsh', ['--profile', PROFILE, '--dump-config'], {
+    const out = runDsh( ['--profile', PROFILE, '--dump-config'], {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 180000,
       maxBuffer: 64 * 1024 * 1024, env: { ...process.env, DSH_HOME: HOME }
     });

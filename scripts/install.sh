@@ -122,6 +122,8 @@ install_modern() {
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「精简·PTC v3（lean-v3）」与「精简·PTC v3 balance」。"
   echo "  已写入：两行预设（lite / balance）。"
+  echo "  升级须知：本脚本整块替换旧托管块 —— 0.2.5 时代的三卡（flash-lean-ptc-v1 / -v2）会被移除，"
+  echo "  且这条路没有旧 id 兜底（别名层只随插件卡发行）。需要旧会话继续可打开，请改装插件卡。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
   echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.3.0"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装会被默认拒绝：预设会重复注册）。"

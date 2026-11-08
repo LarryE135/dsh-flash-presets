@@ -206,6 +206,50 @@ jobs:
         shell: bash
         run: node scripts/check-ps1.mjs
 
+  # issue #23：Windows 上 `npm i -g @deepseek-ai/dsh` 装出来的是 dsh.cmd，没有 dsh.exe。
+  # `execFileSync('dsh', …)` 不做 PATHEXT 解析 → ENOENT；`execFileSync('dsh.cmd', …)` → EINVAL。
+  # 以前 doctor / verify-runtime / tune-runtime / diag / audit-* 全在这条路上静默失效，而 CI 只有 Linux，
+  # 所以一直没人发现。这个 job 就是让这类回归变红。
+  windows-cli:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: 安装 DSH（npm 全局装出来的是 dsh.cmd）
+        shell: bash
+        run: |
+          npm i -g pnpm @deepseek-ai/dsh@0.2.2-rc.1
+          dsh --version
+
+      - name: runDsh 包装能调起 dsh
+        shell: bash
+        run: |
+          node -e "import('./scripts/lib/run-dsh.mjs').then((m) => { const r = m.resolveDsh(); console.log('resolved:', JSON.stringify(r)); const v = m.tryDshVersion(); console.log('version:', v); if (!v) { console.error('runDsh 调不到 dsh —— issue #23 回归'); process.exit(1); } })"
+
+      - name: 装上组合包后 doctor / verify-runtime 在 Windows 上真的能跑
+        shell: bash
+        run: |
+          dsh plugin --profile ci add . 2>&1 | tail -3
+          dsh --profile ci --dump-config > "$RUNNER_TEMP/dump.txt"
+          node scripts/verify-runtime.mjs "$RUNNER_TEMP/dump.txt" | tail -3
+          node scripts/doctor.mjs --profile ci --dump > "$RUNNER_TEMP/doctor.log" 2>&1 || true
+          tail -15 "$RUNNER_TEMP/doctor.log"
+          for bad in "找不到 dsh 命令" "dsh 能定位但调不起来"; do
+            if grep -q "$bad" "$RUNNER_TEMP/doctor.log"; then
+              echo "::error::doctor 在 Windows 上拿不到 dsh（$bad）—— issue #23 回归"
+              exit 1
+            fi
+          done
+          # tune-runtime / diag-preset-load / audit-compat 走同一条 runDsh 路径，抽查两条即可
+          node scripts/tune-runtime.mjs --check --profile ci | head -5
+          node scripts/audit-compat.mjs --dsh-home "$RUNNER_TEMP/nohome" --profile ci 2>&1 | head -5 || true
   # 真实安装验证（评审清单第 7 项）：把本组合包装进一个全新 profile，
   # 再断言两个预设行确实进了组合配置——证明"装得上"且"装完真的生效"。
   bundle-install:

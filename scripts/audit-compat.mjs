@@ -22,6 +22,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback; };
@@ -109,7 +110,7 @@ function rosterIds() {
   if (dumpFile !== null && fs.existsSync(dumpFile)) return { ids: rosterFromDump(fs.readFileSync(dumpFile, 'utf8')), source: 'dump:' + dumpFile };
   const profile = arg('--profile', 'web');
   try {
-    const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 180000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, DSH_HOME: HOME } });
+    const out = runDsh( ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 180000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, DSH_HOME: HOME } });
     const ids = rosterFromDump(out);
     if (ids.size > 0) return { ids, source: 'dsh --profile ' + profile + ' --dump-config' };
   } catch (error) { /* 退回目录扫描 */ }

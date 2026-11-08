@@ -187,6 +187,10 @@ if (hadLegacyLite) {
 }
 const isEmptyArray = s => /^\[\s*\]$/.test(s.trim());
 
+// issue #25：脚本路径是整块替换旧托管块 —— 0.2.5 时代的三卡（v1/v2/v3）会被换成两张卡，
+// 而这条路径没有别名层，引用被移除 id 的旧会话会打不开。安装前先把「会被丢掉哪些」记下来。
+const droppedLegacy = ['flash-lean-ptc-v1', 'flash-lean-ptc-v2']
+  .filter((id) => new RegExp('preset-' + id + '(?![\\w-])').test(raw));
 let out;
 let adopted = [];
 let keptCustom = [];
@@ -236,3 +240,9 @@ if (flag('--check')) {
 fs.mkdirSync(path.dirname(path.resolve(patchPath)), { recursive: true });
 fs.writeFileSync(patchPath, out, 'utf8');
 console.log('预设行: ' + (rows.length ? rows.join(', ') : '（无）'));
+
+if (droppedLegacy.length > 0 && !flag('--remove')) {
+  console.log('⚠ 旧托管块里还有 ' + droppedLegacy.join(' / ') + '：这次升级会移除它们。');
+  console.log('  脚本安装没有旧 id 兜底（别名层只随插件卡发行）：引用这些 id 的旧会话会打不开。');
+  console.log('  需要旧会话继续可打开，请改用插件卡安装：dsh plugin --profile <名称> add dsh-flash-presets');
+}

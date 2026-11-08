@@ -60,6 +60,7 @@
     "presets/compat-exceptions.json",
     ".gitattributes",
     "NOTICE",
+    "scripts/lib/",
     "scripts/install.sh",
     "scripts/install.ps1",
     "scripts/merge-presets.mjs",

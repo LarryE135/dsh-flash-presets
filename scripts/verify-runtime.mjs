@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 const EXPECT = {
   // 0.2.9 起：两个现役（lite 的 id 稳定为 flash-lean-ptc-v3）+ 两张历史 id 兼容卡（v1/v2，原规则）
   'flash-lean-ptc-v3': { order: 27, rules: 13, thr: '0.25', retain: '20000' },
@@ -30,7 +31,7 @@ if (arg) {
 } else {
   const profile = process.env.DSH_PROFILE || 'web';
   try {
-    dump = execFileSync('dsh', ['--profile', profile, '--dump-config'], {
+    dump = runDsh( ['--profile', profile, '--dump-config'], {
       encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {

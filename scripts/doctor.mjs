@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { resolvePlatformTags, hasPlatformTags } from './platform-tags.mjs';
@@ -88,10 +89,17 @@ console.log('');
 console.log('[1] DSH 版本');
 let version = null;
 try {
-  version = execFileSync('dsh', ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-} catch {
-  bad('找不到 dsh 命令（PATH 里没有）—— 这一步跳过，其余检查仍有效');
-  problems.push('dsh 不在 PATH');
+  version = runDsh(['--version'], { stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch (error) {
+  // 区分「CLI 不存在」与「CLI 存在但调不起来」：两者的修法完全不同（issue #23）。
+  const where = JSON.stringify(resolveDsh());
+  if (error.code === 'ENOENT') {
+    bad('找不到 dsh 命令（PATH 里没有）—— 这一步跳过，其余检查仍有效；解析结果 ' + where);
+    problems.push('dsh 不在 PATH');
+  } else {
+    bad('dsh 能定位但调不起来（' + (error.code || error.status || error.message) + '）—— 解析结果 ' + where);
+    problems.push('dsh 调用失败: ' + (error.code || error.status || 'error'));
+  }
 }
 if (version) {
   const m = version.match(/(\d+)\.(\d+)\.(\d+)/);
@@ -321,7 +329,7 @@ if (!flag('--sessions') && !flag('--all')) {
 if (flag('--dump') || flag('--all')) {
   console.log('[8] dsh --dump-config 是否认得这些预设');
   try {
-    const out = execFileSync('dsh', ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
+    const out = runDsh( ['--profile', profile, '--dump-config'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
     // 精确匹配整行，避免 `preset-flash-lean-ptc-v3` 命中 `-v3-lite` / `-v3-balance`。
     const hasRow = (id) => new RegExp('^\\s*-\\s*id:\\s*preset-' + id + '\\s*$', 'm').test(out);
     const CURATED = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];
