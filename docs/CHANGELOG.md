@@ -62,6 +62,14 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 
 三臂在 7/8 题上给出完全相同的字母、每题重复内也稳定，抽查失败项的终答都能引原文句子支撑自己选的选项 —— 长文偏差不是「没读完」，读法与引用纪律都改不动。**两条长文规则同样不进 v4**。顺带一条读数提醒：基准里「长任务注意力 88.4%」是 needle 100% + chain 94.4% + lb2 73.6% 的混合，合成检索与 LongBench 不要混算。
 
+### 更正：压缩阈值是安全网，不是降本手段（注释与一处旧读数）
+
+按 `thresholdTokens = min(window × thresholdRatio, pressureBudget)`（窗口 1,000,000），本预设 0.25 = 250k 才压缩。实测（2026-11-09）：**109 个运行的上下文峰值中位 20k、p90 34k、最大 126k，250k 从未触发**；把阈值压到 0.04（40k）在 O08 上跑，峰值 39.6k，照样一次没压缩 —— 因为 `tool-result-pruner` 已经把每次工具输出压到约 5.2k 字符。
+
+同时更正一处口径：v4-bench 里「10/32 运行超 250k token」是**累计 token**（每次请求求和，含 cache 读），不是上下文峰值。
+
+因此 `presets/*.patch.yml` 里那段注释改写为可核对的表述（原句「长会话里大量步数停在 300k 以上」在 109 次测量里没有出现过）。顺手测了真正起作用的旋钮（O01，n=4）：pruner 8192 → 2048 每次 token 中位 297k → 228k，但 office 床 Q 无分辨力，暂不下发布结论。
+
 ## 未发版修正（2026-11-08，`main` 上，不升版号）
 
 > 按作者要求：**不升版本号、不发 Release**。这批是 CI、脚本细节与随包文档的修正，对外的身份仍是 0.3.0（npm 与 Release 都没动），装法不变。
@@ -402,4 +410,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 - **P1-8 alias 表泄漏本机实验 id**：`presets/legacy-preset-map.json` 只保留本包真实发布过的 5 个 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`），移除 `code` / `win-control` / `codex-contract-v1` / `-v3b` / `-v3-1` / `-v3-max` / `-v3-none` 以及全部 `sessions` 计数与本机备注。个人 id 改用新环境变量 `DSH_FLASH_PRESETS_ALIAS_EXTRA=<json>` 追加，不随包发布。
 - **P1-9 会话改写说法矛盾**：README 只保留「默认关闭，`DSH_FLASH_PRESETS_HEAL=1` 才开」；`files` 移除 `scripts/retarget-session-presets.mjs` 等会写会话的维护脚本（仍留在仓库）。
 - **P2-1 根包缺 `type` / `engines.node`，CI 用 Node 20**：加 `"type": "module"` 与 `engines.node >= 22.15`；CI 的 verify job 从 Node 20 升到 24。
-- **P2-2 / P2-3 包体积数字过期、`files` 过宽（部分完成）**：README 里写死的文件数/体积已删（口径改为以 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize` 为准），但**版本表当时仍写死**——`docs/版本与兼容性.md:82` 当时还写着「0.2.6 的 45 个文件 / 约 474 kB（压缩后约 161 kB）」，与实测 38 文件 / 171.7 kB 不符，留给 0.2.7；`files` 改为白名单这一半是真做了：benchmark / AB / 迁移 / 发布类脚本不再进包。

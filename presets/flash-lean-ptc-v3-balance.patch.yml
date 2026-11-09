@@ -72,8 +72,10 @@
             config:
               - id: compaction-basic
                 name: '@deepseek-ai/dsh-compaction-basic'
-                # FLASH TUNING: 该路由声明 1,000,000 窗口，0.8 默认要到 800k 才压缩；
-                # 实测：长会话里大量步数停在 300k 以上，本预设取 0.25 阈值 / 保留 20000 近期轮次。
+                # FLASH TUNING: 该路由声明 1,000,000 窗口，dsh 默认 0.8 要到 800k 才压缩。
+                # 本预设取 0.25（250k 触发）/ 保留 20000 近期轮次。2026-11-09 实测：109 个运行
+                # 的上下文峰值中位 20k、p90 34k、最大 126k —— 250k 从未触发，这颗旋钮目前是
+                # 安全网而不是降本手段；真正压上下文的是 tool-result-pruner。
                 config:
                   thresholdRatio: 0.25
                   retainTokens: 20000
