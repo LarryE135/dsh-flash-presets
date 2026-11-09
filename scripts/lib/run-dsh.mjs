@@ -3,7 +3,7 @@
 //   execFileSync('dsh.cmd', …) → 撞上 Node 的 CVE-2024-27980 修复 → EINVAL
 // 唯一可行：先按 PATH/PATHEXT 解析出真实 shim，.cmd/.bat 交给 shell 并自己加引号。
 // 这是 issue #23 的统一修法：7 处调用点都走这里，不要再各写一遍。
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { accessSync, constants, existsSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
@@ -55,6 +55,16 @@ export function runDsh(args, options = {}) {
   if (!shell) return execFileSync(file, args, opts);
   const line = [quoteWin(file), ...args.map(quoteWin)].join(' ');
   return execFileSync(line, { ...opts, shell: true });
+}
+
+// 需要同时拿到 stdout 和 stderr 时用它（execFileSync 只回 stdout，而 dsh 的
+// 「disabling profile plugin row …」告警只写在 stderr 上）。返回 { status, stdout, stderr }，不抛。
+export function runDshCapture(args, options = {}) {
+  const { file, shell } = resolveDsh();
+  const opts = { encoding: 'utf8', ...options };
+  if (!shell) return spawnSync(file, args, opts);
+  const line = [quoteWin(file), ...args.map(quoteWin)].join(' ');
+  return spawnSync(line, { ...opts, shell: true });
 }
 
 // 只想知道「CLI 在不在、能不能调起来」时用它：拿不到就返回 null，不抛。

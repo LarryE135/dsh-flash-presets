@@ -180,6 +180,14 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 默认推荐 light。在 n = 3、7 项验收的对比中，两档都是 3/3 全过，full 的 token 多约 17%（中位 40.2 k vs 34.3 k）、耗时多约 33%（196 s vs 147 s，[变更日志](docs/CHANGELOG.md)）。
 - 不用时在卡片里关掉这个组件即可，预设行为不受影响。
 
+## 交付门（可选组件，默认关闭）
+
+同一张卡里还有交付门 `delivery-gate`。它不用规则文本，而是**在回合收尾时替你跑验收**：工作区里存在 `verify.sh` 就自动执行一次，通过才放行；不通过就把退出码和输出的最后一段回灌给模型，同一会话最多两次，让它在「不许交付」的前提下继续修。
+
+- 为什么需要：P15654 的实测里，三份实现都在结束语里**如实**写了「17–19 超时 / 未覆盖」，然后照常交付 —— 缺的不是自述，是「不达标就不许结束」。
+- 打开方式：把该行的 `enabled` 改成 `true`（`cordis.patch.yml` 末段的 `delivery-gate` 行），或临时设 `DSH_DELIVERY_GATE=1`；关掉用 `enabled: false` 或 `DSH_DELIVERY_GATE=0`。
+- 脚本约定：默认找工作区根目录的 `verify.sh`（可用 `scripts` 配置改），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
+
 ## 注意事项
 
 - **先给目标和验收标准。** 标准越明确，效果越好；边界不清时配合 plan 或 goal 模式（P15654 的对照见[实测证据](docs/实测证据.md)）。
@@ -204,6 +212,7 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 | `js-yaml` 报 `unknown tag` | 文件里还有 `!!js` 标签 | `node scripts/doctor.mjs --fix`（先备份） |
 | 预设根本没出现 | DSH 低于 0.2.1-rc.5，或装错了 profile | 升级 DSH，或用 `--profile` 指对 |
 | 升级 DSH 后预设突然消失 | DSH 已超出 `engines` 上限 `<0.2.3-0`，插件在加载时被跳过 | 升级本包；确需强行加载可用 `dsh plugin allow-version` 自担风险放行 |
+| 工具凭空少了几个（例如 `glob` / `grep`），但没有任何报错 | profile 里某个 `@deepseek-ai/*` 副本与本机 dsh 版本对不上，dsh 挂载时**静默跳过**那一行 | `node scripts/doctor.mjs --profile <名字>` 第 9 项会列出来并给修法 |
 
 预设补丁只定义 agent 侧的插件集合，不碰工作区选择器、目录选择器、终端这类 GUI 组件。如果装完后出现与预设无关的界面异常，请把 doctor 输出和浏览器控制台报错一起贴到 [issue](https://github.com/LarryE135/dsh-flash-presets/issues)。
 

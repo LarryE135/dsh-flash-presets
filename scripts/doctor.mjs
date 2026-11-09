@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { runDsh, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
+import { runDsh, runDshCapture, resolveDsh, tryDshVersion } from './lib/run-dsh.mjs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { resolvePlatformTags, hasPlatformTags } from './platform-tags.mjs';
@@ -348,6 +348,49 @@ if (flag('--dump') || flag('--all')) {
   } catch (e) {
     bad('dump-config 失败：' + String(e.message).split('\n')[0]);
     problems.push('dump-config 失败');
+  }
+}
+
+// ── 9. 因版本不兼容被静默禁用的插件行 ────────────────────────────────────────
+// dsh 挂载预设/插件行时，peer 版本对不上的行会被直接跳过，只在 stderr 说一句
+//   disabling profile plugin row "tool-fs-search": Plugin …@0.2.1-rc.5 is incompatible with dsh 0.2.2-rc.1
+// 然后照常启动：用户看到的是「工具少了」，而不是「装错了」。2026-11-08 实测 headless profile
+// 就是这样丢了 glob/grep，之前几十次 bench 都没发现。
+//
+// 这段告警只在**会话挂载**时出现，--dump-config 看不到，所以这里改成静态比对：profile 里
+// 每个 @deepseek-ai/* 包声明的、对 dsh-* 运行时的**精确版本**要求，必须等于本机 dsh 版本。
+// 只认精确版本（`0.2.1-rc.5` 这种），范围要求（`~4.1.0`、`*`）跳过，避免误报。
+console.log('[9] profile 里有没有与本机 dsh 版本对不上、会被静默禁用的插件');
+{
+  const dshVersion = tryDshVersion();
+  const EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
+  const nm = path.join(home, 'profiles', profile, 'node_modules', '@deepseek-ai');
+  const findings = [];
+  let scanned = 0;
+  if (!dshVersion) {
+    warn('读不到 dsh 版本，跳过');
+  } else if (!fs.existsSync(nm)) {
+    info('该 profile 没有本地上游副本（全部走 dsh 自带解析），跳过');
+  } else {
+    for (const entry of fs.readdirSync(nm)) {
+      const pkgFile = path.join(nm, entry, 'package.json');
+      let meta;
+      try { meta = JSON.parse(fs.readFileSync(pkgFile, 'utf8')); } catch { continue; }
+      scanned += 1;
+      const peers = meta.peerDependencies || {};
+      for (const [dep, range] of Object.entries(peers)) {
+        if (!dep.startsWith('@deepseek-ai/dsh-')) continue;
+        if (typeof range !== 'string' || !EXACT.test(range)) continue;
+        if (range !== dshVersion) findings.push(meta.name + '@' + meta.version + ' 要求 ' + dep + '@' + range);
+      }
+    }
+    if (findings.length === 0) ok('扫过 ' + scanned + ' 个包，没有版本对不上的');
+    else {
+      for (const f of findings.slice(0, 4)) info(f);
+      bad(findings.length + ' 处版本对不上（挂载时该插件行会被静默禁用，它提供的工具/命令整体缺失）');
+      info('本机 dsh 版本 ' + dshVersion + '；修法：dsh plugin --profile ' + profile + ' add <包名>@' + dshVersion);
+      problems.push('profile 里有版本对不上的插件 ' + findings.length + ' 处');
+    }
   }
 }
 

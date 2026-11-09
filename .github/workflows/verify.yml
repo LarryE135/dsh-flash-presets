@@ -314,6 +314,15 @@ jobs:
       - name: 断言合成结果里的取值
         run: node scripts/verify-runtime.mjs "$RUNNER_TEMP/dump.txt"
 
+      # 交付门是后加的组件：装完必须能在组合配置里看到，且默认关闭（它会在用户会话里跑工作区脚本）
+      - name: 断言交付门行（默认关闭）
+        run: |
+          n=$(grep -c "id: delivery-gate" "$RUNNER_TEMP/dump.txt" || true)
+          echo "delivery-gate: $n"
+          [ "$n" -ge 1 ] || { echo "::error::delivery-gate 未进入组合配置"; exit 1; }
+          grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
+          grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | grep -q "enabled: false" || { echo "::error::delivery-gate 默认应为 enabled: false"; exit 1; }
+
   canary:
     name: canary (dsh latest)
     if: github.event_name == 'schedule'

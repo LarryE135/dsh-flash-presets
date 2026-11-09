@@ -4,6 +4,39 @@
 > **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（当前版本，GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 
+## 未发版修正（2026-11-09，`main` 上，不升版号）
+
+> 按作者要求：**不升版本号、不发 Release**，对外身份仍是 0.3.0。这一批换的是「机制」，不是规则文本。
+
+### 新增：交付门 delivery-gate（默认关闭）
+
+`lib/delivery-gate.js`，以 `dsh-flash-presets/delivery-gate` 单独成行挂在 profile 上（见 `cordis.patch.yml` 末段）。
+
+- 工作区里存在 `verify.sh` 时，**回合收尾自动跑一次**；通过就放行，不通过就把退出码与输出尾部 steer 回会话，
+  同一会话最多回灌 `maxRounds` 次（默认 2）。超时按失败处理。
+- 为什么做成机制：2026-11-08 的三臂实测（P15654，19 组官方数据本地判分）里，三份实现都在结束语里如实写了
+  「17–19 超时」「未覆盖」，然后照常交付 —— 说明「要求写清楚」这一层已经到位，缺的是「不达标就不许结束」。
+- 实测（P15654，19 组官方数据）：门触发了两次回灌，模型确实收到失败清单，但完成度没有提高（15/19，与不加门相同），
+  成本高约 35%。原因是失败点在算法（每询问 O(L) 超时），不是纪律 —— 门禁必要但不充分，细节见 `docs/实测证据.md`。
+- 默认 `enabled: false`：它会在用户会话里执行工作区脚本，属于要用户显式打开的开关；关掉也可用环境变量
+  `DSH_DELIVERY_GATE=0`。
+- 依赖声明：`peerDependencies` 增加 `@deepseek-ai/dsh-tools` 与 `zod`（与 `@deepseek-ai/dsh-llm` 同口径），
+  否则以 link 方式挂载时模块解析不到 dsh 自带的副本。
+
+### 变更：doctor 新增第 9 项检查
+
+`scripts/doctor.mjs` 现在会**静态比对** profile 里每个 `@deepseek-ai/*` 包声明的精确版本要求与本机 dsh 版本，
+对不上的直接判红并给出修法。原因是 dsh 挂载时会把版本不符的插件行**静默跳过**，只在 stderr 说一句
+`disabling profile plugin row …`：用户看到的是「工具少了」，而不是「装错了」。
+
+实测背景：headless profile 里的 `@deepseek-ai/dsh-tool-fs-search@0.2.1-rc.5` 就是这样丢了 `glob` / `grep`，
+几十次 bench 跑批都没发现（32 条历史结果全部带这个偏差）。
+
+### 脚本：runDshCapture
+
+`scripts/lib/run-dsh.mjs` 增加 `runDshCapture()`（`spawnSync`，同时拿 stdout/stderr），供需要读 stderr 的检查使用；
+`execFileSync` 只回 stdout，而上面的告警只写在 stderr 上。
+
 ## 未发版修正（2026-11-08，`main` 上，不升版号）
 
 > 按作者要求：**不升版本号、不发 Release**。这批是 CI、脚本细节与随包文档的修正，对外的身份仍是 0.3.0（npm 与 Release 都没动），装法不变。

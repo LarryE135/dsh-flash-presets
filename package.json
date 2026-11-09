@@ -97,10 +97,15 @@
     "./alias": {
       "default": "./lib/alias-plugin.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./delivery-gate": {
+      "default": "./lib/delivery-gate.js"
+    }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.2.3-0 || >=0.2.2-0 <0.2.3-0"
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.2.3-0 || >=0.2.2-0 <0.2.3-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.5 <0.2.3-0",
+    "zod": "*"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-llm": {

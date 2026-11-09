@@ -384,3 +384,13 @@
 - insert:
     - id: flash-presets-alias
       name: 'dsh-flash-presets/alias'
+# 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌。
+# 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。
+- insert:
+    - id: delivery-gate
+      name: 'dsh-flash-presets/delivery-gate'
+      config:
+        enabled: false
+        scripts:
+          - verify.sh
+        maxRounds: 2

@@ -72,13 +72,30 @@ const ALIAS_ROW = [
   "      name: 'dsh-flash-presets/alias'",
 ].join('\n');
 
+
+// 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌
+// （最多 maxRounds 次），而不是让模型「如实地」交付部分分。默认 enabled: false —— 它会在用户
+// 会话里跑工作区的脚本，属于要用户显式打开的开关。实测见 docs/实测证据.md。
+const GATE_ROW = [
+  '',
+  '# 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌。',
+  '# 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。',
+  '- insert:',
+  '    - id: delivery-gate',
+  "      name: 'dsh-flash-presets/delivery-gate'",
+  '      config:',
+  '        enabled: false',
+  '        scripts:',
+  '          - verify.sh',
+  '        maxRounds: 2',
+].join('\n');
 function compose() {
   const parts = SOURCES.map(rel => {
     const abs = path.join(repo, rel);
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + ALIAS_ROW + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {
