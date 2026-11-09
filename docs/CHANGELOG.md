@@ -69,6 +69,7 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 同时更正一处口径：v4-bench 里「10/32 运行超 250k token」是**累计 token**（每次请求求和，含 cache 读），不是上下文峰值。
 
 因此 `presets/*.patch.yml` 里那段注释改写为可核对的表述（原句「长会话里大量步数停在 300k 以上」在 109 次测量里没有出现过）。顺手测了真正起作用的旋钮（O01，n=4）：pruner 8192 → 2048 每次 token 中位 297k → 228k，但 office 床 Q 无分辨力，暂不下发布结论。
+补测长文（LongBench lb2 8 题，n=1）走势相反：2048 反而从 66.9k 涨到 83.9k（截断后反复重读），准确率不变（两臂同 2/8）—— **pruner 也不是免费旋钮，保留 8192**。
 
 ## 未发版修正（2026-11-08，`main` 上，不升版号）
 
@@ -406,7 +407,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 - **P1-2 peer 自动安装旧包**：`@deepseek-ai/dsh-llm` 从 `"*"` 收窄到同区间，并加 `peerDependenciesMeta.optional`（与 `plugins/plan-mode-ui/package.json` 一致），避免 `npm i -g` 拉进 2026-08 的 0.0.1-rc.1。
 - **P1-5 预设数量/id 五处打架（部分完成）**：中英文 README 与 `cordis.patch.yml` 头注释模板统一为「两个预设：lite（13 条，默认）+ balance（3 条）；旧 id 由运行时 alias 解析，不建兼容卡」；**版本表没同步**——`docs/版本与兼容性.md:84-90` 当时仍是「一张卡三个组件」、`preset-flash-lean-ptc-v3（兼容别名）`、「补丁层里的三条 insert」，与 README 的两个预设正面冲突，留给 0.2.7 重写；删掉 README 里把 0.2.7–0.2.9 当成已发布版本的段落（改为指向本文件「同日迭代」）；删掉英文版里不存在的 `presets/flash-lean-ptc-v3-alias.patch.yml` 引用。
 - **P1-6 计划模式安装说明三套说法**：统一为「计划模式与常驻运行时只有 `dsh plugin add dsh-flash-presets` 才装；`install.sh` / `install.ps1` 只写两行预设」。删掉不存在的包名 `dsh-plan-mode-ui` 及对应命令，两个安装器的完成文案同步。
-- **P1-7 README 说「不动宿主」不成立（本轮未做）**：0.2.6 定稿时 README 顶部**没有改动**——当时的 `README.md:17` 写的是「不改宿主代码，也不动共享工具注册表」，与同页「插件在运行时为 `glob` / `grep` 补上只读并发标记」直接矛盾；三项全局生效说明与关闭开关 `DSH_FLASH_PRESETS_CONCURRENCY=0` / `DSH_FLASH_PRESETS_ALIAS=0` 当时也都没写进 README（全文只有 `DSH_FLASH_PRESETS_SELFCHECK_HEAL`）。该页在本文件定稿后已另行修改，不属 0.2.6。开关本身在代码里已有（`lib/tool-concurrency.js` / `lib/preset-alias.js`），缺的是文档；留给 0.2.7。
-- **P1-8 alias 表泄漏本机实验 id**：`presets/legacy-preset-map.json` 只保留本包真实发布过的 5 个 id（`flash-lean`、`flash-lean-ptc`、`-v1`、`-v2`、`-v3`），移除 `code` / `win-control` / `codex-contract-v1` / `-v3b` / `-v3-1` / `-v3-max` / `-v3-none` 以及全部 `sessions` 计数与本机备注。个人 id 改用新环境变量 `DSH_FLASH_PRESETS_ALIAS_EXTRA=<json>` 追加，不随包发布。
-- **P1-9 会话改写说法矛盾**：README 只保留「默认关闭，`DSH_FLASH_PRESETS_HEAL=1` 才开」；`files` 移除 `scripts/retarget-session-presets.mjs` 等会写会话的维护脚本（仍留在仓库）。
-- **P2-1 根包缺 `type` / `engines.node`，CI 用 Node 20**：加 `"type": "module"` 与 `engines.node >= 22.15`；CI 的 verify job 从 Node 20 升到 24。
