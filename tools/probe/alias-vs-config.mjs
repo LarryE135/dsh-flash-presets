@@ -10,7 +10,7 @@
 //   node tools/probe/alias-vs-config.mjs                    # 等价于 --composed
 //
 // 不覆盖什么：真实的「建会话 → 升级 → resume」。那一步需要能跑模型的 provider，
-// CI 里没有凭据，只能人工（见 docs/审计索引-0.2.9.md 第 7 节）。
+// CI 里没有凭据，只能人工（见 docs/审计索引.md 第 7 节）。
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
