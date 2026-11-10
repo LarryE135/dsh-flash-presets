@@ -10,6 +10,18 @@
 
 > 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
 
+### 措辞：v1/v2 的规则差异警告不再给一个走不通的办法（第七轮审计 A7）
+
+别名层命中 `rulesDiffer` 的 id 时会警告「规则变了」，原来那句建议是「在自己的 profile 补丁里加回原来那一行」。问题在于：v1/v2 是 0.2.5 时代的卡，**那几行在 DSH 0.2.2 上本身就加载不了**，照做不生效。
+
+改成两条真能走的路：① 继续用 0.2.8 或更早的版本打开这段对话；② 照警告里给出的原规则参数，用当前语法自建一条同规则的预设。警告里同时带出这条的历史参数（「14 条 / 0.3·50k」这类），不必再去翻 map 文件。
+
+测试跟着加严：`plugins/plan-mode-ui/test/preset-alias.mjs` 第 ⑨ 组断言警告里**不许出现「加回」**、且必须写明 `0.2.8` 这条退路；把措辞改回旧说法时该断言必然失败（已反向验证）。
+
+### 守卫：`check-preset-compat` 在发行包里直说原因（第七轮审计 #24）
+
+这个脚本要从每个历史 tag 里读预设定义才能判定兼容性，而 npm 包里既没有 `.git` 也没有 tag —— 以前它先抛一条 git 报错，看起来像「东西坏了」。现在开头先看有没有 `.git`，没有就说明原因、给出克隆命令并 exit 0。
+
 ### 新增：升级后旧会话能否打开的自动化守卫（第七轮审计 A5）
 
 这类回归的症状是「装上新版，旧会话直接打不开」，而且是**静默**的 —— 只有打开那个会话时才炸；此前没有任何测试覆盖它。
@@ -463,12 +475,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
   - 验证：`desktop` profile 实机安装后，用一次性诊断插件调 `agentPresets.list()`，两个预设均无 `broken`；`--dump-config` 本包预设行 2 条、`persistent-in-memory` 1 处、`plan-mode-ui` 1 处。
 - **升级注意（0.2.5 → 0.2.6）**
   - `flash-lean-ptc-v3` 不再作为独立预设定义：旧 id 由运行时兼容层解析，按 id 恢复的历史会话**无需重选**；但 `agent-preset-registry` 的 `selectedDefault` 若仍指向旧 id，**仍需手改**（alias 只兜底解析，不改 profile 配置），否则新建会话报 `Unknown agent preset: flash-lean-ptc-v3`。
-  - `flash-lean-ptc-v3-lite` 的语义变了：0.2.5 时期它是 3 条规则的弱约束版，0.2.6 起是 13 条规则的默认版；原来的 3 条版本改名为 `flash-lean-ptc-v3-balance`（order 26）。
-  - `desktop` / `headless` / `acp` 只在启动时读补丁层，装完必须完全退出再启动；`web` 刷新页面即可。替换后卡片仍然红，说明还有别的行不匹配，按上面 `broken` 字符串的格式继续排查。
-  - 自定义预设时不要写 `@deepseek-ai/dsh-tool-subagent-control/list-agents`：DSH 0.2.2 起该子路径已移除，写了会让整份预设失效。
-
-- **预设重命名为两个，语义按「约束强度」重新排列**：
-  - `flash-lean-ptc-v3-lite`（显示名「轻量PTC-v3 lite」，13 条规则，order 27，**默认**）：原 `flash-lean-ptc-v3` 的自由精确改名，描述改为「效率最高的轻量预设，适用于绝大部分日常工作」。
-  - `flash-lean-ptc-v3-balance`（显示名「轻量PTC-v3 balance」，3 条规则，order 26）：原 `flash-lean-ptc-v3-lite` 改名，描述改为「约束较弱的预设，适用于需要模型发挥的场景」。
-  - `flash-lean-ptc-v3` 不再作为独立预设定义；旧 id 由运行时兼容层解析，按 id 恢复的历史会话无需重选（兼容层见下方 0.3.0）。
-  - `v3-max`（7 条）与 `v3-none`（0 条）仍在 `presets/` 之外，只保留在评测协议 `arm-v3max.yml` / `arm-v0.yml` 里作对照臂。

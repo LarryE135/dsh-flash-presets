@@ -130,8 +130,12 @@ export function installPresetAliases(ctx, service, map, options) {
       if (entryW !== undefined && entryW.rulesDiffer === true) {
         warned.add(from);
         try {
-          console.warn('[preset-alias] 注意：' + from + ' 的规则与 ' + to + ' 不同，该会话现在按 ' + to + ' 的规则运行；'
-            + '要保留原规则，请在自己的 profile 补丁里加回 ' + from + ' 那一行（见 presets/legacy-preset-map.json 的 note）。');
+          // 措辞不能再让人「加回那一行」（第七轮审计 A7）：v1/v2 是 0.2.5 时代的卡，那几行在 DSH 0.2.2 上
+          // 本身就加载不了，加回去不生效。给两条真能走的路，并把这条的历史参数写出来。
+          const why = entryW && typeof entryW.note === 'string' && entryW.note ? '（原规则：' + entryW.note + '）' : '';
+          console.warn('[preset-alias] 注意：' + from + ' 的规则与 ' + to + ' 不同' + why + '，该会话现在按 ' + to + ' 的规则运行；'
+            + '要保留原规则只有两条路：① 继续用 0.2.8 或更早的版本打开这段对话；'
+            + '② 照上面的参数用当前语法自建一条同规则的预设（v1/v2 的原始行在 DSH 0.2.2 上本身就加载不了，照抄一遍也不生效）。');
         } catch (e) {}
       }
     }

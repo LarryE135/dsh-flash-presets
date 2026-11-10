@@ -26,6 +26,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// npm 发行包里没有 .git（也没有历史 tag），本脚本从第一步就无从判定（第七轮审计 #24）。
+// 与其先抛一条 git 报错让人以为坏了，不如直说原因并以 0 退出。
+if (!fs.existsSync(path.join(repo, '.git')) && !process.env.GIT_DIR) {
+  console.log('本份是 npm 发行包（没有 .git 与历史 tag）：这一项要读每个历史 tag 的定义才能判定，只在完整克隆里可用。');
+  console.log('  完整仓库：git clone https://github.com/LarryE135/dsh-flash-presets && npm run verify');
+  process.exit(0);
+}
 const ID_RE = /^\s*(?:- )?id: (flash-lean-ptc[\w-]*|flash-lean|codex-contract-v[0-9]+|light-ptc[\w-]*)\s*$/gm;
 /** 冻结 id：这两个是发行包的两张卡，永远不许消失、也不许被豁免掉。 */
 const FROZEN = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance'];

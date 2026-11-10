@@ -6,7 +6,7 @@
 //   - mount/select 只有在 id **真的没定义**时才换成 canonical（T2-2：不许劫持用户自己建的同名预设）；
 //   - 完全陌生的 id 必须照原样抛 not-found；
 //   - 上游同步函数必须仍然同步返回（返回 Promise 会把调用方全打坏）；
-//   - rulesDiffer 的别名首次命中要打印警告（T0-2：规则变化必须可见）。
+//   - rulesDiffer 的别名首次命中要打印警告（T0-2：规则变化必须可见），且措辞不能给走不通的办法（A7）。
 import assert from 'node:assert/strict';
 import { loadAliasMap, installPresetAliases } from '../lib/preset-alias.js';
 
@@ -90,10 +90,16 @@ assert.throws(() => service.resolve('totally-unknown'), (e) => e.code === 'agent
 // ⑧ rulesDiffer 警告（flash-lean 命中过一次）
 const ruleWarnings = captured.filter((w) => w.includes('规则与'));
 assert.ok(ruleWarnings.length >= 1, 'rulesDiffer 的别名必须打印过警告');
+// ⑨ 警告不能给一个走不通的办法（第七轮审计 A7）：v1/v2 的原行在 DSH 0.2.2 上加载不了，
+//    「加回那一行」等于空话；必须给出「留在 0.2.8 以前」这条真能走的路。
+for (const w of ruleWarnings) {
+  assert.ok(!/加回/.test(w), 'rulesDiffer 警告不该再让人「加回那一行」：' + w.slice(0, 80));
+  assert.ok(/0\.2\.8/.test(w), 'rulesDiffer 警告要写明「继续用 0.2.8 或更早版本」这条退路：' + w.slice(0, 80));
+}
 
 await new Promise((resolve) => setTimeout(resolve, 30));
 assert.equal(status.selfCheck, 'ok', '自检必须把别名解析到 canonical（T2-1）');
 
 console.warn = realWarn;
 console.info = realInfo;
-console.log('preset-alias: 9 组断言全部通过（含 Promise.reject 形态）');
+console.log('preset-alias: 10 组断言全部通过（含 Promise.reject 形态与 rulesDiffer 措辞）');
