@@ -187,6 +187,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 为什么需要：P15654 的实测里，三份实现都在结束语里**如实**写了「17–19 超时 / 未覆盖」，然后照常交付 —— 缺的不是自述，是「不达标就不许结束」。
 - 打开方式：把该行的 `enabled` 改成 `true`（`cordis.patch.yml` 末段的 `delivery-gate` 行），或临时设 `DSH_DELIVERY_GATE=1`；关掉用 `enabled: false` 或 `DSH_DELIVERY_GATE=0`。
 - 脚本约定：默认找工作区根目录的 `verify.sh`（可用 `scripts` 配置改），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
+- 注意：出厂配置把这行写成 `enabled: false`，而插件自身默认是**开**的 —— 想保持关闭就别删 `config` 块。
 
 ## 注意事项
 

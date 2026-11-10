@@ -188,6 +188,15 @@ The same plugin card carries a plan-mode component, plan-mode v1 (1.0.0). Within
 - Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 17% more tokens (median 40.2k vs 34.3k) and about 33% more time (196 s vs 147 s) ([changelog](docs/CHANGELOG.md), Chinese).
 - If you don't want it, switch the component off on the card. The presets behave exactly the same without it.
 
+## Delivery gate (optional component, off by default)
+
+The same card also ships a delivery gate, `delivery-gate`. It needs no rule text: at the end of a turn it runs your acceptance script for you. If the workspace contains `verify.sh` it runs once, and the turn only finishes when it passes; a failure is fed back to the model, which keeps working.
+
+- Why: in the P15654 runs all three implementations *honestly* wrote "17-19 timed out / not covered" in their closing message and shipped anyway. What was missing was not self-reporting but a "you may not finish while it fails" mechanism.
+- Turning it on: set `enabled: true` on that row (the `delivery-gate` row near the end of `cordis.patch.yml`), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
+- Script contract: it looks for `verify.sh` in the workspace root by default (change it via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
+- Note: the shipped row sets `enabled: false`, while the plugin's own default is `true` -- keep the `config` block if you want it off.
+
 ## Getting the most out of it
 
 - **State the goal and how success is checked.** The sharper the criteria, the better the result; when the boundaries are fuzzy, pair it with plan or goal mode. The P15654 comparison is in [measured evidence](docs/实测证据.md).
