@@ -10,6 +10,21 @@
 
 > 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
 
+### 新增：升级后旧会话能否打开的自动化守卫（第七轮审计 A5）
+
+这类回归的症状是「装上新版，旧会话直接打不开」，而且是**静默**的 —— 只有打开那个会话时才炸；此前没有任何测试覆盖它。
+
+`scripts/verify-session-compat.mjs` 在临时 `DSH_HOME` 里造 10 类会话（5 个历史 id / 2 个现役 id / 内建 `ptc` / 没有 `agentPreset` / header 写旧 id 而最后一条 `agent-preset/selected` 写新 id），交给真正的解析器判：
+
+- `audit-compat` 必须 exit 0：5 个历史 id 走别名层、4 类按定义、1 类 none、零孤儿、零结构可疑；
+- **反向控制 1**：`--no-alias`（脚本安装形态）时那 5 类必须判「解析不到」且 exit 1 —— 证明测试有牙；
+- **反向控制 2**：塞一个不存在的 id，必须进 orphan 且 exit 1；
+- `doctor --sessions` 的 `[7]` 段必须是通过态、无 `✗`。
+
+顺带修了 `audit-compat` 的两个盲点：`rosterFromDump` 现在把内建预设（`standard` / `minimal` / `ptc` / `cordis`）并进 roster —— 它们由上游组合包提供，dump 里不一定逐条出现，之前会把内建预设的会话误报成孤儿。
+
+校验项随之变化：`npm run verify` 增加这一步，CI 另加同名步骤。
+
 ### 修复：doctor / audit-compat 在空环境下误报（第七轮审计 A3）
 
 三处误报，都会把「没问题」说成「有问题」：
@@ -457,12 +472,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
   - `flash-lean-ptc-v3-balance`（显示名「轻量PTC-v3 balance」，3 条规则，order 26）：原 `flash-lean-ptc-v3-lite` 改名，描述改为「约束较弱的预设，适用于需要模型发挥的场景」。
   - `flash-lean-ptc-v3` 不再作为独立预设定义；旧 id 由运行时兼容层解析，按 id 恢复的历史会话无需重选（兼容层见下方 0.3.0）。
   - `v3-max`（7 条）与 `v3-none`（0 条）仍在 `presets/` 之外，只保留在评测协议 `arm-v3max.yml` / `arm-v0.yml` 里作对照臂。
-- 依据：三床 × 四臂实测（决策 15 次/臂、hard 9 次/臂、算法 10 次/臂）显示 persona 规则条数对质量与 token 均无可测差异（配对比 0.86–1.42，Bonferroni 后无一显著）；同时长任务注意力评测里 v3 在长文阅读轴出现可判定退化（−4.00 [−7.60, −1.20]），故不做进一步削减，也不保留无人格对照组作为发布项。
-- 校验脚本、安装器、doctor 与中英 README 改为两预设口径（`verify-runtime` 断言预设行数为 2）；**版本表当时没有同步**——仍是「一张卡三个组件 / 兼容别名 / 三条 insert」（见下文「第三方审计修复」P1-5 与本节末的措辞更正）。
-
-### 发布验证（2026-11-06 晚：全新安装 + 同环境 A/B）
-
-- **tag `v0.2.6` 的指向（如实记录）**：该 tag 在 2026-11-06 19:38–20:29 之间先后指向 6 个提交（`702472b` → `a8f041b` → `efff2d8` → `2a337ad` → `ed68fc9` → `8f069d9`），最终停在 `8f069d9` 并**已冻结，后续改动只进新版本号**。按 tag 安装的用户，锁文件钉住的是各自安装那一刻 tag 所指的提交——所以同一个名字 0.2.6 实际对应过 6 个不同提交；Release 附件也在 20:29 按 `8f069d9` 重传。
-- **CI（提交 `8f069d9`，即 tag `v0.2.6` 最终指向的提交）**：`verify (ubuntu-24.04 / windows-latest / macos-latest)` + `integration` + `bundle-install` + `plugin-tests (22 / 24)` 全部 success（`canary` 只在每周 cron 跑，本次 skipped 属正常）。
-  这之前从 `cf955ac` 起 CI **一直是红的**，原因是三处**过期断言**：① `selftest-integration.sh` 写死 `[7] dsh --dump-config`，而 doctor 新增「旧会话的预设 id」小节后该检查漂到 `[8]`；② `verify-runtime.mjs` 写死「预设行数 3」，而 0.2.6 只装 lite / balance 两个；③ `verify-versions.mjs` 要求 `dist/` 附件名带**插件版本**，与真实约定（组合包附件按 tag 命名，如 `dsh-flash-presets-v0.2.6.zip`）冲突。三处分别改为「按小节标题匹配」「从 `SHIPPED` 推导行数」「两类附件各按各的版本口径」。
-- **全新安装（空 `DSH_HOME`）**：`dsh plugin --profile web add dsh-flash-presets-0.2.6.tgz` → `+1 package`、475 ms（pnpm 离线）。安装包内 `lib/{tool-concurrency,preset-alias,composition-check,compat-heal,index}.js` 与仓库 sha256 **逐个相同**；`--dump-config` 里 `ptc-runtime → executionMode: persistent-in-memory`、`preset-flash-lean-ptc-v3-lite` / `-balance` 各 1 行，`verify-runtime.mjs` 对该 dump 断言通过；把**安装包里的 `lib/`** 直接喂给插件测试：12 passed / 0 failed（含「executable 钩子：决策点即时标记（不依赖扫描）」）。

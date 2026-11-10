@@ -333,6 +333,11 @@ jobs:
           grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
           grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | grep -q "dsh-flash-presets/core" || { echo "::error::flash-presets-core 的 name 应为 dsh-flash-presets/core"; exit 1; }
 
+      # 升级回归守卫（第七轮审计 A5）：造 10 类会话（5 个历史 id + 现役 + 内建 + 无 id + 事件覆盖 header），
+      # 交给真正的解析器判「能不能打开」；另带两个反向控制（去掉别名层、塞孤儿 id 必须判红）。
+      - name: 断言升级后旧会话仍能打开（A5 会话兼容守卫）
+        run: node scripts/verify-session-compat.mjs
+
   canary:
     name: canary (dsh latest)
     if: github.event_name == 'schedule'

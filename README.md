@@ -253,6 +253,7 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 npm run verify          # 合成一致性、YAML、预设结构、文本审计、版本一致性、基准防泄漏等
 npm run bench:office    # 办公基准的结构与完整性校验（只在仓库里可用，npm 包不含 benchmarks/）
 bash scripts/selftest.sh
+node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开（10 类合成会话，含两个反向控制）
 ```
 
 > 这三条都要求**完整克隆**（`git clone` 下来的仓库）。npm 发行包只带运行需要的那部分脚本与两份预设：

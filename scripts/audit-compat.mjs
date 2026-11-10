@@ -67,7 +67,9 @@ function aliasMap() {
 // 只扫目录里的 yml 是不可靠的——profiles/ 下还有别的 profile（acp 等）和一堆 .bak-*，
 // 曾经因此把 codex-contract-v1 / -v2 误判成“已定义”，掩盖了 117 个打不开的会话。
 function rosterFromDump(text) {
-  const ids = new Set();
+  // 内建预设由上游 web 组合包提供，dump 里不一定逐条出现（精简 home、或只挂部分行时就没有）。
+  // 它们的定义来自上游包本身，不可能「缺失」，所以先并进来 —— 否则内建预设的会话会被报成孤儿。
+  const ids = new Set(BUILTIN);
   const lines = text.split('\n');
   let name = null;
   for (let i = 0; i < lines.length; i++) {

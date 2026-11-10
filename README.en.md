@@ -260,6 +260,7 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 npm run verify          # composition, YAML, preset structure, text lint, version consistency, benchmark leak guard, and more
 npm run bench:office    # structure and integrity checks for the office benchmark (repo only; the npm package excludes benchmarks/)
 bash scripts/selftest.sh
+node scripts/verify-session-compat.mjs   # whether old sessions still open after an upgrade (10 synthetic sessions, two negative controls)
 ```
 
 `cordis.patch.yml` is composed from `presets/*.patch.yml`; don't edit it by hand — CI asserts the two match. The measurement table in this README is generated from `docs/bench-office-results.json`. See [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md) for how to contribute.
