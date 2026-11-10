@@ -250,8 +250,11 @@ if (AS_JSON) {
       console.log('   ' + r.effective + ' | ' + r.events + 'ev | ' + r.kb + 'KB | ' + r.date + ' | ' + r.project + ' | ' + r.title);
     }
     console.log('   修法：把 id 加进 presets/legacy-preset-map.json（不动会话文件），或跑 scripts/retarget-session-presets.mjs 一次性迁移。');
-  } else {
+  } else if (buckets.unresolved.length === 0) {
     console.log('✓ 没有孤儿 id：全部会话的 preset 都能解析');
+  } else {
+    // 上一段已经报过「本形态没有别名层」：此时再说「全部都能解析」是自相矛盾（第七轮审计 A3）。
+    console.log('   孤儿 id：0（上面那批不是孤儿，只是本形态缺别名层解析不到）');
   }
   if (damaged.length) {
     console.log('✖ 结构可疑会话：' + damaged.length);

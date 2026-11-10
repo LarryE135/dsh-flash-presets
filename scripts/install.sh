@@ -25,7 +25,7 @@ PROFILE="web"
 MODE="auto"
 ACTION="install"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# 0.2.6 起只发两个预设：lite（13 条，默认）与 balance（3 条）
+# 0.2.6 起只发两个预设：v3（lean-v3，默认）与 v3 balance（0.3.0 起 id 里不再带 lite 字样）
 PRESETS=(flash-lean-ptc-v3 flash-lean-ptc-v3-balance)
 FORCE=0
 # --with-runtime（旧名 --with-plan-mode，保留为别名）：额外往 profile 补丁层追加
@@ -121,7 +121,7 @@ install_modern() {
   echo
   echo "安装完成。web profile 是 live reload：无需重启，刷新 GUI 即可在预设列表看到"
   echo "「精简·PTC v3（lean-v3）」与「精简·PTC v3 balance」。"
-  echo "  已写入：两行预设（lite / balance）。"
+  echo "  已写入：两行预设（v3 / v3 balance）。"
   echo "  升级须知：本脚本整块替换旧托管块 —— 0.2.5 时代的三卡（flash-lean-ptc-v1 / -v2）会被移除，"
   echo "  且这条路没有旧 id 兜底（别名层只随插件卡发行）。需要旧会话继续可打开，请改装插件卡。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："

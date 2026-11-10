@@ -244,6 +244,7 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 - 补丁含 `!!js` 标签，由 DSH 加载器解析，第三方 YAML 解析器会报 unknown tag。安装脚本在写入 profile 前会把它解析成普通值。
 - `glob` / `grep` 的只读并发标记只在插件管理器安装时才有（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）；脚本安装路径本来就没有它。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
 - 计划模式组件的两个开关也可以从环境变量给：`DSH_PLAN_TODO_SYNC=off|remind|strict`（默认 `remind`）控制是否提醒/强制写 todo，`DSH_PLAN_LAG_TURNS=<n>`（默认 2）是进度落后几回合才提示；等价于插件配置里的 `todoSync` / `lagTurns`。
+- 计划模式的档位状态对其他监听 `planMode` 的插件是可见的。若同时装了会在计划模式下注入提醒的插件（例如 `chatgpt-subscription`），纯问答（只说话、不调工具）的回合可能被判成「没做完」而**再答一遍**。缓解：这类会话把计划模式档位切到 `off`。
 - 开发与测试主要围绕洛谷公开题库和上面的办公基准，其他类型任务的表现缺少数据。
 
 ## 开发与校验

@@ -251,6 +251,7 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 - The patch contains `!!js` tags that the DSH loader resolves; third-party YAML parsers report an unknown tag. The install script resolves them to plain values before writing to the profile.
 - The `glob` / `grep` concurrency marks only exist in a plugin-manager install (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them); the script install never has them. Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
 - The plan-mode component also reads two environment variables: `DSH_PLAN_TODO_SYNC=off|remind|strict` (default `remind`) controls whether todo writes are reminded or required, and `DSH_PLAN_LAG_TURNS=<n>` (default 2) is how many turns behind the run may fall before a nudge; they mirror the `todoSync` / `lagTurns` plugin config keys.
+- The plan-mode tier is visible to other plugins that watch `planMode`. If you also run a plugin that injects reminders while plan mode is on (e.g. `chatgpt-subscription`), a pure Q&A turn — one that only talks and calls no tools — may be judged unfinished and **answered twice**. Mitigation: set the plan-mode tier to `off` in such sessions.
 - Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
 
 ## Development and checks

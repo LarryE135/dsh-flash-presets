@@ -10,6 +10,28 @@
 
 > 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
 
+### 修复：doctor / audit-compat 在空环境下误报（第七轮审计 A3）
+
+三处误报，都会把「没问题」说成「有问题」：
+
+1. **脚本安装 + 一个会话都没有时，`doctor --all` 判红并 exit 1。** 随包不带旧会话扫描器（`migrate-legacy-preset-ids.mjs` 会写会话，故不发布），那一段就在没有扫描器时无条件 `bad('本形态没有兼容层…')` —— 全新安装、`sessions/` 根本不存在也照判红。现在先看有没有会话：没有就 `ok('没有会话目录…本项无需检查')`；有会话但判不了，改用 `warn` 说明「本份安装没有扫描器，无法逐条确认」，不再计入失败。
+2. **脚本安装形态把「托管块里有兼容行」的 -lite 会话也算成打不开。** 升级路径会给 `-lite` 留一行兼容行（见 `[3]` 的处置），块内有定义就该能打开。现在按「块内有没有定义」判定，只把既无别名层、块内也无定义的 id 判红。
+3. **audit-compat 一边报 `✖ 本形态没有别名层…解析不到`，下一行又打 `✓ 没有孤儿 id：全部会话的 preset 都能解析`。** 两句话互斥。现在只有在没有未解析会话时才打那句 ✓，否则改打「孤儿 id：0（上面那批只是缺别名层）」。
+
+实测（解包的 npm 包 + 空的 `DSH_HOME`）：修前 `doctor --all` exit 1；修后 exit 0、`✗` 零行、输出 `✓ 没有会话目录（~/.dsh/sessions），本项无需检查`。
+
+### 文档：计划模式与 chatgpt-subscription 叠加的已知限制（issue #22）
+
+计划模式的档位状态对监听 `planMode` 的插件是可见的；`chatgpt-subscription`（0.62.0–0.63.1）在这种状态下会给「只说话、不调工具」的回合注入提醒，于是模型再答一遍。两版 README 的「已知限制 / Known limitations」都补了这条，并给出缓解办法（这类会话把档位切到 `off`）。机制是读代码确认的，本机没有复现到「答两遍」。
+
+### 守卫：别名行与两份冻结预设不许 `disabled`（A8）
+
+别名行一旦 `disabled: true`，旧会话就整体打不开；预设行一旦 `disabled`，卡片从列表里消失——两者都不报错，只有 `compose --check` 会拦。`scripts/verify-core.mjs` 加了 8 条断言（组合包里这四行存在 + 行级 `disabled` 不存在），校验项 145 → 153。反向验证：给别名行种一行 `disabled: true`，`verify-core` exit 1。
+
+### 措辞：install.sh 不再叫「lite / balance」（issue #25）
+
+0.3.0 起 id 里就没有 lite 字样了（`flash-lean-ptc-v3` / `-balance`），安装脚本的注释与收尾提示还写着 `lite / balance`，容易让人去找不存在的卡片。改成就地叫 `v3 / v3 balance`。
+
 ### 修复：子代理的「选模型 / 列模型」开关在 DSH 0.2.2 上一直是关的（issue #21）
 
 `tool-subagent` 在 DSH 0.2.2-alpha.2 把 `modelSelectionSettings` 拆成了 `modelSelection`（能不能让子代理选模型）与 `modelDiscovery`（能不能先列出可选模型）。预设只写了旧名，而 0.2.2 只读新名 —— 结果是 **`engines` 区间里的新版上这两个功能一直是关的，且不报错**（`z.object` 非 strict，未知键直接 strip）。
@@ -444,8 +466,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 - **CI（提交 `8f069d9`，即 tag `v0.2.6` 最终指向的提交）**：`verify (ubuntu-24.04 / windows-latest / macos-latest)` + `integration` + `bundle-install` + `plugin-tests (22 / 24)` 全部 success（`canary` 只在每周 cron 跑，本次 skipped 属正常）。
   这之前从 `cf955ac` 起 CI **一直是红的**，原因是三处**过期断言**：① `selftest-integration.sh` 写死 `[7] dsh --dump-config`，而 doctor 新增「旧会话的预设 id」小节后该检查漂到 `[8]`；② `verify-runtime.mjs` 写死「预设行数 3」，而 0.2.6 只装 lite / balance 两个；③ `verify-versions.mjs` 要求 `dist/` 附件名带**插件版本**，与真实约定（组合包附件按 tag 命名，如 `dsh-flash-presets-v0.2.6.zip`）冲突。三处分别改为「按小节标题匹配」「从 `SHIPPED` 推导行数」「两类附件各按各的版本口径」。
 - **全新安装（空 `DSH_HOME`）**：`dsh plugin --profile web add dsh-flash-presets-0.2.6.tgz` → `+1 package`、475 ms（pnpm 离线）。安装包内 `lib/{tool-concurrency,preset-alias,composition-check,compat-heal,index}.js` 与仓库 sha256 **逐个相同**；`--dump-config` 里 `ptc-runtime → executionMode: persistent-in-memory`、`preset-flash-lean-ptc-v3-lite` / `-balance` 各 1 行，`verify-runtime.mjs` 对该 dump 断言通过；把**安装包里的 `lib/`** 直接喂给插件测试：12 passed / 0 failed（含「executable 钩子：决策点即时标记（不依赖扫描）」）。
-- **A 在新装里立刻生效**：启动即 `[tool-concurrency] 已启用（目标 glob,grep；全局视图 未注册；已挂载会话 0）→ 会话挂载预设后会补标记`；首个会话挂上后立刻出现 `已标记 glob,grep（全局视图 + 1 个会话作用域，共 2 处）｜调度器判据 glob=true grep=true（最近会话）` —— 不等任何定时扫描，决策点钩子按预期工作。
-- **同环境 A/B（一步里三个 grep，同一句提示词）**：
-  - A 开：`65949→68440(2491ms) / 65951→68447 / 65951→68450` ⇒ **并行**，跨度 2501 ms，各自之和 7486 ms（起始相差 2 ms，窗口完全重叠）。
-  - A 关（`DSH_FLASH_PRESETS_CONCURRENCY=0` 重启同一 home）：`8624→11578(2954ms) / 11580→11942(362ms) / 11943→12147(204ms)` ⇒ **串行**，跨度 3523 ms ≈ 各自之和 3520 ms。
-  - 结论：并发来自本插件（而不是 DSH 默认行为），且**新装第一轮就生效**。

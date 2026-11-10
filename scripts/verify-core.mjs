@@ -10,6 +10,8 @@
 //   ④ 工具还没注册时说「未生效 + 原因」，不假装成功。
 import { coreStatus } from "../lib/core.js";
 import core from "../lib/core.js";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 const problems = [];
 const check = (ok, label, detail) => {
@@ -78,6 +80,20 @@ try {
   console.warn = warn0;
 }
 check(missingLogs.some((l) => /未生效/.test(l) && /工具尚未注册/.test(l)), "工具缺失时打「未生效 + 原因」", missingLogs.join(" | ").slice(0, 160));
+
+
+// ⑤ 组合配置（第七轮审计 A8）：别名行与两份冻结预设不能是 disabled —— 那会让「旧会话可打开」
+// 与「预设能选」静默失效，而 compose --check 是唯一会拦的地方。行的键写在缩进 6，插件行的
+// disabled 在缩进 12 以上，因此只认 /^ {6}disabled: true/ 这一层，不会误伤「停用某个工具」。
+const composedPath = fileURLToPath(new URL("../cordis.patch.yml", import.meta.url));
+const composed = await readFile(composedPath, "utf8");
+const rowBlocks = composed.split(/\n(?=- insert:)/);
+const rowOf = (id) => rowBlocks.find((b) => new RegExp("^(?:\\s*)- id: " + id.replace(/[-]/g, "\\-") + "$", "m").test(b));
+for (const id of ["flash-presets-core", "flash-presets-alias", "preset-flash-lean-ptc-v3", "preset-flash-lean-ptc-v3-balance"]) {
+  const b = rowOf(id);
+  check(!!b, "组合配置里有 " + id + " 这一行");
+  if (b) check(!/^ {6}disabled: true/m.test(b), id + " 不是 disabled（行级）");
+}
 
 if (problems.length > 0) {
   console.error("✖ run_code 优化 A 的「安装即优化」未兑现（" + problems.length + " 处）：");

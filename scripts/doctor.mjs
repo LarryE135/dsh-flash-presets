@@ -288,6 +288,9 @@ if (fs.existsSync(stateFile)) {
 
 // ── 7. 旧会话的预设 id ──────────────────────────────────────────────────────
 // 会话把预设 id 写进 header；0.2.6 改了 id，旧会话不迁移就解析不到（一次性 runner 直接拒绝）。
+// 脚本安装形态下「托管块里有定义」的历史 id 是能打开的（升级路径会给 -lite 留一行兼容行，
+// 见 [3] 的处置），所以判断能不能打开要看块内定义，而不是一律按「没有别名层」判红。
+const legacyInBlock = new Set(LEGACY_IDS.filter((id) => insideCount(id) > 0));
 console.log('[7] 旧会话的预设 id');
 if (!flag('--sessions') && !flag('--all')) {
   info('跳过（加 --sessions 或 --all 才扫会话；' + path.join(home, 'sessions') + '）');
@@ -298,12 +301,18 @@ if (!flag('--sessions') && !flag('--all')) {
   if (typeof scanSessions !== 'function') {
     const ids = (() => { try { return Object.keys(loadAliasMap().aliases); } catch { return []; } })();
     info('本份安装没有带旧会话扫描器（随包只发布只读组件）');
-    if (bundleInstalled) {
+    const sessionsDir = path.join(home, 'sessions');
+    const hasSessions = (() => { try { return fs.existsSync(sessionsDir) && fs.readdirSync(sessionsDir).length > 0; } catch { return false; } })();
+    if (!hasSessions) {
+      // 全新安装、一个会话都没有时判红是误报（第七轮审计 A3）：没有会话就没有打不开的会话。
+      ok('没有会话目录（' + sessionsDir + '），本项无需检查');
+    } else if (bundleInstalled) {
       info('旧 id 由运行时兼容层解析，会话无需迁移：' + (ids.length ? ids.join('、') : '见 presets/legacy-preset-map.json'));
+    } else if (legacyInBlock.size > 0) {
+      info('脚本安装形态：托管块里定义了 ' + [...legacyInBlock].join('、') + '，这些 id 的会话能打开；其余历史 id 没有别名层');
     } else {
       // 脚本安装只往补丁里写托管块，没有 flash-presets-alias 这一行 —— 别名层根本不存在（第六轮 U1-3）。
-      bad('本形态没有兼容层（脚本安装不装 flash-presets-alias）：这些历史 id 的会话打不开');
-      problems.push('脚本安装形态下存在无法解析的历史 preset id');
+      warn('本形态既没有别名层、托管块里也没有历史 id 的定义：若存在旧 id 的会话会打不开（本份安装没有扫描器，无法逐条确认）');
       info('两条路：① 改装插件卡（自带别名层）；② 在自己的 profile 补丁里加回原预设行');
     }
   } else {
@@ -317,9 +326,15 @@ if (!flag('--sessions') && !flag('--all')) {
       if (bundleInstalled) {
         ok('无需处理：这些 id 由运行时兼容层解析（presets/legacy-preset-map.json），不改写任何会话文件');
       } else {
-        bad('本形态没有兼容层：上面这些会话打不开（脚本安装只写托管块）');
-        problems.push('脚本安装形态下有打不开的历史 preset 会话');
-        info('两条路：① 改装插件卡；② 在 profile 补丁里加回原预设行（见 docs/版本与兼容性.md）');
+        // 托管块里有定义的历史 id 是可解析的（脚本安装的兼容行），只有块内也没有的才真打不开。
+        const blocked = pending.filter(([id]) => !legacyInBlock.has(id));
+        if (blocked.length === 0) {
+          ok('都能打开：这些 id 在托管块里有定义（脚本安装的兼容行）');
+        } else {
+          bad('这些历史 id 既没别名层、托管块里也没有定义 → 对应会话打不开：' + blocked.map(([id, c]) => id + ' ×' + c).join('、'));
+          problems.push('脚本安装形态下有打不开的历史 preset 会话');
+          info('两条路：① 改装插件卡；② 在 profile 补丁里加回原预设行（见 docs/版本与兼容性.md）');
+        }
       }
     }
   }
