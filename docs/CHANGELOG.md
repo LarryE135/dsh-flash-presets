@@ -10,6 +10,14 @@
 
 > 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
 
+### npm：0.2.2–0.2.9 的弃用提示语已订正（第七轮审计 A4）
+
+0.2.2 / 0.2.3 / 0.2.4 三条的提示语原来照抄了 0.2.5 的原因（「0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话」），但那句话跟这三个版本无关；0.2.8 / 0.2.9 干脆没有弃用标记。现在五条各自写自己的事实（id 差异、安装层误报、被 0.3.0 取代），全部指向 `dsh-flash-presets@0.3.0`。
+
+**顺带纠正一条此前的错误结论**：`0.2.5` 那节写着「Automation token 已随 npm 收紧 bypass-2FA 一并失效，不要再依赖它」。失效的是 **classic** token；**Granular Access Token 勾上「Bypass two-factor authentication」仍然有效** —— 本次五条弃用就是这样发出去的（账号仍是 `auth-and-writes`，全程没有输入一次性验证码）。以后要发布或改 dist-tag，走这条路。
+
+复现：`npm view dsh-flash-presets@0.2.8 deprecated`；`dist-tags.latest` 仍是 `0.3.0`，未被弃用。
+
 ### 措辞：v1/v2 的规则差异警告不再给一个走不通的办法（第七轮审计 A7）
 
 别名层命中 `rulesDiffer` 的 id 时会警告「规则变了」，原来那句建议是「在自己的 profile 补丁里加回原来那一行」。问题在于：v1/v2 是 0.2.5 时代的卡，**那几行在 DSH 0.2.2 上本身就加载不了**，照做不生效。
@@ -470,8 +478,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
 
 - **发布前修正：DSH 0.2.2-rc.1 下两张「Agent 预设」卡片显示「加载失败」**（本机实机复现并修复）
   - 现象：GUI「设置 → Agent 预设」里 `轻量PTC-v3 lite` 与 `轻量PTC-v3 balance` 都带红标「加载失败」；`agentPresets/list` 的 `broken` 为 `tool-subagent-list-agents (@deepseek-ai/dsh-tool-subagent-control/list-agents): never started`，新建会话用不了这两个预设。
-  - 原因：两个预设都声明了 `- id: tool-subagent-list-agents` / `name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'`。DSH 0.2.2-rc.1 把 `list_agents` 并进 `@deepseek-ai/dsh-tool-subagent-control` 主插件，`exports` 只剩 `"."`，子路径 `./list-agents` 已不存在；该行 import 失败，**整份预设**被判 broken。0.2.1-rc.x 上这行有效，所以在旧版本上测不出来。
-  - 修法：两份 `presets/*.patch.yml` 删掉这个两行条目（`list_agents` 由 `tool-subagent-control` 主插件自带，能力不减），重新合成 `cordis.patch.yml`；`verify-yaml.mjs` 增加断言，禁止再出现该子路径。
-  - 验证：`desktop` profile 实机安装后，用一次性诊断插件调 `agentPresets.list()`，两个预设均无 `broken`；`--dump-config` 本包预设行 2 条、`persistent-in-memory` 1 处、`plan-mode-ui` 1 处。
-- **升级注意（0.2.5 → 0.2.6）**
-  - `flash-lean-ptc-v3` 不再作为独立预设定义：旧 id 由运行时兼容层解析，按 id 恢复的历史会话**无需重选**；但 `agent-preset-registry` 的 `selectedDefault` 若仍指向旧 id，**仍需手改**（alias 只兜底解析，不改 profile 配置），否则新建会话报 `Unknown agent preset: flash-lean-ptc-v3`。
