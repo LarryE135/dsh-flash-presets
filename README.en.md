@@ -196,6 +196,7 @@ The same card also ships a delivery gate, `delivery-gate`. It needs no rule text
 - Turning it on: set `enabled: true` on that row (the `delivery-gate` row near the end of `cordis.patch.yml`), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
 - Script contract: it looks for `verify.sh` in the workspace root by default (change it via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
 - Note: the shipped row sets `enabled: false`, while the plugin's own default is `true` -- keep the `config` block if you want it off.
+- **Version note:** the delivery gate landed on `main` after 0.3.0, so **npm 0.3.0 does not contain it** (no `lib/delivery-gate.js` in the tarball, no such row in `cordis.patch.yml`). To use it today install from git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`; the npm path needs the next release.
 
 ## Getting the most out of it
 

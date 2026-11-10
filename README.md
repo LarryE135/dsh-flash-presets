@@ -188,6 +188,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 打开方式：把该行的 `enabled` 改成 `true`（`cordis.patch.yml` 末段的 `delivery-gate` 行），或临时设 `DSH_DELIVERY_GATE=1`；关掉用 `enabled: false` 或 `DSH_DELIVERY_GATE=0`。
 - 脚本约定：默认找工作区根目录的 `verify.sh`（可用 `scripts` 配置改），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
 - 注意：出厂配置把这行写成 `enabled: false`，而插件自身默认是**开**的 —— 想保持关闭就别删 `config` 块。
+- **版本提示**：交付门是 0.3.0 之后才加进 `main` 的，**npm 上的 0.3.0 里没有它**（包内既无 `lib/delivery-gate.js`，`cordis.patch.yml` 里也没有这一行）。想现在就用，从 git 装：`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`；走 npm 的话请等下一版。
 
 ## 注意事项
 
