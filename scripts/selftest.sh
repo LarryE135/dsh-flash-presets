@@ -232,7 +232,8 @@ grep -q 'function Invoke-Gh' scripts/publish.ps1 \
 STUBG="$TMP/ghbin"; mkdir -p "$STUBG"
 printf '#!/bin/sh\necho "proxy=$HTTPS_PROXY"\n' > "$STUBG/gh"; chmod +x "$STUBG/gh"
 FUNC="$(sed -n '/^GH_PROXY=/,/^}$/p' scripts/publish.sh)"
-GOT="$(PATH="$STUBG:$PATH" bash -c "$FUNC; gh_ ping" 2>/dev/null)"
+  # 继承的 HTTPS_PROXY 会污染断言（端口不通时 gh_ 按设计「继承环境」）：先清空再测
+GOT="$(env -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY -u all_proxy PATH="$STUBG:$PATH" bash -c "$FUNC; gh_ ping" 2>/dev/null)"
 if (exec 3<>/dev/tcp/127.0.0.1/10808) 2>/dev/null; then WANT="proxy=http://127.0.0.1:10808"; else WANT="proxy="; fi
 [ "$GOT" = "$WANT" ] && ok "gh_ 的环境前缀随端口有无切换（当前期望 ${WANT}）" \
   || bad "gh_ 环境前缀不对：拿到 [$GOT]，期望 [$WANT]"

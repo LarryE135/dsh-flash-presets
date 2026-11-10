@@ -10,6 +10,18 @@
 
 > 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
 
+### 修复：子代理的「选模型 / 列模型」开关在 DSH 0.2.2 上一直是关的（issue #21）
+
+`tool-subagent` 在 DSH 0.2.2-alpha.2 把 `modelSelectionSettings` 拆成了 `modelSelection`（能不能让子代理选模型）与 `modelDiscovery`（能不能先列出可选模型）。预设只写了旧名，而 0.2.2 只读新名 —— 结果是 **`engines` 区间里的新版上这两个功能一直是关的，且不报错**（`z.object` 非 strict，未知键直接 strip）。
+
+实测（本机 dsh 0.2.2-rc.1）：`@deepseek-ai/dsh-tool-subagent/lib/index.js:304-305` 声明 `modelSelection` / `modelDiscovery`，全文没有 `modelSelectionSettings`。
+
+改法：两份预设同时写三个字段（旧版读旧名、新版读新名，互不干扰）；顺手删掉 4 处 `backgroundMode` —— 在整个 `engines` 区间里没有任何代码读它。
+
+### 修复：自测里的 gh 代理用例会被环境变量污染
+
+`scripts/selftest.sh` 的「gh_ 的环境前缀」用例在继承 `HTTPS_PROXY` 的环境里必然失败（端口不通时 `gh_` 按设计「继承环境」，而断言期望空）。改为在子 shell 里先 `env -u` 三个代理变量再测。
+
 ### 修复：run_code 优化 A 现在「装上即生效」（独立成行 `flash-presets-core`）
 
 **问题。** 0.3.0 把优化 A（给 `glob` / `grep` 补 `isConcurrencySafe`，让同轮多个搜索并行）写在 `lib/index.js` 的 `apply()` 里，而那一行是 `plan-mode-ui`。两个后果：
@@ -437,14 +449,3 @@ Release 说明里记了这次移动，zip 附件也按新标签重新打包覆�
   - A 开：`65949→68440(2491ms) / 65951→68447 / 65951→68450` ⇒ **并行**，跨度 2501 ms，各自之和 7486 ms（起始相差 2 ms，窗口完全重叠）。
   - A 关（`DSH_FLASH_PRESETS_CONCURRENCY=0` 重启同一 home）：`8624→11578(2954ms) / 11580→11942(362ms) / 11943→12147(204ms)` ⇒ **串行**，跨度 3523 ms ≈ 各自之和 3520 ms。
   - 结论：并发来自本插件（而不是 DSH 默认行为），且**新装第一轮就生效**。
-- **复现**：隔离实例起在 3099（自带 `--patch` 只把模型指向本机 WB Proxy，不改安装内容），用带 token 的入口打开会话发同一句提示词，然后用本机私有的并发测量脚本（`measure-tool-concurrency.mjs`，不随包发布，参数 `--dsh-home <隔离 home>`）跑一遍。测量时看每批的 `⇒ 并行/串行` 结论，别只看脚本末尾那句汇总（只要存在任一并行批它就会打印「并发确实发生」）。
-- 同版本其它校验：`npm run verify` 退出 0（含 `sync-lib --check`、`check-ps1`）；插件测试 25 项通过；四层对齐审计存储层 1622/1622、reject 0、无幽灵目录、`aliased 0 / orphan 0`；实机 DSH 0.2.2-rc.1（WSL）与 0.2.1-rc.5。
-
-### 第三方审计修复（2026-11-06 晚，P0/P1/P2 处理）
-
-审计报告共 36 条（P0 1 / P1 13 / P2 16 / P3 6）。本轮只处理**不改规则文本、不改预设行为**的部分；代码级改动另行排期（见本节末「未做」）。
-
-- **P0-1（npm 上 0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话）**：README 明确「npm 上的 0.2.5 不可用；0.2.6 上 npm 之前从 GitHub / Release 附件安装」，安装节首选 `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.2.6`。但审计建议的「脚本安装与插件卡安装**二选一**、切换前先 `--uninstall`」这两句**没有**写进 README（全文无「二选一」，卸载节也没有切换前先卸的说明），留给 0.2.7。npm 端仍需 `npm login` 后 `npm deprecate dsh-flash-presets@0.2.5 "DSH 0.2.2-rc.1+ 下预设无法加载，请用 0.2.6+"` 并发布 0.2.6（本机 token 已过期）。
-- **P1-1 DSH 版本闸放错位置**：`engines` 原来嵌在 `dsh` 对象里，而 `dsh-app-boot` 只读**顶层** `fields.engines`（已核对该文件 1098-1102 行），等于没有任何闸。现改为顶层 `engines: { dsh: ">=0.2.1-rc.5 <0.2.3-0", node: ">=22.15" }`，`dsh.engines` 删除。
-- **P1-2 peer 自动安装旧包**：`@deepseek-ai/dsh-llm` 从 `"*"` 收窄到同区间，并加 `peerDependenciesMeta.optional`（与 `plugins/plan-mode-ui/package.json` 一致），避免 `npm i -g` 拉进 2026-08 的 0.0.1-rc.1。
-- **P1-5 预设数量/id 五处打架（部分完成）**：中英文 README 与 `cordis.patch.yml` 头注释模板统一为「两个预设：lite（13 条，默认）+ balance（3 条）；旧 id 由运行时 alias 解析，不建兼容卡」；**版本表没同步**——`docs/版本与兼容性.md:84-90` 当时仍是「一张卡三个组件」、`preset-flash-lean-ptc-v3（兼容别名）`、「补丁层里的三条 insert」，与 README 的两个预设正面冲突，留给 0.2.7 重写；删掉 README 里把 0.2.7–0.2.9 当成已发布版本的段落（改为指向本文件「同日迭代」）；删掉英文版里不存在的 `presets/flash-lean-ptc-v3-alias.patch.yml` 引用。
