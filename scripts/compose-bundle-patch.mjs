@@ -50,6 +50,19 @@ const RUNTIME = [
   '    executionMode: persistent-in-memory',
 ].join('\n');
 
+// run_code 优化 A（glob/grep 只读并发安全）**单独成行**：0.3.x 它搭的是 plan-mode-ui 的车——
+// 关掉计划模式、或用只挂部分行的精简组合，优化就静默消失；而且 plan-mode-ui 的 inject 含
+// webServer / systemPrompt，宿主缺任一个就停在 pending，连带 A 也不跑（headless、部分桌面端）。
+// 这一行只 inject tools / agents，装包即生效。实现见 lib/core.js + lib/tool-concurrency.js。
+const CORE_ROW = [
+  '',
+  '# run_code 优化 A（glob/grep 只读并发安全）：独立成行，装包即生效，与计划模式开不开无关。',
+  '# 关闭（优先级从高到低）：DSH_FLASH_PRESETS_CONCURRENCY=0 ＞ 本行 config.toolConcurrency.enabled=false ＞ 默认开启。',
+  '- insert:',
+  '    - id: flash-presets-core',
+  "      name: 'dsh-flash-presets/core'",
+].join('\n');
+
 // 计划模式（plan-mode v1）是本包的第三个组件：宿主半边由包根的 main（lib/index.js）提供，
 // 浏览器半边由 dsh.client 声明。这一行把组件挂到 profile，插件列表里显示在 dsh-flash-presets 卡下。
 // 注意 name 必须是本包名：解析器按 name 去找模块入口。
@@ -95,7 +108,7 @@ function compose() {
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + CORE_ROW + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

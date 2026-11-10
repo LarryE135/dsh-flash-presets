@@ -323,6 +323,16 @@ jobs:
           grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
           grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | grep -q "enabled: false" || { echo "::error::delivery-gate 默认应为 enabled: false"; exit 1; }
 
+      # run_code 优化 A 从 0.4 起是独立行：0.3.x 它搭的是 plan-mode-ui 的车，关掉计划模式就静默消失。
+      # 这条只守「独立成行 + name 正确」，真正的生效由单元守卫 scripts/verify-core.mjs 覆盖。
+      - name: 断言 run_code 优化 A 是独立行（flash-presets-core）
+        run: |
+          n=$(grep -c "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" || true)
+          echo "flash-presets-core: $n"
+          [ "$n" -ge 1 ] || { echo "::error::flash-presets-core 未进入组合配置（优化 A 又搭到别的行上了）"; exit 1; }
+          grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
+          grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | grep -q "dsh-flash-presets/core" || { echo "::error::flash-presets-core 的 name 应为 dsh-flash-presets/core"; exit 1; }
+
   canary:
     name: canary (dsh latest)
     if: github.event_name == 'schedule'

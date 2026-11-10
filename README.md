@@ -48,7 +48,16 @@
 另外两项随包生效：
 
 - 工具面使用 PTC（`tool-presentation: ptc`），PTC 运行时改为会话内常驻（`ptc-runtime: persistent-in-memory`）。实测每个 program 的固定启动成本从 108 ms 降到约 0（按收益模型计），嵌套工具调用从 44 ms 降到 15 ms（[压测记录](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md)）。收益随单个 program 内的调用次数线性增长，只跑一条命令的短任务几乎无感。
-- 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行（仅插件管理器安装的 web / desktop profile；脚本安装没有这一项，`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）。
+- 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行。启动日志里会打一行自检，排障只认它：
+
+  ```
+  [tool-concurrency] v0.3.0 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
+  ```
+
+  - **两个状态要分清**：npm 上的 0.3.0 把这一项搭在计划模式那一行上——宿主没有 `webServer`（headless、部分桌面端）时整行停在 `pending`，优化**不生效也不报错**；`main` 上已拆成独立行 `flash-presets-core`，装上包就生效，下一个版本带上。
+  - **关闭方式**（优先级从高到低）：环境变量 `DSH_FLASH_PRESETS_CONCURRENCY=0` ＞ 该行 `config.toolConcurrency.enabled=false` ＞ 默认开启。
+  - **覆盖范围**：只有 `glob` / `grep`；要扩到别的只读工具，在该行 `toolConcurrency.tools` 里列出。
+  - **旧路径已废弃**：早期用 `scripts/tune-runtime.mjs` 改 `node_modules` 里 fs-search 的源码，从 DSH 0.2.2-rc.1 起那条路径就不存在了；受支持的只有运行期在内存里给已注册的定义对象打补丁。
 
 逐项原理与源码行号见[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)。
 

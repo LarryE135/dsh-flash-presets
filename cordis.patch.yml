@@ -380,6 +380,11 @@
 - id: ptc-runtime
   config:
     executionMode: persistent-in-memory
+# run_code 优化 A（glob/grep 只读并发安全）：独立成行，装包即生效，与计划模式开不开无关。
+# 关闭（优先级从高到低）：DSH_FLASH_PRESETS_CONCURRENCY=0 ＞ 本行 config.toolConcurrency.enabled=false ＞ 默认开启。
+- insert:
+    - id: flash-presets-core
+      name: 'dsh-flash-presets/core'
 # 计划模式组件（plan-mode v1）：宿主半边与浏览器半边都来自本包。
 - insert:
     - id: plan-mode-ui

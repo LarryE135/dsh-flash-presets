@@ -153,15 +153,28 @@ function witnessOf(tools, targets, scope) {
  */
 export function installToolConcurrency(ctx, options) {
   const opts = options !== null && typeof options === "object" ? options : {};
+  // 版本号与状态回调由挂载方（lib/core.js）传入：日志带版本，排障只认这一行。
+  const VERSION = typeof opts.version === "string" && opts.version.length > 0 ? opts.version : "0.0.0";
+  const report = typeof opts.onStatus === "function" ? opts.onStatus : () => {};
   if (opts.enabled === false || process.env.DSH_FLASH_PRESETS_CONCURRENCY === "0") {
-    say("info", TAG + " 未启用（toolConcurrency.enabled=false 或 DSH_FLASH_PRESETS_CONCURRENCY=0）");
-    return { installed: false, reason: "disabled" };
+    const why = process.env.DSH_FLASH_PRESETS_CONCURRENCY === "0" ? "env:DSH_FLASH_PRESETS_CONCURRENCY=0" : "config:toolConcurrency.enabled=false";
+    say("info", TAG + " v" + VERSION + " 未启用｜原因=" + why + "｜（默认开启；去掉这条配置或环境变量即可恢复）");
+    report({ active: false, reason: why, witness: "n/a", scopes: 0 });
+    return { installed: false, reason: why };
   }
   const targets = parseTargets(opts.tools);
   const sweepMs = Number.isFinite(Number(opts.sweepMs)) && Number(opts.sweepMs) >= 1000 ? Math.floor(Number(opts.sweepMs)) : DEFAULT_SWEEP_MS;
   const targetSet = new Set(targets);
   // lazy：决策点勾子上“顺手”标上的定义（不在扫描列表里），卸载时也要撤
-  const state = { tools: null, marked: new Map(), loggedScopes: 0, timers: new Set(), hook: null, lazy: new Set() };
+  const state = { tools: null, marked: new Map(), loggedScopes: 0, loggedWitness: false, timers: new Set(), hook: null, lazy: new Set() };
+
+  /** 唯一一行自检日志：版本 / 目标 / 扫描间隔 / 调度器判据 / 作用域数。 */
+  const lineOf = () => {
+    const scopes = state.marked.size - (state.marked.has("__global__") ? 1 : 0);
+    return TAG + " v" + VERSION + " 生效｜targets=" + targets.join(",") + "｜sweep=" + sweepMs + "ms｜witness="
+      + witnessOf(state.tools, targets, undefined) + "｜scopes=" + scopes;
+  };
+  const scopesOf = () => state.marked.size - (state.marked.has("__global__") ? 1 : 0);
 
   const remember = (key, names, scope) => {
     if (names.length === 0) return;
@@ -192,14 +205,19 @@ export function installToolConcurrency(ctx, options) {
       added += result.marked.length;
     }
     if (!quiet) {
-      const scopes = state.marked.size - (state.marked.has("__global__") ? 1 : 0);
-      if (scopes > state.loggedScopes) {
+      const witness = witnessOf(tools, targets, undefined);
+      const active = witness.includes("=true");
+      const scopes = scopesOf();
+      report({ active, reason: active ? null : "not-marked", witness, scopes });
+      if (active && !state.loggedWitness) {
+        state.loggedWitness = true;
+        state.loggedScopes = scopes;
+        say("info", lineOf());
+      } else if (scopes > state.loggedScopes) {
         state.loggedScopes = scopes;
         let total = 0;
         for (const entry of state.marked.values()) total += entry.names.length;
-        const sample = list.length > 0 ? list[list.length - 1] : undefined;
-        say("info", TAG + " 已标记 " + targets.join(",") + "（全局视图 + " + scopes + " 个会话作用域，共 " + total + " 处）｜调度器判据 "
-          + witnessOf(tools, targets, sample) + (sample === undefined ? "（全局）" : "（最近会话）"));
+        say("info", TAG + " 作用域 +" + scopes + "（共标 " + total + " 处）｜witness=" + witness);
       }
     }
     return added;
@@ -213,17 +231,16 @@ export function installToolConcurrency(ctx, options) {
     ctx.inject(["tools", "agents"], (child) => {
       const warmup = setTimeout(() => {
         try {
-          const before = state.marked.size;
           sweep(child, false);
-          // 首次诊断始终打一行：证明模块确实在跑，并说明“还没标记”是正常的等待态
-          if (state.marked.size === before) {
+          // 首次诊断始终打一行：要么「生效」，要么「未生效 + 原因」，不留静默态
+          if (!state.loggedWitness) {
             const tools = state.tools;
-            const globalDef = tools === null ? undefined : getDef(tools, targets[0]);
-            const agents = serviceOf(child, "agents");
-            let count = 0;
-            try { const list = agents !== null && typeof agents.list === "function" ? agents.list() : []; count = Array.isArray(list) ? list.length : 0; } catch (error) {}
-            say("info", TAG + " 已启用（目标 " + targets.join(",") + "；全局视图 " + (globalDef === undefined ? "未注册" : "已注册")
-              + "；已挂载会话 " + count + "）→ 会话挂载预设后会补标记");
+            const first = targets[0];
+            const def = tools === null || tools === undefined ? undefined : getDef(tools, first);
+            say("info", TAG + " v" + VERSION + " 未生效｜原因="
+              + (def === undefined ? "工具尚未注册（" + first + " 不在本宿主的工具表里）" : "判据还不是 true")
+              + "｜会话挂载后会自动补标");
+            report({ active: false, reason: def === undefined ? "tool-missing" : "not-marked", witness: witnessOf(tools, targets, undefined), scopes: scopesOf() });
           }
         } catch (error) {}
       }, WARMUP_MS);

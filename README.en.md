@@ -49,7 +49,16 @@ Four mechanisms, each acting at a different point in a session:
 Two more things come with the bundle:
 
 - Tools are presented through PTC (`tool-presentation: ptc`), and the PTC runtime stays resident for the whole session (`ptc-runtime: persistent-in-memory`). Measured: the fixed startup cost per program dropped from 108 ms to about 0 (per the cost model), and nested tool calls from 44 ms to 15 ms ([benchmark notes](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md), in Chinese). The gain grows linearly with the number of calls inside a program; a short task that runs a single command will barely notice.
-- The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel (plugin-manager installs of web / desktop only; the script install doesn't have it; `DSH_FLASH_PRESETS_CONCURRENCY=0` disables it).
+- The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel. A one-line self-check is printed at startup -- that is the line to read first when troubleshooting:
+
+  ```
+  [tool-concurrency] v0.3.0 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
+  ```
+
+  - **Two states to keep apart**: npm 0.3.0 rides on the plan-mode row -- on a host without `webServer` (headless, some desktop setups) that row stays `pending`, so the optimization never runs and never complains. On `main` it is its own row, `flash-presets-core`, which takes effect as soon as the package is installed; the next release ships it.
+  - **Turning it off** (highest priority first): env `DSH_FLASH_PRESETS_CONCURRENCY=0` > that row's `config.toolConcurrency.enabled=false` > on by default.
+  - **Scope**: `glob` and `grep` only. For other read-only tools, list them in that row's `toolConcurrency.tools`.
+  - **Deprecated path**: the old `scripts/tune-runtime.mjs` edited fs-search inside `node_modules`; that file has not existed since DSH 0.2.2-rc.1. Patching registered definitions in memory at runtime is the only supported route.
 
 For the reasoning behind each setting, with source line references, see the [four mechanisms write-up](docs/技术文档-省token四机制.md) (Chinese).
 
