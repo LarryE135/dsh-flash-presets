@@ -87,8 +87,9 @@ await check("install：全局 + 会话作用域都标记，并打出调度器判
     assert.equal(r.installed, true);
     assert.equal(globalDefs.glob.isConcurrencySafe({ pattern: "*" }), true);
     assert.equal(scoped.s1.glob.isConcurrencySafe({ pattern: "*" }), true, "会话作用域应被标记");
-    assert.ok(logs.some((l) => l.includes("已标记 glob,grep")), "应打印已标记：" + logs.join(" | "));
-    assert.ok(logs.some((l) => l.includes("调度器判据") && l.includes("glob=true")), "应打印判据：" + logs.join(" | "));
+    // 0.2.7 起自检合并成一行：`v<版本> 生效｜targets=…｜sweep=…｜witness=…｜scopes=N`（见 d867535）
+    assert.ok(logs.some((l) => l.includes("生效") && l.includes("targets=glob,grep")), "应打印生效行：" + logs.join(" | "));
+    assert.ok(logs.some((l) => l.includes("witness=") && l.includes("glob=true")), "应打印判据：" + logs.join(" | "));
     disposer();
     assert.equal(globalDefs.glob.isConcurrencySafe, undefined, "卸载应撤销全局标记");
     assert.equal(scoped.s1.glob.isConcurrencySafe, undefined, "卸载应撤销会话标记");
@@ -158,13 +159,18 @@ await check("日志随作用域增长：每个新会话各一条，不刷屏", a
       effect(factory) { disposer = factory(); }
     };
     installToolConcurrency(ctx, { sweepMs: 300 });
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // 首次扫描要等 WARMUP_MS=1200；sweepMs<1000 会回落到默认 500，所以这里等足 1.6 s。
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    const first = logs.filter((l) => l.includes("生效") && l.includes("scopes="));
+    assert.equal(first.length, 1, "首次只应打一行自检：" + logs.join(" | "));
+    assert.ok(first[0].includes("scopes=1"), "首次的作用域数应为 1：" + first[0]);
     list.push(agentB);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, 1200));
     assert.equal(scoped.b.glob.isConcurrencySafe({ pattern: "*" }), true, "新会话的作用域应被标记");
-    const lines = logs.filter((l) => l.includes("已标记 glob"));
-    assert.ok(lines.length >= 2, "应至少两条：" + logs.join(" | "));
-    assert.ok(lines[lines.length - 1].includes("+ 2 个会话作用域"), "最后一条应显示 2 个作用域：" + lines.join(" | "));
+    const lines = logs.filter((l) => l.includes("作用域 +"));
+    assert.equal(lines.length, 1, "新增一个会话只应打一条增长日志：" + logs.join(" | "));
+    assert.ok(lines[0].includes("作用域 +2"), "应显示 2 个作用域：" + lines[0]);
+    assert.ok(logs.length <= 3, "不该刷屏：" + logs.join(" | "));
     if (disposer) disposer();
   });
 });

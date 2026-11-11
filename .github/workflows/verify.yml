@@ -19,6 +19,9 @@ jobs:
   verify:
     name: verify (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # macOS 的 runner 明显更慢（同一套 npm run verify 在 macOS 上 15 分钟没跑完被掐）。
+    # 给 macOS 单独的预算，别让它连带取消其它 job 的判断。
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 35 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -37,6 +40,7 @@ jobs:
       # js-yaml 必须早于安装步骤：安装器会调用 verify-yaml，缺依赖时它会返回 2（跳过）。
       - name: Install js-yaml
         shell: bash
+        timeout-minutes: 6
         run: npm install --no-save --silent js-yaml@4
 
       # 权威闸门：`npm run verify` 是 10 个检查串联的唯一入口（sync-lib 一致性 / YAML / 结构 / 文本审计 /
@@ -45,16 +49,19 @@ jobs:
       # 于是「lib/ 忘了同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里是绿的。
       - name: 权威闸门（npm run verify）
         shell: bash
+        timeout-minutes: 12
         run: npm run verify
 
       # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
       - name: 别名表 × 合成配置
         shell: bash
+        timeout-minutes: 5
         run: node tools/probe/alias-vs-config.mjs --composed
 
       # 发布面卫生 + 办公基准复核清单：prepublishOnly 会跑，但 CI 之前一次都没跑过（同样属于「本地过、CI 不过」的盲区）。
       - name: 发布面卫生与基准复核清单
         shell: bash
+        timeout-minutes: 5
         run: |
           node scripts/verify-release-hygiene.mjs
           node scripts/bench-release-checklist.mjs
@@ -424,14 +431,24 @@ jobs:
           if ! node "$P/doctor.mjs" --profile web --all --warn-only > /tmp/doctor2.out 2>&1; then
             echo "::error::doctor --warn-only 不应退出非 0"; cat /tmp/doctor2.out; exit 1
           fi
-          if ! grep -qE '旧 id 由运行时兼容层解析|本形态没有兼容层' /tmp/doctor.out; then
+          # 第 7 节在「解包直跑」这种形态下的合法措辞：没有会话目录 → 本项无需检查；
+          # 有会话但没别名层 → 「本形态既没有别名层…」（第六轮 U1-3）。
+          if ! grep -qE '本项无需检查|本形态既没有别名层|旧 id 由运行时兼容层解析' /tmp/doctor.out; then
             echo "::error::doctor 第 7 节没有说明旧 id 的解析路径"; cat /tmp/doctor.out; exit 1
           fi
           # 这个 job 从解包目录直跑（没装插件卡）→ 没有别名层，doctor 必须说实话（第六轮 U1-3），
           # 不能再说「由运行时兼容层解析 ✓」。
-          if ! grep -q '本形态没有兼容层' /tmp/doctor.out; then
-            echo "::error::解包直跑没有别名层，doctor 却没说「本形态没有兼容层」"; cat /tmp/doctor.out; exit 1
+          if grep -q '旧 id 由运行时兼容层解析' /tmp/doctor.out; then
+            echo "::error::解包直跑没有别名层，doctor 却声称「由运行时兼容层解析」"; cat /tmp/doctor.out; exit 1
           fi
+          # 有会话时走另一条分支：必须点名「本形态既没有别名层…」，不能静默
+          mkdir -p "$DSH_HOME/sessions/s1"
+          printf '{"preset":"preset-flash-lean-ptc-lite"}\n' > "$DSH_HOME/sessions/s1/session.json"
+          node "$P/doctor.mjs" --profile web --all --warn-only > /tmp/doctor3.out 2>&1 || true
+          if ! grep -q '本形态既没有别名层' /tmp/doctor3.out; then
+            echo "::error::有会话时 doctor 没有说明「本形态既没有别名层」"; sed -n '/\[7\]/,/\[8\]/p' /tmp/doctor3.out; exit 1
+          fi
+          rm -rf "$DSH_HOME/sessions"
           # 打包件里 tune-runtime 要能真写进去、再撤干净（R1-2 那道回归的防线）
           node "$P/tune-runtime.mjs" --apply --profile web
           if ! grep -q 'persistent-in-memory' "$DSH_HOME/profiles/web/cordis.patch.yml"; then
