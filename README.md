@@ -45,23 +45,14 @@
 | 关闭插件 | 组装系统提示时 | 6 个插件 `disabled: true` | 这些工具的 schema 不进提示，固定省一笔 |
 | 行为纪律 | 模型每一步决策时 | persona 规则（lean-v3 13 条，balance 3 条） | 引导少读、批量调用、增量改写 |
 
-另外两项随包生效：
+另外两项runcode优化随包生效：
 
 - 工具面使用 PTC（`tool-presentation: ptc`），PTC 运行时改为会话内常驻（`ptc-runtime: persistent-in-memory`）。实测每个 program 的固定启动成本从 108 ms 降到约 0（按收益模型计），嵌套工具调用从 44 ms 降到 15 ms（[压测记录](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/压测-run_code开销.md)）。收益随单个 program 内的调用次数线性增长，只跑一条命令的短任务几乎无感。
 - 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行。启动日志里会打一行自检，排障只认它：
 
-  ```
-  [tool-concurrency] v0.3.0 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
-  ```
-
-  - **两个状态要分清**：npm 上的 0.3.0 把这一项搭在计划模式那一行上——宿主没有 `webServer`（headless、部分桌面端）时整行停在 `pending`，优化**不生效也不报错**；`main` 上已拆成独立行 `flash-presets-core`，装上包就生效，下一个版本带上。
-  - **关闭方式**（优先级从高到低）：环境变量 `DSH_FLASH_PRESETS_CONCURRENCY=0` ＞ 该行 `config.toolConcurrency.enabled=false` ＞ 默认开启。
-  - **覆盖范围**：只有 `glob` / `grep`；要扩到别的只读工具，在该行 `toolConcurrency.tools` 里列出。
-  - **旧路径已废弃**：早期用 `scripts/tune-runtime.mjs` 改 `node_modules` 里 fs-search 的源码，从 DSH 0.2.2-rc.1 起那条路径就不存在了；受支持的只有运行期在内存里给已注册的定义对象打补丁。
-
 逐项原理与源码行号见[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)。
 
-## 预设：lean-v3 + balance（发行包就这两张）
+## 预设：lean-v3 + balance
 
 | 预设 | id | 规则 | 压缩 | 何时用 |
 |---|---|---:|---|---|
@@ -97,9 +88,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 | 配置 | 办公基准 v1 | 相对标准模式 | 办公追加 v1 | 相对标准模式 |
 |---|---:|---:|---:|---:|
 | 标准模式 | 5.380 M（n=5） | — | 2.827 M（n=5） | — |
-| OPS + 标准模式 | 4.693 M（n=5） | −12.8% | 2.141 M（n=5） | −24.3% |
 | PTC 模式 | 3.553 M（n=5） | −34.0% | 1.560 M（n=5） | −44.8% |
-| OPS + PTC | 3.499 M（n=4） | −35.0% | 1.404 M（n=5） | −50.3% |
 | lean-v3 | 1.437 M（n=5） | −73.3% | 0.481 M（n=5） | −83.0% |
 <!-- bench-table:end -->
 
