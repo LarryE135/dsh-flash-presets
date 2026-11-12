@@ -265,6 +265,18 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 ## 版本历史
 
+### v0.3.1（2026-11-12）
+
+- **`run_code` 优化随安装即生效**：`glob` / `grep` 只读并发安全优化从 `plan-mode-ui` 独立成 `flash-presets-core` 一行，
+  只 `inject` `tools` / `agents`。此前关掉计划模式、或用只挂部分行的组合，优化会静默消失；headless 下更因 `plan-mode-ui`
+  停在 `pending` 而完全跑不到。关闭：`DSH_FLASH_PRESETS_CONCURRENCY=0` ＞ 行内 `toolConcurrency.enabled=false` ＞ 默认开启。
+- **修复子代理「选模型 / 列模型」在 DSH 0.2.2 上一直是关的**（#21）：两份预设补 `modelSelection` / `modelDiscovery`，
+  删掉 4 处没有任何代码读的 `backgroundMode`。
+- **新增交付门 `delivery-gate`**（默认关闭，需显式 `enabled: true`）与 `doctor` 第 9 项（profile 里会被静默禁用的插件）。
+- 旧会话兼容：新增 `verify-session-compat.mjs` 守卫（A5）；`doctor` / `audit-compat` 的空环境误报全修（A3）；
+  别名行与两份预设行不许 `disabled`（A8）。
+- **预设 id、规则文本、压缩阈值与裁剪参数均未改动**，装法不变（插件卡 / bundle / 脚本三条路照旧）。
+
 ### v0.3.0（2026-11-07）
 
 - 之后在 `main` 上陆续修正 CI 与随包文档（**不升版号、不发 Release**）：`verify` job 改跑 `npm run verify`、新增「文档陈述对账」lint、修 `tune-runtime --check` 与 `install.ps1` 的 `DSH_HOME` 泄漏、`publish.sh` 每次重打附件。预设 id / 规则 / 行为一律未变。

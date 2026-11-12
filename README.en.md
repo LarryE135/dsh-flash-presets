@@ -267,6 +267,16 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 ## Version history
 
+### v0.3.1 (2026-11-12)
+
+- **The `run_code` optimization now applies on install**: the `glob`/`grep` concurrency-safety patch is its own row
+  (`flash-presets-core`, injecting only `tools`/`agents`) instead of riding on `plan-mode-ui`, which silently dropped it in
+  headless or partial installs. Opt out with `DSH_FLASH_PRESETS_CONCURRENCY=0`.
+- **Fixed subagent model selection / discovery being off on DSH 0.2.2** (#21).
+- **New delivery gate** `delivery-gate` (disabled by default) and `doctor`'s 9th check.
+- Old-session compat guard (A5), empty-environment false alarms (A3), alias and preset rows must not be `disabled` (A8).
+- Preset ids, rule text and tuning values are unchanged.
+
 ### v0.3.0 (2026-11-07)
 
 - **Display names and descriptions only — no id, rule or behavior change**: `flash-lean-ptc-v3` now reads "the most token-efficient option, right for most everyday work"; `flash-lean-ptc-v3-balance` is shown as 精简·PTC v3 balance with the internal note dropped. DSH resolves presets by `config.id`; `config.name` is just picker text, so old sessions and old ids keep resolving.
