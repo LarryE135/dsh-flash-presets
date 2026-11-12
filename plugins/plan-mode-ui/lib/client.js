@@ -48,6 +48,9 @@ window.__ModuleLoader__.load({
     ];
 
     var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, autoApprove: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
+      // 全局默认值（设置页专用）：来自响应里的 settings.default，不受会话行覆盖。
+      // 与 tier/scope/max 分开存，否则设置页会被"当前会话的有效值"盖住，点完看着像没生效。
+      gTier: "light", gScope: "always", gMax: false, gAutoApprove: false,
       // 每个会话一份设置：切走再切回来还是自己的值；by 只存面板关心的几项
       by: {}, error: "" };
     function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, autoApprove: S.autoApprove, source: S.source }; }
@@ -244,13 +247,23 @@ window.__ModuleLoader__.load({
           var scope = pending ? S.scope : d.scope;
           var max = pending ? S.max : (d.max === true);
           var autoOn = pending ? S.autoApprove : (d.autoApprove === true);
+          // 全局默认值：设置页显示的是这一组，不是上面那组"当前会话有效值"。
+          // 服务端把两者分开返回（tier = 会话覆盖后的有效值，settings.default = 全局默认），
+          // 这里必须分开接收，否则设置页切档后会被 pull() 用会话值冲回原位。
+          var gDef = (d.settings !== undefined && d.settings !== null && d.settings.default !== undefined && d.settings.default !== null) ? d.settings.default : null;
+          var gTier = pending ? S.gTier : (gDef !== null && gDef.tier !== undefined ? gDef.tier : tier);
+          var gScope = pending ? S.gScope : (gDef !== null && gDef.scope !== undefined ? gDef.scope : scope);
+          var gMax = pending ? S.gMax : (gDef !== null && gDef.max !== undefined ? gDef.max === true : max);
+          var gAuto = pending ? S.gAutoApprove : (gDef !== null && gDef.autoApprove !== undefined ? gDef.autoApprove === true : autoOn);
           var nextPhase = typeof d.phase === "string" ? d.phase : (d.planning ? "planning" : "idle");
           // 原生计划模式是否开着：开着就把自己的入口让给原生胶囊（见 CSS .pmo-root[data-native='true']）
           var nativeOpen = d.native === true;
           var nextIndicator = typeof d.indicator === "string" && d.indicator.length > 0 ? d.indicator : null;
           var changed = tier !== S.tier || scope !== S.scope || max !== S.max || nextPhase !== S.phase
-            || autoOn !== S.autoApprove || nativeOpen !== S.native || nextIndicator !== S.indicator;
+            || autoOn !== S.autoApprove || nativeOpen !== S.native || nextIndicator !== S.indicator
+            || gTier !== S.gTier || gScope !== S.gScope || gMax !== S.gMax || gAuto !== S.gAutoApprove;
           S.tier = tier; S.scope = scope; S.max = max; S.autoApprove = autoOn; S.phase = nextPhase; S.native = nativeOpen;
+          S.gTier = gTier; S.gScope = gScope; S.gMax = gMax; S.gAutoApprove = gAuto;
           S.indicator = nextIndicator;
           // 生效来源：本会话覆盖 or 全局默认（面板上标出来，免得不知道自己在改哪一层）
           // pending 期间同样不能让服务端的旧来源盖回乐观值，否则勾/取消勾会闪一下"全局"
@@ -293,6 +306,10 @@ window.__ModuleLoader__.load({
           stow();
           var cached = S.by[sid];
           S.sid = sid;
+          // 换会话后上一轮提交留下的乐观宽限不再适用：它会让 pull() 继续用旧会话的
+          // 会话值，表现为"先显示之前的模式、1.5s 后才跳到正确的值"。
+          // 同会话内的 1500ms 防闪回窗口不受影响，这里只在切换瞬间结束它。
+          S.pendingUntil = 0;
           if (cached) {
             S.tier = cached.tier; S.scope = cached.scope; S.max = cached.max; S.autoApprove = cached.autoApprove === true; S.source = cached.source;
           }
@@ -316,6 +333,14 @@ window.__ModuleLoader__.load({
       var sid = currentSessionId();
       if (where === "session" && !sid) { S.commitError = "拿不到会话 id"; notify(); return; }
       Object.keys(patchObj).forEach(function (k) { S[k] = patchObj[k]; });
+      // 写全局时同步乐观更新设置页那一组值（g*），否则 pull() 会在 pending 结束后
+      // 用会话有效值把它冲掉，表现为"点了闪一下又回到原位"。
+      if (where === "global") {
+        if (patchObj.tier !== undefined) S.gTier = patchObj.tier;
+        if (patchObj.scope !== undefined) S.gScope = patchObj.scope;
+        if (patchObj.max !== undefined) S.gMax = patchObj.max;
+        if (patchObj.autoApprove !== undefined) S.gAutoApprove = patchObj.autoApprove;
+      }
       // 源标记立刻跟上（服务端下一次响应会复核，避免闪回"全局"）
       S.source = where === "session" ? "session" : "default";
       S.pendingUntil = Date.now() + 1500;
@@ -667,19 +692,19 @@ window.__ModuleLoader__.load({
               + " · 当前阶段：" + phaseText)
         ),
         setRow("强度", "关闭=直接开工；轻量=桥接到 DSH 自带计划模式（计划与评审卡都由原生负责，本插件不注入）；全量=同样走原生评审，批准后由本插件接管 PHASE 2 与 P0 验收。",
-          segControl(TIERS.map(function (t) { return { id: t.id, label: t.label, title: t.line }; }), s.tier,
+          segControl(TIERS.map(function (t) { return { id: t.id, label: t.label, title: t.line }; }), s.gTier,
             function (id) { commit({ tier: id }, "global"); })),
         setRow("生效范围", "每次=每个回合都先规划；自动=首轮+任务明显变化时；仅首轮=只规划第 1 回合。",
           segControl([
             { id: "always", label: "每次", title: "每个回合都先出计划再执行" },
             { id: "auto", label: "自动", title: "首轮必规划；之后只在任务明显变化时重新规划" },
             { id: "first", label: "仅首轮", title: "只有第 1 回合出计划" }
-          ], s.scope, function (id) { commit({ scope: id }, "global"); })),
+          ], s.gScope, function (id) { commit({ scope: id }, "global"); })),
         setRow("Max 模式", "注入「不用担心预算」的提示，抑制模型在预算受限时提前收手。",
-          switchControl("Max 模式", s.max === true, function (next) { commit({ max: next }, "global"); })),
+          switchControl("Max 模式", s.gMax === true, function (next) { commit({ max: next }, "global"); })),
         setRow("自动批准", "开启后计划评审自动通过、直接进入执行，不再等你点「批准」；只影响计划评审卡，不影响其它提问。"
-          + (s.tier === "off" ? " 当前档位为「关闭」，自动批准不会触发。" : ""),
-          switchControl("自动批准", s.autoApprove === true, function (next) { commit({ autoApprove: next }, "global"); }, s.tier === "off")),
+          + (s.gTier === "off" ? " 当前档位为「关闭」，自动批准不会触发。" : ""),
+          switchControl("自动批准", s.gAutoApprove === true, function (next) { commit({ autoApprove: next }, "global"); }, s.gTier === "off")),
         (s.commitError || s.error) ? React.createElement("div", { className: "pmo-err", role: "alert" }, "设置未生效：" + (s.commitError || s.error)) : null
       );
     }
@@ -692,6 +717,8 @@ window.__ModuleLoader__.load({
             why: why, anim: glyphInfo, hud: hud,
             state: function () {
               return { tier: S.tier, scope: S.scope, max: S.max, autoApprove: S.autoApprove, source: S.source, native: S.native,
+                // 设置页那一组（全局默认），与上面那组（当前会话有效值）分开看
+                gTier: S.gTier, gScope: S.gScope, gMax: S.gMax, gAutoApprove: S.gAutoApprove,
                 indicator: S.indicator, phase: S.phase, sid: S.sid, open: S.open,
                 poll: pollDelay(), reduced: reduceMotion() };
             },
