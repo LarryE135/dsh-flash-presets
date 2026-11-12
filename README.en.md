@@ -18,7 +18,7 @@ Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a p
 
 > Current version: 0.3.1 (2026-11-12) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> When installing from npm, pin the version: `dsh-flash-presets@0.3.0` (`npm view dsh-flash-presets version`). Later commits on `main` fixed CI and the shipped docs **without a version bump and without a new Release** — 0.3.0 is still the published identity. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
+> `dsh-flash-presets@0.3.1` is live on npm (`npm view dsh-flash-presets version`; `latest` = 0.3.1); the GitHub Release follows the pre-release audit. 0.3.1 folds in the three "no version bump" batches that followed 0.3.0 — most importantly, the `run_code` optimization now applies as soon as the package is installed. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 
@@ -124,7 +124,7 @@ The plugin manager installs the whole plugin card: both presets, the plan-mode c
 
 ```console
 # 0.2.9 from npm, pinned to the version
-dsh plugin --profile web add dsh-flash-presets@0.3.0
+dsh plugin --profile web add dsh-flash-presets@0.3.1
 # or the same release as a tag, if you'd rather not use npm
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
 ```

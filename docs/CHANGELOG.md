@@ -6,7 +6,7 @@
 >
 > **日期口径**：本文件的日期是本机时区（UTC+8）的日期；npm registry 的 `time` 是 UTC，因此 0.2.1 / 0.2.3 / 0.2.4 三个版本在两边会差一天，属正常，不是笔误。
 
-## 0.3.1（2026-11-12，GitHub tag `v0.3.1` + Release + npm）
+## 0.3.1（2026-11-12，npm 已发布 · GitHub Release 待发）
 
 > 0.3.0 之后，`main` 上还积累了三批当时按「不升版号、不发 Release」记的修正（11-08 / 11-09 / 11-10）。本版把它们一次性收口成一个正式版本。
 >
@@ -33,6 +33,7 @@
 | 13 | CI | 三处红灯收口（过期断言 2 项 + 第 7 节形态 + macOS 预算）、`npm run verify` 直跑、随包文档陈述对账 lint | CI / 本地校验 |
 | 14 | 文档 | 全量审计报告、CHANGELOG 恢复被误删的 0.2.5–0.1.0 历史、README 的安装版本与交付门口径订正 | 文档 |
 | 15 | npm | 0.2.2–0.2.9 五条弃用提示语各自写自己的事实（A4），全部指向 0.3.0 | npm 元数据 |
+| 16 | 流程 | 发布链路补守卫：`scripts/verify-published.mjs`（发布后校验 registry 与 `latest`）、`scripts/publish-npm.sh`（发布 + 复核）、`publish.sh` 建 Release 前强制确认 npm 已生效；`sync-published-version.mjs` 现在真的同步 marketplace / README 的 npm 引用 | 只影响发布，不影响用户行为 |
 
 > 下面三节按提交批次（由近及远）保留当时的完整记录与复现步骤，顺序不代表重要性。
 

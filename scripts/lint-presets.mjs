@@ -136,7 +136,10 @@ for (const doc of [...DOCS.filter((d) => d !== 'docs/CHANGELOG.md'), 'README.en.
     if (/lite\s*[（(]\s*(默认|default)\s*[）)]/i.test(line)) {
       problems.push(doc + ':' + no + ': 把 lite 说成默认卡 —— 默认卡是 精简·PTC v3（flash-lean-ptc-v3）');
     }
-    if (PUBLISHED === VERSION && /(待发|未发布|not yet published)/i.test(line) && line.includes(VERSION)) {
+    if (PUBLISHED === VERSION && /(待发|未发布|not yet published)/i.test(line) && line.includes(VERSION) &&
+        // 2026-11-12 审计 D4：整句说了「npm 已发布」就放过 —— Release 在 npm 之后发是正常流程，
+        // 旧规则连这种真话也会判红。只有提到 npm 却没说已发布时才拦。
+        !/(npm\s*已发布|已发布到\s*npm|published to npm|is live on npm)/i.test(line)) {
       problems.push(doc + ':' + no + ': 把当前版本 ' + VERSION + ' 说成未发布（现查 npm view dsh-flash-presets version）');
     }
   });

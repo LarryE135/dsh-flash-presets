@@ -18,7 +18,7 @@
 
 > 当前版本：v0.3.1（2026-11-12）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> 从 npm 安装请写死版本号：`dsh-flash-presets@0.3.0`（`npm view dsh-flash-presets version` 可复核）。`main` 上还陆续修正了 CI 与随包文档，**没有升版号、也没有发 Release** —— 对外发布的仍是同一个 0.3.0。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> `dsh-flash-presets@0.3.1` 已发布到 npm（`npm view dsh-flash-presets version` 复核，`latest` = 0.3.1）；GitHub Release 排在发布前审计之后补。0.3.1 收口了 0.3.0 之后那三批「不升版号」的修正 —— 其中最关键的是 `run_code` 优化随安装即生效。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -118,7 +118,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 
 ```console
 # 0.2.9：npm 上按版本号装（锁死版本）
-dsh plugin --profile web add dsh-flash-presets@0.3.0
+dsh plugin --profile web add dsh-flash-presets@0.3.1
 # 不想走 npm 时，装同一个 tag
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
 ```

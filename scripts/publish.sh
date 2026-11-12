@@ -96,6 +96,17 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
     gh_ repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (lite 13 rules / balance 3 rules)"
   git push -u origin main
   git push origin "$TAG"
+
+  # ⑤ npm 必须先发（2026-11-12 审计 D2）：Release 早于 npm，会让正文里的安装命令指向一个装不到的版本。
+  # 判定一律走 node scripts/verify-published.mjs（内部用 npm view）：直连 registry 会命中边缘缓存，别自写探测。
+  if [ "\${ALLOW_MISSING_NPM:-0}" != "1" ] && command -v node >/dev/null 2>&1; then
+    if ! node scripts/verify-published.mjs --version "$PKG_VERSION" --timeout 8 --quiet >/dev/null 2>&1; then
+      fail "npm 上查不到 \${PKG_VERSION}（Release 会给出装不到的版本）" \
+        "先跑 bash scripts/publish-npm.sh（发布 + 复核），再回来建 Release" \
+        "确实只发 git、不发 npm：ALLOW_MISSING_NPM=1 bash scripts/publish.sh"
+    fi
+    echo "npm 侧已确认 \${PKG_VERSION} 生效"
+  fi
   mkdir -p dist
   # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
   # 每次重打：复用 dist/ 里的旧附件会让 Release 内容与 tag 悄悄不一致（第六轮审计 U3-7）。
