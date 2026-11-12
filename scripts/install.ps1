@@ -174,7 +174,7 @@ function Install-Modern {
   Write-Host '  升级须知：本脚本整块替换旧托管块 —— 0.2.5 时代的三卡（flash-lean-ptc-v1 / -v2）会被移除，'
   Write-Host '  且这条路没有旧 id 兜底（别名层只随插件卡发行）。需要旧会话继续可打开，请改装插件卡。'
   Write-Host '  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有：'
-  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.0"
+  Write-Host "    dsh plugin --profile $Profile add github:LarryE135/dsh-flash-presets#v0.3.1"
   Write-Host '    两者二选一：本脚本写过预设之后要改装插件卡，请先 -Uninstall（都装会被默认拒绝：预设会重复注册）。'
   Write-Host "  自检：dsh --profile $Profile --dump-config | Select-String 'id: preset-flash-lean-ptc-v3'"
   Write-Host "  体检：node scripts\doctor.mjs --profile $Profile   （版本/重复行/!!js/解析 一次过）"

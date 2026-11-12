@@ -6,11 +6,41 @@
 >
 > **日期口径**：本文件的日期是本机时区（UTC+8）的日期；npm registry 的 `time` 是 UTC，因此 0.2.1 / 0.2.3 / 0.2.4 三个版本在两边会差一天，属正常，不是笔误。
 
-## 未发版修正（2026-11-10，`main` 上，不升版号）
+## 0.3.1（2026-11-12，GitHub tag `v0.3.1` + Release + npm）
 
-> 按作者要求：不升版本号、不发 Release。这一批修的是「装上包却没用上优化」的结构问题。
+> 0.3.0 之后，`main` 上还积累了三批当时按「不升版号、不发 Release」记的修正（11-08 / 11-09 / 11-10）。本版把它们一次性收口成一个正式版本。
+>
+> **预设 id、规则文本、压缩阈值、裁剪参数全都没动**，装法也没变（插件卡 / bundle / 脚本三条路照旧）。改的是两件事：**装上包到底有没有真的用上优化**，以及**诊断说的到底是不是真的**。
 
-### npm：0.2.2–0.2.9 的弃用提示语已订正（第七轮审计 A4）
+**头条：`run_code` 优化 A 现在「装上即生效」。** 此前它搭的是 `plan-mode-ui` 那行的车：关掉计划模式、或用只挂部分行的精简组合，优化会**静默消失**；headless 下更因为 `plan-mode-ui` 停在 `pending (waiting for service: webServer)` 而完全跑不到。现在它独立成 `flash-presets-core` 一行，只 `inject` `tools` / `agents`，任何宿主都能挂——「装上这个包」就等于「`run_code` 优化生效」，与计划模式开不开无关。关闭方式优先级：`DSH_FLASH_PRESETS_CONCURRENCY=0` ＞ 该行 `config.toolConcurrency.enabled=false` ＞ 默认开启。
+
+### 条目一览
+
+| # | 类别 | 条目 | 影响面 |
+|---|---|---|---|
+| 1 | 生效 | `run_code` 优化 A（`glob`/`grep` 只读并发安全）独立成 `flash-presets-core` 行，装包即生效，与计划模式无关 | 插件卡 / bundle 安装 |
+| 2 | 修复 | 子代理「选模型 / 列模型」在 DSH 0.2.2 上一直是关的（#21）：补 `modelSelection` / `modelDiscovery`，删 4 处 `backgroundMode` | 两份预设 |
+| 3 | 新增 | 交付门 `delivery-gate`：把「验收」从 persona 里的一句话变成运行时机制（默认关闭） | 需显式 `enabled: true` |
+| 4 | 诊断 | `doctor` 新增第 9 项：profile 里与本机 dsh 版本对不上、会被静默禁用的插件 | 诊断输出 |
+| 5 | 修复 | `doctor --all` / `audit-compat` 在空环境下的三处误报（第七轮审计 A3） | 全新安装不再判红 |
+| 6 | 修复 | 别名层 v1/v2 规则差异警告不再给走不通的办法（A7）；`check-preset-compat` 在 npm 包里直说原因（#24） | 旧会话提示语 |
+| 7 | 守卫 | 别名行与两份冻结预设不许 `disabled`（A8）：`verify-core` 新增 8 条断言 | 校验项 145 → 153 |
+| 8 | 新增 | `scripts/verify-session-compat.mjs`：升级后旧会话能否打开的自动化守卫（A5），含两条反向控制 | 进 `npm run verify` 与 CI |
+| 9 | 变更 | `runDshCapture`：Windows 上 7 处 CLI 调用统一走包装（#23） | 仅 Windows |
+| 10 | 措辞 | `install.sh` 不再叫 lite / balance（#25），就地叫 v3 / v3 balance | 安装提示 |
+| 11 | 校正 | 压缩阈值 0.25 / 20000 是安全网不是降本手段（109 次运行峰值中位 20k、最大 126k，250k 从未触发）；真正压上下文的是 `tool-result-pruner` 8192 | 注释与文档口径 |
+| 12 | 否决 | v4 候选规则「契约先行」「长文阅读」实测否掉，不进预设 | 规则文本不变 |
+| 13 | CI | 三处红灯收口（过期断言 2 项 + 第 7 节形态 + macOS 预算）、`npm run verify` 直跑、随包文档陈述对账 lint | CI / 本地校验 |
+| 14 | 文档 | 全量审计报告、CHANGELOG 恢复被误删的 0.2.5–0.1.0 历史、README 的安装版本与交付门口径订正 | 文档 |
+| 15 | npm | 0.2.2–0.2.9 五条弃用提示语各自写自己的事实（A4），全部指向 0.3.0 | npm 元数据 |
+
+> 下面三节按提交批次（由近及远）保留当时的完整记录与复现步骤，顺序不代表重要性。
+
+### 批次：2026-11-10（结构：装上却没真的用上优化）
+
+> 本批原以「不升版号」记在 `main` 上，随 0.3.1 一并发布。这一批修的是「装上包却没用上优化」的结构问题。
+
+#### npm：0.2.2–0.2.9 的弃用提示语已订正（第七轮审计 A4）
 
 0.2.2 / 0.2.3 / 0.2.4 三条的提示语原来照抄了 0.2.5 的原因（「0.2.5 在 DSH 0.2.2-rc.1 上无法新建会话」），但那句话跟这三个版本无关；0.2.8 / 0.2.9 干脆没有弃用标记。现在五条各自写自己的事实（id 差异、安装层误报、被 0.3.0 取代），全部指向 `dsh-flash-presets@0.3.0`。
 
@@ -18,7 +48,7 @@
 
 复现：`npm view dsh-flash-presets@0.2.8 deprecated`；`dist-tags.latest` 仍是 `0.3.0`，未被弃用。
 
-### 措辞：v1/v2 的规则差异警告不再给一个走不通的办法（第七轮审计 A7）
+#### 措辞：v1/v2 的规则差异警告不再给一个走不通的办法（第七轮审计 A7）
 
 别名层命中 `rulesDiffer` 的 id 时会警告「规则变了」，原来那句建议是「在自己的 profile 补丁里加回原来那一行」。问题在于：v1/v2 是 0.2.5 时代的卡，**那几行在 DSH 0.2.2 上本身就加载不了**，照做不生效。
 
@@ -26,11 +56,11 @@
 
 测试跟着加严：`plugins/plan-mode-ui/test/preset-alias.mjs` 第 ⑨ 组断言警告里**不许出现「加回」**、且必须写明 `0.2.8` 这条退路；把措辞改回旧说法时该断言必然失败（已反向验证）。
 
-### 守卫：`check-preset-compat` 在发行包里直说原因（第七轮审计 #24）
+#### 守卫：`check-preset-compat` 在发行包里直说原因（第七轮审计 #24）
 
 这个脚本要从每个历史 tag 里读预设定义才能判定兼容性，而 npm 包里既没有 `.git` 也没有 tag —— 以前它先抛一条 git 报错，看起来像「东西坏了」。现在开头先看有没有 `.git`，没有就说明原因、给出克隆命令并 exit 0。
 
-### 新增：升级后旧会话能否打开的自动化守卫（第七轮审计 A5）
+#### 新增：升级后旧会话能否打开的自动化守卫（第七轮审计 A5）
 
 这类回归的症状是「装上新版，旧会话直接打不开」，而且是**静默**的 —— 只有打开那个会话时才炸；此前没有任何测试覆盖它。
 
@@ -45,7 +75,7 @@
 
 校验项随之变化：`npm run verify` 增加这一步，CI 另加同名步骤。
 
-### 修复：doctor / audit-compat 在空环境下误报（第七轮审计 A3）
+#### 修复：doctor / audit-compat 在空环境下误报（第七轮审计 A3）
 
 三处误报，都会把「没问题」说成「有问题」：
 
@@ -55,19 +85,19 @@
 
 实测（解包的 npm 包 + 空的 `DSH_HOME`）：修前 `doctor --all` exit 1；修后 exit 0、`✗` 零行、输出 `✓ 没有会话目录（~/.dsh/sessions），本项无需检查`。
 
-### 文档：计划模式与 chatgpt-subscription 叠加的已知限制（issue #22）
+#### 文档：计划模式与 chatgpt-subscription 叠加的已知限制（issue #22）
 
 计划模式的档位状态对监听 `planMode` 的插件是可见的；`chatgpt-subscription`（0.62.0–0.63.1）在这种状态下会给「只说话、不调工具」的回合注入提醒，于是模型再答一遍。两版 README 的「已知限制 / Known limitations」都补了这条，并给出缓解办法（这类会话把档位切到 `off`）。机制是读代码确认的，本机没有复现到「答两遍」。
 
-### 守卫：别名行与两份冻结预设不许 `disabled`（A8）
+#### 守卫：别名行与两份冻结预设不许 `disabled`（A8）
 
 别名行一旦 `disabled: true`，旧会话就整体打不开；预设行一旦 `disabled`，卡片从列表里消失——两者都不报错，只有 `compose --check` 会拦。`scripts/verify-core.mjs` 加了 8 条断言（组合包里这四行存在 + 行级 `disabled` 不存在），校验项 145 → 153。反向验证：给别名行种一行 `disabled: true`，`verify-core` exit 1。
 
-### 措辞：install.sh 不再叫「lite / balance」（issue #25）
+#### 措辞：install.sh 不再叫「lite / balance」（issue #25）
 
 0.3.0 起 id 里就没有 lite 字样了（`flash-lean-ptc-v3` / `-balance`），安装脚本的注释与收尾提示还写着 `lite / balance`，容易让人去找不存在的卡片。改成就地叫 `v3 / v3 balance`。
 
-### 修复：子代理的「选模型 / 列模型」开关在 DSH 0.2.2 上一直是关的（issue #21）
+#### 修复：子代理的「选模型 / 列模型」开关在 DSH 0.2.2 上一直是关的（issue #21）
 
 `tool-subagent` 在 DSH 0.2.2-alpha.2 把 `modelSelectionSettings` 拆成了 `modelSelection`（能不能让子代理选模型）与 `modelDiscovery`（能不能先列出可选模型）。预设只写了旧名，而 0.2.2 只读新名 —— 结果是 **`engines` 区间里的新版上这两个功能一直是关的，且不报错**（`z.object` 非 strict，未知键直接 strip）。
 
@@ -75,11 +105,11 @@
 
 改法：两份预设同时写三个字段（旧版读旧名、新版读新名，互不干扰）；顺手删掉 4 处 `backgroundMode` —— 在整个 `engines` 区间里没有任何代码读它。
 
-### 修复：自测里的 gh 代理用例会被环境变量污染
+#### 修复：自测里的 gh 代理用例会被环境变量污染
 
 `scripts/selftest.sh` 的「gh_ 的环境前缀」用例在继承 `HTTPS_PROXY` 的环境里必然失败（端口不通时 `gh_` 按设计「继承环境」，而断言期望空）。改为在子 shell 里先 `env -u` 三个代理变量再测。
 
-### 修复：run_code 优化 A 现在「装上即生效」（独立成行 `flash-presets-core`）
+#### 修复：run_code 优化 A 现在「装上即生效」（独立成行 `flash-presets-core`）
 
 **问题。** 0.3.0 把优化 A（给 `glob` / `grep` 补 `isConcurrencySafe`，让同轮多个搜索并行）写在 `lib/index.js` 的 `apply()` 里，而那一行是 `plan-mode-ui`。两个后果：
 
@@ -113,11 +143,12 @@ plan-mode-ui (dsh-flash-presets): pending (waiting for service: webServer)
 
 **没变的。** 预设规则文本、压缩阈值、裁剪参数、交付门默认值都没动；A 只影响调度与墙钟，不影响请求数、token 与正确率。
 
-## 未发版修正（2026-11-09，`main` 上，不升版号）
 
-> 按作者要求：**不升版本号、不发 Release**，对外身份仍是 0.3.0。这一批换的是「机制」，不是规则文本。
+### 批次：2026-11-09（机制：交付门、诊断与实测订正）
 
-### 新增：交付门 delivery-gate（默认关闭）
+> 本批原以「不升版号」记在 `main` 上，随 0.3.1 一并发布。这一批换的是「机制」，不是规则文本。
+
+#### 新增：交付门 delivery-gate（默认关闭）
 
 `lib/delivery-gate.js`，以 `dsh-flash-presets/delivery-gate` 单独成行挂在 profile 上（见 `cordis.patch.yml` 末段）。
 
@@ -132,7 +163,7 @@ plan-mode-ui (dsh-flash-presets): pending (waiting for service: webServer)
 - 依赖声明：`peerDependencies` 增加 `@deepseek-ai/dsh-tools` 与 `zod`（与 `@deepseek-ai/dsh-llm` 同口径），
   否则以 link 方式挂载时模块解析不到 dsh 自带的副本。
 
-### 变更：doctor 新增第 9 项检查
+#### 变更：doctor 新增第 9 项检查
 
 `scripts/doctor.mjs` 现在会**静态比对** profile 里每个 `@deepseek-ai/*` 包声明的精确版本要求与本机 dsh 版本，
 对不上的直接判红并给出修法。原因是 dsh 挂载时会把版本不符的插件行**静默跳过**，只在 stderr 说一句
@@ -141,12 +172,12 @@ plan-mode-ui (dsh-flash-presets): pending (waiting for service: webServer)
 实测背景：headless profile 里的 `@deepseek-ai/dsh-tool-fs-search@0.2.1-rc.5` 就是这样丢了 `glob` / `grep`，
 几十次 bench 跑批都没发现（32 条历史结果全部带这个偏差）。
 
-### 脚本：runDshCapture
+#### 脚本：runDshCapture
 
 `scripts/lib/run-dsh.mjs` 增加 `runDshCapture()`（`spawnSync`，同时拿 stdout/stderr），供需要读 stderr 的检查使用；
 `execFileSync` 只回 stdout，而上面的告警只写在 stderr 上。
 
-### 否决：v4 候选规则「契约先行」与「长文阅读」（测过，不加）
+#### 否决：v4 候选规则「契约先行」与「长文阅读」（测过，不加）
 
 Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次失败里 63 次是「被测代码异常/断言失败」，
 据此起草了「先写 3–8 行公开契约（签名 / 返回类型 / 异常类型 / 错误消息原文 / 输出格式）再动手」这条候选规则，
@@ -171,7 +202,7 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 
 三臂在 7/8 题上给出完全相同的字母、每题重复内也稳定，抽查失败项的终答都能引原文句子支撑自己选的选项 —— 长文偏差不是「没读完」，读法与引用纪律都改不动。**两条长文规则同样不进 v4**。顺带一条读数提醒：基准里「长任务注意力 88.4%」是 needle 100% + chain 94.4% + lb2 73.6% 的混合，合成检索与 LongBench 不要混算。
 
-### 更正：压缩阈值是安全网，不是降本手段（注释与一处旧读数）
+#### 更正：压缩阈值是安全网，不是降本手段（注释与一处旧读数）
 
 按 `thresholdTokens = min(window × thresholdRatio, pressureBudget)`（窗口 1,000,000），本预设 0.25 = 250k 才压缩。实测（2026-11-09）：**109 个运行的上下文峰值中位 20k、p90 34k、最大 126k，250k 从未触发**；把阈值压到 0.04（40k）在 O08 上跑，峰值 39.6k，照样一次没压缩 —— 因为 `tool-result-pruner` 已经把每次工具输出压到约 5.2k 字符。
 
@@ -182,15 +213,16 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 
 另外更正一条判断：office 床「Q 没有分辨力」是错的 —— **同一题的交付物在四臂之间逐字节相同**（唯一差异是 CRLF），所以 Q 必然相同。这批题因此只能当成本基准。顺带得到一个读数：产出相同而 token 相差 **1.1–8.7 倍**（O08：568k / 939k / 1145k / 4918k），说明单题成本对比没有意义，成本结论必须跨题、够 n。
 
-## 未发版修正（2026-11-08，`main` 上，不升版号）
 
-> 按作者要求：**不升版本号、不发 Release**。这批是 CI、脚本细节与随包文档的修正，对外的身份仍是 0.3.0（npm 与 Release 都没动），装法不变。
+### 批次：2026-11-08（CI 与随包文档对账）
+
+> 本批原以「不升版号」记在 `main` 上，随 0.3.1 一并发布。这批是 CI、脚本细节与随包文档的修正。
 
 **只改 CI、脚本细节与随包文档：预设 id、规则文本、别名表、模型行为一律不动。**
 
 这一批是 0.3.0 的「对账」—— 把第六轮审计里那些「本地过、CI 不过」和「文档写的不是事实」的条目一次清掉。
 
-### CI 收口（以前 CI 绿，不等于仓库闸门绿）
+#### CI 收口（以前 CI 绿，不等于仓库闸门绿）
 
 - `verify` job 现在直接跑 `npm run verify`（10 个检查的唯一入口）。此前 CI 是逐项手抄，**漏了 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check` 四个** —— 也就是「`lib/` 忘了从 `plugins/plan-mode-ui/lib/` 同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里完全看不见。
 - 新增一步「发布面卫生与基准复核清单」：`verify-release-hygiene.mjs` + `bench-release-checklist.mjs`，这两个以前只挂在 `prepublishOnly` 上。
@@ -198,13 +230,13 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 - 新增探针 `tools/probe/alias-vs-config.mjs`（也可 `npm run verify:alias`）：把别名表与**真实组合配置**对一遍 —— CI 里喂 `dsh --profile ci --dump-config` 的输出，断言别名指向的 id 真的在配置里、`flash-presets-alias` 行真的在。0.2.8 → 0.2.9 那次事故的形状（会话里的 id 解析到包内不存在的定义）从此有闸门。
 - 仍然不能自动化的：真实「建会话 → 升级 → resume」需要能跑模型的 provider，CI 没有凭据，继续留在人工检查单（见《审计索引》第 7 节）。
 
-### 新 lint 规则：随包文档的陈述对账
+#### 新 lint 规则：随包文档的陈述对账
 
 `scripts/lint-presets.mjs` 增加「2.5 陈述对账」：把 lite 说成默认卡的说法直接判红；同一行里既有「待发 / 未发布」又出现**当前版本号**也判红（历史章节与变更日志本身不受影响）。
 
 规则上线当场抓到一条：`docs/审计索引-0.2.9.md` 还写着「0.3.0 待发」，已改成三通道发齐。
 
-### 文档对账
+#### 文档对账
 
 - `README.en.md`：「today's lite」改成「today's `flash-lean-ptc-v3` (lean-v3)」；`-lite` 的区间由「0.2.7–0.2.8」改成「0.2.6–0.2.8」（`git ls-tree v0.2.6 presets/` 可复现）。
 - `cordis.patch.yml` 与 `scripts/compose-bundle-patch.mjs` 的注释：「历史 id」由 3 个改成 **5 个**（`v3-lite / v1 / v2 / flash-lean-ptc / flash-lean`），与 `lib/preset-alias.js` 的别名表一致。
@@ -213,14 +245,14 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 - `plugins/plan-mode-ui/NOTICE.md`：「64 项自测」改成「26 个测试文件」（`bash test/run.sh` 的实测输出）。
 - `README` 的「更新与卸载」写清升级语义：用精确版本安装后 `dsh plugin update` **不会**自动升级，升级 = 再 `add` 一次新版本；并说明 pnpm 留下的 `minimumReleaseAgeExclude` 行是正常的。
 
-### 脚本小修
+#### 脚本小修
 
 - `tune-runtime --check` 以前会被当成未知参数拒绝（而它自己的用法行就写着 `[--check]`），现在接受；与 `--apply` / `--revert` 同时给出时明确报错退出 2。
 - `install.ps1` 退出时还原 `$env:DSH_HOME`（dot-source 或交互式调用不再污染调用者会话）。
 - `publish.sh`：Release 附件**每次重打**（以前 `dist/` 里有同名 zip 就直接复用，容易传上旧内容）；删掉「临时放宽 tag 规则集 → `git tag -f`」的错误指引，与「已发布的 tag 永不移动」保持一致。
 - `publish.ps1`：仓库描述文案由「v1/v2 预设」改成「v3 十三条 / v3 balance 三条」。
 
-### 兼容性
+#### 兼容性
 
 - 预设 id、规则文本、描述、别名表：**与 0.3.0 完全相同**。老会话、老配置不需要任何迁移。
 - 装法完全不变：`add dsh-flash-presets@0.3.0`（或 tag `v0.3.0`）。这批修正只影响 CI 与随包文档，已经装好的东西不用动。
