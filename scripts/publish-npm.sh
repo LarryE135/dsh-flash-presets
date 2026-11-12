@@ -23,6 +23,25 @@ if command -v gh >/dev/null 2>&1 && git remote get-url origin >/dev/null 2>&1; t
   fi
 fi
 
+# README 口径守卫（第二轮审计 P1-1）：npm 包页面直接显示 README，里面的「当前版本」行与安装命令
+# 必须就是本次要发的版本；0.3.1 就在这里吃过亏 —— 包里的 README 还在叫用户装 0.3.0，且已发出、改不了。
+README_VER="$(sed -n 's/.*当前版本：v\([0-9][0-9.]*\).*/\1/p' README.md | head -1)"
+[ "$README_VER" = "$VER" ] || fail "README 的「当前版本」是 ${README_VER}，与要发的 ${VER} 不一致" "先改 README 顶部再发"
+grep -q "dsh-flash-presets${VER}" README.md || fail "README 里没有 dsh-flash-presets${VER} 的安装命令" "npm 页面照抄会装到别的版本"
+STALE="$(grep -oE 'dsh-flash-presets@[0-9]+\.[0-9]+\.[0-9]+' README.md | sort -u | grep -v "@${VER}" || true)"
+[ -z "$STALE" ] || fail "README 里还留着旧版本安装命令：${STALE}" "只允许出现 @${VER}"
+
+# CI 守卫（第二轮审计 P2-1）：0.3.1 的 npm 发布早于 CI 结果，最后是绿的属于侥幸。
+if command -v gh >/dev/null 2>&1; then
+  RUNS="$(gh run list --commit "$(git rev-parse HEAD)" --limit 30 --json conclusion 2>/dev/null || true)"
+  if [ -n "$RUNS" ]; then
+    if printf '%s' "$RUNS" | grep -qE '"conclusion":"(failure|cancelled)"'; then
+      fail "本次提交的 CI 有失败/取消的 run" "等 CI 全绿再发"
+    fi
+    echo "CI 侧未见失败 run"
+  fi
+fi
+
 echo "发布 $PKG_VER 到 npm…"
 npm publish
 echo "复核 registry…"
