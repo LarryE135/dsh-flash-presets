@@ -30,7 +30,8 @@ function render(lang) {
     ? "| Setup | " + data.suites.map(s => s.en).join(" | vs standard | ") + " | vs standard |"
     : "| 配置 | " + data.suites.map(s => s.zh).join(" | 相对标准模式 | ") + " | 相对标准模式 |";
   const align = "|---|" + data.suites.map(() => "---:|---:").join("|") + "|";
-  const body = data.rows.map(row => {
+  // hidden: true 的行不进 README（数据仍留在 JSON 里，便于追溯）
+  const body = data.rows.filter(row => !row.hidden).map(row => {
     const cells = data.suites.map(s => fmtM(row[s.id], en) + " | " + fmtPct(pct(row, s.id)));
     return "| " + (en ? row.en : row.zh) + " | " + cells.join(" | ") + " |";
   });

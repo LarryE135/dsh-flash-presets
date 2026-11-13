@@ -100,9 +100,7 @@ Two synthetic suites of everyday office data-processing tasks: [Office benchmark
 | Setup | Office benchmark v1 | vs standard | Office addendum v1 | vs standard |
 |---|---:|---:|---:|---:|
 | Standard mode | 5.380 M(n=5) | — | 2.827 M(n=5) | — |
-| OPS + standard | 4.693 M(n=5) | −12.8% | 2.141 M(n=5) | −24.3% |
 | PTC mode | 3.553 M(n=5) | −34.0% | 1.560 M(n=5) | −44.8% |
-| OPS + PTC | 3.499 M(n=4) | −35.0% | 1.404 M(n=5) | −50.3% |
 | lean-v3 | 1.437 M(n=5) | −73.3% | 0.481 M(n=5) | −83.0% |
 <!-- bench-table:end -->
 

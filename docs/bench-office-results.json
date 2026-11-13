@@ -37,7 +37,9 @@
       "addendum": {
         "m": 2.141,
         "n": 5
-      }
+      },
+      "hidden": true,
+      "hiddenReason": "2026-11-13 作者在 README 手删这两行：OPS 是外部插件组合，与本发行包的两张卡无关；数据保留在 JSON 里备查。要恢复，删掉本字段并跑 node scripts/render-bench-table.mjs --write。"
     },
     {
       "key": "ptc",
@@ -63,7 +65,9 @@
       "addendum": {
         "m": 1.404,
         "n": 5
-      }
+      },
+      "hidden": true,
+      "hiddenReason": "2026-11-13 作者在 README 手删这两行：OPS 是外部插件组合，与本发行包的两张卡无关；数据保留在 JSON 里备查。要恢复，删掉本字段并跑 node scripts/render-bench-table.mjs --write。"
     },
     {
       "key": "lean-v3",
