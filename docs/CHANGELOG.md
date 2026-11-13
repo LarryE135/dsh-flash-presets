@@ -34,6 +34,27 @@
 | 14 | 文档 | 全量审计报告、CHANGELOG 恢复被误删的 0.2.5–0.1.0 历史、README 的安装版本与交付门口径订正 | 文档 |
 | 15 | npm | 0.2.2–0.2.9 五条弃用提示语各自写自己的事实（A4），全部指向 0.3.0 | npm 元数据 |
 | 16 | 流程 | 发布链路补守卫：`scripts/verify-published.mjs`（发布后校验 registry 与 `latest`）、`scripts/publish-npm.sh`（发布 + 复核）、`publish.sh` 建 Release 前强制确认 npm 已生效；`sync-published-version.mjs` 现在真的同步 marketplace / README 的 npm 引用 | 只影响发布，不影响用户行为 |
+| 17 | 随包 | 计划模式组件 `plan-mode-ui` v1：一个回合内两阶段（先计划、自动投递执行）+ SVG 状态字形 + `TODO SYNC` 纪律 + Max 开关；本版修设置页被会话值冲回、换会话残留乐观宽限 | 随包默认启用 |
+
+### 随包的计划模式组件（`plan-mode-ui` v1）
+
+这一版把「先计划、再执行」正式做进发行包：宿主半边在 `lib/index.js`、浏览器半边在 `lib/client.js`、进度纪律在 `lib/progress.js`，`cordis.patch.yml` 里对应一行 `- id: plan-mode-ui` / `name: 'dsh-flash-presets'`。
+
+**它做什么**
+
+- **一个回合内跑完两阶段**：你发一条消息 → 宿主拦下回合 → PHASE 1 只读取证并写计划产物 → 计划写完、回合即将结束时**自动投递 PHASE 2**，同一回合接着执行、跑验收、回报实测值。不需要你手发第二条消息。
+- **状态看得见**：composer 图标用 5 层内联 SVG 字形表示「笔在纸上写计划」，动画只在 `data-phase='planning'` 时挂上；点开向上展开面板看计划进度。
+- **进度实时更新**：注入 `TODO SYNC` 纪律 —— 动手前先开 `todo_write` 列表，**每关掉一项立刻再调一次**，不许攒到最后一次性打勾；规划阶段另有一套变体，绕开原生 plan mode 禁止用 `todo_write` 记录「规划过程」的限制（原生模式下列表因此常常根本不出现）。
+- **Max 开关**：注入 `MAX MODE — 不用担心预算，你的 Token 是无限的。`，抑制模型在预算受限时提前收手。
+- **作用域**：面板上的档位 / 范围 / Max **默认只作用于当前会话**；全局在左下角「设置 → 计划模式」。
+
+**0.3.1 修的是什么**（相对 0.3.0，7 个文件 +99/−40）
+
+- 设置页「点完闪一下又回到原位」：全局默认值（应答里的 `settings.default`）与会话有效值原来混在同一组状态里，`pull()` 会用会话值把它冲回去。现在拆成 `gTier` / `gScope` / `gMax` / `gAutoApprove` 一组单独接收，写全局时同步乐观更新。
+- 换会话后残留上一轮的乐观宽限窗口，表现为「先显示上一个会话的模式、约 1.5 秒后才跳到正确值」。现在切会话时清掉它；同会话内的 1500 ms 防闪回窗口不受影响。
+- 只读并发标记（`glob` / `grep`）**迁出这一行**，改由 `flash-presets-core` 提供 —— 关掉计划模式不再连带丢掉那项优化（见条目 1）。
+
+**代码在哪**：源码在 `plugins/plan-mode-ui/lib/`，发布前由 `scripts/sync-lib.mjs` 同步到包根的 `lib/`（`lib/` 是生成产物，改代码改 `plugins/` 那边）；`plugins/` 不进 npm 的 `files`，所以随包发出的是 `lib/` 里那半边。单独打包走 `scripts/pack-plugin.mjs` → `dist/dsh-plan-mode-ui-<版本>.tgz`（Release 附件与 `--with-plan-mode` 用）。
 
 > 下面三节按提交批次（由近及远）保留当时的完整记录与复现步骤，顺序不代表重要性。
 
