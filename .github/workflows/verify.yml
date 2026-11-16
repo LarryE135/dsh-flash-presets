@@ -235,7 +235,7 @@ jobs:
 
       - name: 安装 DSH（npm 全局装出来的是 dsh.cmd）
         shell: bash
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           npm i -g pnpm @deepseek-ai/dsh@0.2.2-rc.1
           dsh --version
