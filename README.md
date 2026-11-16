@@ -257,6 +257,16 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 ## 版本历史
 
+### v0.3.2（2026-11-16）
+
+仓库内版本：**未发 npm、未发 GitHub Release、tag 待发布时补**（npm `latest` 仍是 0.3.1）。
+
+- **自动批准按钮换 v1.1 字形**：两段环箭头 + 中心对勾，`off / on` 两态生效（`fire` 冲击帧已在 CSS 按 `data-fire` 预留，宿主计数尚未下发），20px；修掉旧 `.pmo-aa svg` 规则强制 15px 与「按钮里所有 svg 一起旋转」——那正是对勾跟着外圈转、图标始终长不大的原因。
+- **默认上下文瘦身**：`tool-skill.catalogDescriptionMaxLength: 60`，关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（两份上报合计每请求少传约 40 KB，不进上下文）。
+- **交付门回归默认关闭**：`delivery-gate.enabled` 默认 `true` → `false`，普通对话不再被验收门追着跑。
+- **计划模式**：「空跑一场」不再被当成批准；作用域默认 `always` → `auto`。
+- **新增可选预设** `flash-lean-ptc-v3-team`（v3 + `agent-team` + `tool-agent-team`，需先自行安装这两个包）。
+
 ### v0.3.1（2026-11-12）
 
 - **`run_code` 优化随安装即生效**：`glob` / `grep` 只读并发安全优化从 `plan-mode-ui` 独立成 `flash-presets-core` 一行，
