@@ -261,7 +261,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 仓库内版本：**未发 npm、未发 GitHub Release、tag 待发布时补**（npm `latest` 仍是 0.3.1）。
 
-- **自动批准按钮换 v1.1 字形**：两段环箭头 + 中心对勾，`off / on` 两态生效（`fire` 冲击帧已在 CSS 按 `data-fire` 预留，宿主计数尚未下发），20px；修掉旧 `.pmo-aa svg` 规则强制 15px 与「按钮里所有 svg 一起旋转」——那正是对勾跟着外圈转、图标始终长不大的原因。
+- **自动批准按钮换 v1.1 字形**：两段环箭头 + 中心对勾，`off / on / fire` 三态生效（每真正自动批准一次，外圈甩半圈、对勾弹一下），20px；修掉旧 `.pmo-aa svg` 规则强制 15px 与「按钮里所有 svg 一起旋转」——那正是对勾跟着外圈转、图标始终长不大的原因。
 - **默认上下文瘦身**：`tool-skill.catalogDescriptionMaxLength: 60`，关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（两份上报合计每请求少传约 40 KB，不进上下文）。
 - **交付门回归默认关闭**：`delivery-gate.enabled` 默认 `true` → `false`，普通对话不再被验收门追着跑。
 - **计划模式**：「空跑一场」不再被当成批准；作用域默认 `always` → `auto`。

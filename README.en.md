@@ -269,7 +269,7 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 Repo-only version: **not on npm, no GitHub Release, tag pending** (`latest` is still 0.3.1).
 
-- **Auto-approve button rebuilt to glyph v1.1**: two ring arrows plus a center check, `off / on` both working (`fire` frames are wired in CSS via `data-fire`; the host does not emit the counter yet), 20 px. Fixes the old `.pmo-aa svg` rule that forced 15 px and rotated every svg in the button, which made the check spin with the ring and kept the icon tiny.
+- **Auto-approve button rebuilt to glyph v1.1**: two ring arrows plus a center check, all three states (`off / on / fire`) working — every real auto-approval flings the ring half a turn and pops the check, 20 px. Fixes the old `.pmo-aa svg` rule that forced 15 px and rotated every svg in the button, which made the check spin with the ring and kept the icon tiny.
 - **Lean defaults in the bundle**: `tool-skill.catalogDescriptionMaxLength: 60`, `session-log-deepseek` / `plugin-package-inventory-deepseek` disabled (~40 KB less per request, none of it in context).
 - **Delivery gate defaults back to off**: `delivery-gate.enabled` `true` → `false`.
 - **Plan mode**: a no-op planning phase no longer counts as approval; default scope `always` -> `auto`.
