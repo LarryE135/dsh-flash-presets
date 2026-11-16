@@ -58,6 +58,7 @@
 |---|---|---:|---|---|
 | 精简·PTC v3（lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | **默认**。效率最高的版本，适合绝大多数日常工作 |
 | 精简·PTC v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 约束更弱，适合需要模型发挥的场景 |
+| 精简·PTC v3 team | `flash-lean-ptc-v3-team` | 13 | 0.25 / 20k | 可选。v3 之上挂 `agent-team` + `tool-agent-team`（需先自行安装这两个包），团队协作/并行任务用 |
 
 两张卡共享同一套压缩/裁剪框架与插件配置，区别只在 persona 规则文本。
 
@@ -109,8 +110,10 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 # 0.2.9：npm 上按版本号装（锁死版本）
 dsh plugin --profile web add dsh-flash-presets@0.3.1
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
 ```
+
+> **0.3.2 的 tag 还没推**（按计划先入库、后发版）：现在要从仓库装，把上面的 `#v0.3.2` 换成 `#main`。
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
@@ -164,7 +167,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
 - 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
-- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.1`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - **脚本路径升级会移除旧卡**：托管块是整块替换的，0.2.5 时代的三卡（`flash-lean-ptc-v1` / `-v2` / `-v3`）升级后只剩 `flash-lean-ptc-v3` 与 `-balance`。这条路径**没有旧 id 兜底**（别名层只随插件卡发行），引用 `-v1` / `-v2` 的旧会话升级后会 `agent-preset/not-found`。升级脚本会打印警告；需要旧会话继续可打开，请改装插件卡（`dsh plugin --profile <名称> add dsh-flash-presets`），它带兼容层。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。

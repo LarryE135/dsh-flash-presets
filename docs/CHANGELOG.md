@@ -15,11 +15,11 @@
 | # | 类别 | 条目 | 影响面 |
 |---|---|---|---|
 | 1 | 新增 | 预设 `flash-lean-ptc-v3-team`：lean-v3 + `agent-team`（默认开、`maxTasks: 40`）+ `tool-agent-team`，单列一行便于按需挑选 | 新预设 |
-| 2 | 瘦身 | `cordis.patch.yml` 默认带上两条上下文瘦身：`tool-skill.catalogDescriptionMaxLength: 60`、关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（每请求少传约 34KB + 6KB，不进上下文） | 默认配置 |
+| 2 | 瘦身 | `cordis.patch.yml` 默认带上两条上下文瘦身：`tool-skill.catalogDescriptionMaxLength: 60`、关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（两份上报合计每请求少传约 40 KB，不进上下文） | 默认配置 |
 | 3 | 修复 | 交付门 `delivery-gate` 默认值由 `true` 改为 `false`：0.3.1 的默认会让普通对话也被验收门追着跑（插件卡建行时不会带本包的路由配置，schema 默认值即唯一防线） | 需显式开启 |
 | 4 | 修复 | 计划模式：「空跑一场」不再被当成批准 —— 只有规划阶段真的产出过助手文本，`plan/mode` 关闭才触发 PHASE 2 投递 | 计划模式 |
 | 5 | 变更 | 计划模式作用域默认 `always` → `auto`（首轮必规划，之后只在任务明显变化时重规划） | 计划模式 |
-| 6 | 重做 | 自动批准按钮换成 v1.1 字形：两段环箭头 + 中心对勾，三态（off / on / fire），20px；顺带修掉旧规则 `.pmo-aa svg` 强制 15px 与「所有 svg 一起旋转」导致的**对勾跟着外圈转**、图标始终长不大 | `plan-mode-ui` |
+| 6 | 重做 | 自动批准按钮换成 v1.1 字形：两段环箭头 + 中心对勾，两态（off / on）已生效——fire 冲击帧在 CSS 里已按 `data-fire` 预留，但宿主尚未下发自动批准计数，属未接完；20px；顺带修掉旧规则 `.pmo-aa svg` 强制 15px 与「所有 svg 一起旋转」导致的**对勾跟着外圈转**、图标始终长不大 | `plan-mode-ui` |
 | 7 | 研究 | 新增文档：`研究-DSH0.2.2-Team-Agent.md`（Team 的 token 成本与配置面）、`研究-DSH-0.2.2-rc.3-上下文注入.md`、`上游讨论-长开发会话成本归因.md`、`会话审计/`（重试浪费、上下文与内存两篇） | 文档 |
 | 8 | 工具 | 新增 `scripts/ptc-redeclare-fix/` 与 `patches/`：`run_code` 顶层重复声明（实测 57/120 次失败）的本地复现与可回滚补丁；**不随安装流程生效**，仅供手动选择 | 手动 |
 
