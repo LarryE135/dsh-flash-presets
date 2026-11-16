@@ -2,8 +2,8 @@
   "id": "dsh-flash-presets",
   "name": "DSH Flash 精简预设",
   "version": "0.3.2",
-  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. 精简·PTC v3 (lean-v3, flash-lean-ptc-v3) keeps 13 rules (default); 精简·PTC v3 balance (flash-lean-ptc-v3-balance) keeps only the 3 rules the harness cannot enforce. Optional: flash-lean-ptc-v3-team adds agent-team + tool-agent-team for collaboration.",
-  "descriptionZh": "面向 flash 级路由的 token 效率预设，只发两个：精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条规则，默认）与 精简·PTC v3 balance（flash-lean-ptc-v3-balance，3 条规则）。旧 id 由运行时兼容层解析到 flash-lean-ptc-v3，不改写任何会话文件。另有可选的 flash-lean-ptc-v3-team（在 v3 上挂 agent-team + tool-agent-team，需先装这两个包）。",
+  "description": "Two DSH agent presets tuned for token efficiency on flash-tier routes: PTC tool surface, a 25% compaction threshold and a turn budget. 精简·PTC v3 (lean-v3, flash-lean-ptc-v3) keeps 13 rules (default); 精简·PTC v3 balance (flash-lean-ptc-v3-balance) keeps only the 3 rules the harness cannot enforce.",
+  "descriptionZh": "面向 flash 级路由的 token 效率预设，只发两个：精简·PTC v3（lean-v3，flash-lean-ptc-v3，13 条规则，默认）与 精简·PTC v3 balance（flash-lean-ptc-v3-balance，3 条规则）。旧 id 由运行时兼容层解析到 flash-lean-ptc-v3，不改写任何会话文件。",
   "author": {
     "name": "LarryE135",
     "url": "https://github.com/LarryE135"

@@ -58,7 +58,6 @@
 |---|---|---:|---|---|
 | 精简·PTC v3（lean-v3） | `flash-lean-ptc-v3` | 13 | 0.25 / 20k | **默认**。效率最高的版本，适合绝大多数日常工作 |
 | 精简·PTC v3 balance | `flash-lean-ptc-v3-balance` | 3 | 0.25 / 20k | 约束更弱，适合需要模型发挥的场景 |
-| 精简·PTC v3 team | `flash-lean-ptc-v3-team` | 13 | 0.25 / 20k | 可选。v3 之上挂 `agent-team` + `tool-agent-team`（需先自行安装这两个包），团队协作/并行任务用 |
 
 两张卡共享同一套压缩/裁剪框架与插件配置，区别只在 persona 规则文本。
 
@@ -265,7 +264,6 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 - **默认上下文瘦身**：`tool-skill.catalogDescriptionMaxLength: 60`，关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（两份上报合计每请求少传约 40 KB，不进上下文）。
 - **交付门回归默认关闭**：`delivery-gate.enabled` 默认 `true` → `false`，普通对话不再被验收门追着跑。
 - **计划模式**：「空跑一场」不再被当成批准；作用域默认 `always` → `auto`。
-- **新增可选预设** `flash-lean-ptc-v3-team`（v3 + `agent-team` + `tool-agent-team`，需先自行安装这两个包）。
 
 ### v0.3.1（2026-11-12）
 

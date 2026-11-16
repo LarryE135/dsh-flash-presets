@@ -30,7 +30,9 @@
 
 ## 我们的用法：`lean-v3-team` 预设
 
-新增 `presets/flash-lean-ptc-v3-team.patch.yml`（**非默认**，order 28）：
+**状态：草稿，未随包发布**（未通过验证，文件放在 `candidates/flash-lean-ptc-v3-team.patch.yml`，不参与安装器、组合包与 `npm run verify`）。验证通过前不要把它写进预设表。
+
+草稿内容（**非默认**，order 28）：
 
 ```yaml
 - id: agent-team

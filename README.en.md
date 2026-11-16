@@ -273,7 +273,6 @@ Repo-only version: **not on npm, no GitHub Release, tag pending** (`latest` is s
 - **Lean defaults in the bundle**: `tool-skill.catalogDescriptionMaxLength: 60`, `session-log-deepseek` / `plugin-package-inventory-deepseek` disabled (~40 KB less per request, none of it in context).
 - **Delivery gate defaults back to off**: `delivery-gate.enabled` `true` → `false`.
 - **Plan mode**: a no-op planning phase no longer counts as approval; default scope `always` -> `auto`.
-- **New optional preset** `flash-lean-ptc-v3-team` (v3 + `agent-team` + `tool-agent-team`; install those two packages first).
 
 ### v0.3.1 (2026-11-12)
 

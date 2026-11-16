@@ -57,7 +57,6 @@
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
     "presets/flash-lean-ptc-v3-balance.patch.yml",
-    "presets/flash-lean-ptc-v3-team.patch.yml",
     "presets/legacy-preset-map.json",
     "presets/compat-exceptions.json",
     ".gitattributes",
