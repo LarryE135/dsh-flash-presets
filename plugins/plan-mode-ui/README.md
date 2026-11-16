@@ -210,8 +210,17 @@ DSH_PLAN_MODE_UI_HEADLESS=off dsh headless "把 1+1 写进 /tmp/x.txt"
 10. **PTC 预设下的评审超时（#29）**：lean-v3 预设只能通过 `run_code` 调工具，而 `run_code` 默认 120 秒截止，
    这 120 秒**包括你阅读计划的时间**。插件会在派发前拦下「调用了 `exit_plan_mode` / `ask_user_question`
    却没给 `timeoutMs ≥ 600000`」的 `run_code`，让模型带上超时重发（只多一个回合，不弹卡、不执行代码）。
-   自动批准开着时不拦；`DSH_FLASH_PRESETS_REVIEW_GUARD=0` 可关闭；宿主没有 `tools.guard` 时自动跳过。
+   自动批准开着时不拦；`DSH_FLASH_PRESETS_REVIEW_GUARD=0` 可关闭；宿主没有 `tools.guard` 时自动跳过并打一条 warn。
    评审仍然只有 10 分钟上限（宿主 `maxTimeoutMs`），超时不等于拒绝，模型会提示你而不是自己重交。
+
+   实现细节与边界：
+
+   - 判据只认**调用形态**（工具名后面跟括号），所以文档、注释、字符串里单纯写到 `exit_plan_mode` 不会误拦；
+     但程序里真的写了 `exit_plan_mode(`（哪怕只是要生成这段源码字符串）仍会被要求给超时。
+   - 守卫在**审批判定之后、真正派发之前**运行（DSH `ToolsService.checkGuards`）。若某次 `run_code`
+     本身需要你审批，你会先看到审批、随后才被守卫拒——`run_code` 通常不需要审批，影响很小。
+   - 自检：`GET /api/plan-mode/state` 的 `debug.reviewGuard` 现在有三个字段——
+     `blocked`（拦了几次）、`unavailable`（宿主没有 `tools.guard`）、`disabled`（被环境变量关掉）。
 
 ## 卸载
 

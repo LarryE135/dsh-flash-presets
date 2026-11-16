@@ -14,18 +14,19 @@ async function boot({ autoApprove = false, withGuard = true } = {}) {
   }));
   process.env.DSH_HOME = home;
   const guards = [];
+  const warns = [];
   const mod = await import("../lib/index.js?guard" + (++seq) + "-" + Date.now());
   const ctx = {
     get: () => undefined,
     on: () => () => {}, inject: () => {}, effect: (fn) => { try { fn(); } catch (e) {} },
     webServer: { register: () => () => {} },
     systemPrompt: { section: () => () => {}, getSectionOrder: () => 500 },
-    logger: { warn() {}, info() {} },
+    logger: { warn: (m) => { warns.push(m); }, info() {} },
     tools: withGuard ? { guard: (g) => { guards.push(g); return () => {}; } } : {}
   };
   mod.default.apply(ctx);
   const session = { id: "g-" + seq, delegationDepth: 0 };
-  return { mod, guards, agent: { session } };
+  return { mod, guards, agent: { session }, warns };
 }
 const runCode = (code, timeoutMs, agent) => ({ name: "run_code", arguments: timeoutMs === undefined ? { code } : { code, timeoutMs }, agent });
 const PLAN = "const res = await tools.exit_plan_mode({ plan });";
@@ -61,6 +62,30 @@ console.log("review-guard");
   process.env.DSH_FLASH_PRESETS_REVIEW_GUARD = "0";
   const { guards } = await boot();
   ok(guards.length === 0, "DSH_FLASH_PRESETS_REVIEW_GUARD=0 可关闭");
+  delete process.env.DSH_FLASH_PRESETS_REVIEW_GUARD;
+}
+{
+  const { mod } = await boot();
+  const f = mod.__reviewTimeoutReasonForTest;
+  ok(f(runCode('const t = "用 exit_plan_mode 提交计划"; await tools.write({ content: t })')) === undefined,
+    "只是提到工具名（写文档/字符串）不再误拦");
+  ok(f(runCode("// 不要用 ask_user_question" + String.fromCharCode(10) + "await tools.read({ path: 'a' })")) === undefined,
+    "注释里提到工具名不再误拦");
+  ok(typeof f(runCode("await tools.exit_plan_mode({ plan })")) === "string",
+    "真正的调用形态仍然被拦");
+}
+{
+  const { mod, warns } = await boot({ withGuard: false });
+  const st = mod.__reviewGuardStatsForTest;
+  ok(st.unavailable === true, "宿主无 tools.guard 时标记 unavailable");
+  ok(warns.length === 1 && /tools\.guard/.test(warns[0]), "并打一条 warn 说明守卫未启用");
+}
+{
+  process.env.DSH_FLASH_PRESETS_REVIEW_GUARD = "0";
+  const { mod, guards } = await boot();
+  const st = mod.__reviewGuardStatsForTest;
+  ok(guards.length === 0, "环境变量关闭时不注册 guard");
+  ok(st.disabled === true, "关闭状态在 debug 里可区分（disabled）");
   delete process.env.DSH_FLASH_PRESETS_REVIEW_GUARD;
 }
 if (failed > 0) { console.log(failed + " 项失败"); process.exit(1); }
