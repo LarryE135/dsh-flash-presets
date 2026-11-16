@@ -44,7 +44,14 @@ if (CHECK && (APPLY || REVERT)) { console.error('--check 不能与 --apply / --r
 // 只有显式 --profile 才收窄；环境里的 DSH_PROFILE 不参与，否则默认只查一个 profile 很坑。
 const only = (() => {
   const i = A.indexOf('--profile');
-  return i >= 0 ? A[i + 1] : null;
+  if (i < 0) return null;
+  const v = A[i + 1];
+  // 漏写值（或紧跟另一个开关）时，绝不能当成「所有 profile」：那会一次改掉全部 profile。
+  if (v === undefined || v === '' || String(v).startsWith('--')) {
+    console.error('--profile 需要一个值，例如 --profile web；只写 --profile 会作用于全部 profile，已中止。');
+    process.exit(2);
+  }
+  return v;
 })();
 
 // 尊重 DSH_HOME：隔离环境（DSH_HOME=/tmp/x）里跑安装器时不能去改真实的 ~/.dsh。
@@ -72,7 +79,7 @@ ${MARK}
 `;
 
 function backup(file) {
-  if (NO_BACKUP) return '(未备份)';
+  if (NO_BACKUP) return null;
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const dst = `${file}.bak-tune-${stamp}`;
   fs.copyFileSync(file, dst);
@@ -114,12 +121,16 @@ function applyB(dir, st, profile) {
     body = lines.join('\n').replace(/\s*$/, '');
   }
   const next = (body ? body + '\n' : '') + BLOCK + '\n';
+  const original = st.text ?? '';
   const bak = backup(st.file);
   fs.writeFileSync(st.file, next);
   // 写完立刻用 dump-config 验一遍；配置坏了就回滚，不留半成品。
   const okNow = dumpSaysPersistent(profile);
   if (okNow === false) {
-    fs.copyFileSync(bak, st.file);
+    // --no-backup 时没有备份文件，只能拿内存里的原始文本回滚；
+    // 以前这里无条件 copyFileSync('(未备份)') → ENOENT 抛出，把写了一半的文件留在原地。
+    if (typeof bak === 'string' && fs.existsSync(bak)) fs.copyFileSync(bak, st.file);
+    else fs.writeFileSync(st.file, original);
     return 'failed (dump-config 未生效，已回滚)';
   }
   return 'patched';

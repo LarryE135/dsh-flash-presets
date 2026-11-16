@@ -13,6 +13,7 @@
  * 只删“已知退役”的 id，不碰其他预设（standard / 用户自己装的都不动）。
  */
 import fs from 'node:fs';
+import yaml from 'js-yaml';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -21,7 +22,15 @@ const RETIRED = ['flash-lean-ptc-v3-1-high', 'flash-lean-ptc-v3-1-max'];
 const A = process.argv.slice(2);
 const APPLY = A.includes('--apply');
 const pi = A.indexOf('--profile');
-const ONLY = pi >= 0 ? A[pi + 1] : null;
+const ONLY = (() => {
+  if (pi < 0) return null;
+  const v = A[pi + 1];
+  if (v === undefined || v === '' || String(v).startsWith('--')) {
+    console.error('--profile 需要一个值，例如 --profile web；只写 --profile 会清理全部 profile，已中止。');
+    process.exit(2);
+  }
+  return v;
+})();
 const ROOT = path.join(os.homedir(), '.dsh', 'profiles');
 
 if (!fs.existsSync(ROOT)) {
@@ -29,16 +38,28 @@ if (!fs.existsSync(ROOT)) {
   process.exit(2);
 }
 
-/** 从文本里摘掉一个 insert 块（块首是 `- insert:`，块尾是下一条顶层 `- ` 之前）。 */
-function dropBlock(text, marker) {
-  const i = text.indexOf(marker);
-  if (i < 0) return text;
-  let start = text.lastIndexOf('\n- insert:', i);
-  if (start < 0) start = text.lastIndexOf('- insert:', i);
-  if (start < 0) return text;
-  let end = text.indexOf('\n- ', i);
-  if (end < 0) end = text.length;
-  return text.slice(0, start) + text.slice(end);
+/** 从文本里摘掉一个「列表项」（最小删除）：只删属于该 id 的那一项，不动同一 insert 里的其它项。
+ *  旧实现按「整块 insert」删，会连带把现役预设一起删掉；单 insert 场景还会把文件清成 0 字节。 */
+function dropItem(text, id) {
+  const lines = text.split("\n");
+  const re = new RegExp("^[ \t]*-[ \t]*id:[ \t]*(?:preset-)?" + id + "[ \t]*$");
+  let idx = -1;
+  for (let k = 0; k < lines.length; k += 1) {
+    if (re.test(lines[k])) { idx = k; break; }
+  }
+  if (idx < 0) return text;
+  const indent = lines[idx].length - lines[idx].trimStart().length;
+  let endLine = idx + 1;
+  while (endLine < lines.length) {
+    const ln = lines[endLine];
+    if (ln.trim() === "") { endLine += 1; continue; }
+    const ind = ln.length - ln.trimStart().length;
+    if (ind < indent) break;                                 // 回到上层（例如 insert: 本身）
+    if (ind === indent && /^[ \t]*-[ \t]/.test(ln)) break;   // 同级下一项
+    endLine += 1;
+  }
+  lines.splice(idx, endLine - idx);
+  return lines.join("\n");
 }
 
 const dirs = fs.readdirSync(ROOT, { withFileTypes: true })
@@ -61,9 +82,16 @@ for (const dir of dirs) {
   if (!APPLY) continue;
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   fs.copyFileSync(file, file + '.bak-prune-' + stamp);
-  for (const id of hits) {
-    text = dropBlock(text, '- id: preset-' + id);
-    text = dropBlock(text, 'id: ' + id + '\n');
+  for (const id of hits) text = dropItem(text, id);
+  // 兜底：删完为空（或只剩注释/空行）时写回 []，别留下 0 字节或空文档。
+  const stripped = text.replace(/#[^\n]*/g, "").trim();
+  if (stripped === "" || stripped === "[]") text = "[]\n";
+  // 结构校验：解析不了就回滚，绝不写坏 profile 补丁。
+  try {
+    yaml.load(text);
+  } catch (error) {
+    console.error(path.basename(dir).padEnd(12) + "✖ 清理后 YAML 解析失败，已回滚：" + String(error && error.message));
+    continue;
   }
   fs.writeFileSync(file, text);
   console.log(path.basename(dir).padEnd(12) + '→ 已清理（备份 ' + path.basename(file) + '.bak-prune-' + stamp + '）');

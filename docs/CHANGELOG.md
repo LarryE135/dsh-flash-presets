@@ -1,14 +1,14 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（当前版本，GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）、**0.3.1**（GitHub tag `04b889e` + Release + npm，2026-11-12 发布；npm `latest` 当前就是它）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 >
 > **日期口径**：本文件的日期是本机时区（UTC+8）的日期；npm registry 的 `time` 是 UTC，因此 0.2.1 / 0.2.3 / 0.2.4 三个版本在两边会差一天，属正常，不是笔误。
 
 ## 0.3.2（2026-11-16，npm 未发布 · GitHub Release 未发）
 
-> 按用户要求**只入库**：不打 tag、不发 Release、不发 npm。预设 id、规则文本、压缩阈值、裁剪参数均未改动。
+> 按用户要求**只入库**：不打 tag、不发 Release、不发 npm。预设 id 与压缩/裁剪参数未改动；persona 规则文本未改，**但 plan-mode 行提示词补了 #29 的一句**（PTC 下调 `exit_plan_mode` 要带 `timeoutMs: 600000`），见下表第 8 条。
 
 ### 条目一览
 
@@ -22,6 +22,7 @@
 | 6 | 研究 | 新增文档：`研究-DSH0.2.2-Team-Agent.md`（Team 的 token 成本与配置面）、`研究-DSH-0.2.2-rc.3-上下文注入.md`、`上游讨论-长开发会话成本归因.md`、`会话审计/`（重试浪费、上下文与内存两篇） | 文档 |
 | 7 | 工具 | 新增 `scripts/ptc-redeclare-fix/` 与 `patches/`：`run_code` 顶层重复声明（实测 57/120 次失败）的本地复现与可回滚补丁；**不随安装流程生效**，仅供手动选择 | 手动 |
 | 8 | 修复 | **#29**：PTC 预设下计划评审被 run_code 的 120 秒默认截止打断（ASK_ABORTED）后重复提交 —— 插件用 tools.guard 在派发前拦下「调用 exit_plan_mode / ask_user_question 却未给 timeoutMs ≥ 600000」的 run_code，不执行、不弹卡；政策文本同步要求 PTC 下评审批次带超时、中止不等于拒绝、不要自行重交；README 补「light 档会自动进计划」与超时说明；审计后收紧：判据只认调用形态（写文档/注释里提到工具名不再误拦）、守卫不可用打 warn、状态接口补 disabled 字段 | plan-mode-ui / 预设政策 |
+| 9 | 整改 | **外部全量审计（2026-11-17）逐条核对后修复**：宿主事件形态（`{type,seq,time,data}`，`user/message` 不带 turn）导致 `scope=auto/first` 失效、改档位丢 `autoApprove`、守卫在自动批准下连 `ask_user_question` 一起放行、交付门关闭仍注入不存在的 `verify` 工具、交付门被后台进程挂死整回合、`/api/plan-mode/*` 挡不住 DNS rebinding、`prune-stale-presets --apply` 删掉整个 insert 块、发布脚本三处互锁、安装器写不存在的 `#v0.3.2` 等；明细见 `docs/审计-外部报告核对与修复-20261117.md` | 插件 / 脚本 / 预设 / 文档 |
 
 ### 为什么这两条瘦身要做成默认
 

@@ -125,7 +125,7 @@ install_modern() {
   echo "  升级须知：本脚本整块替换旧托管块 —— 0.2.5 时代的三卡（flash-lean-ptc-v1 / -v2）会被移除，"
   echo "  且这条路没有旧 id 兜底（别名层只随插件卡发行）。需要旧会话继续可打开，请改装插件卡。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
-  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.3.2"
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.3.1"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装会被默认拒绝：预设会重复注册）。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
@@ -142,8 +142,9 @@ install_runtime() {
     return 0
   fi
   # --no-backup：install_modern 开头已经整份备份过，不必再留一份 .bak-tune-*
-  node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" --no-backup >/dev/null 2>&1 || true
-  if grep -q 'executionMode: persistent-in-memory' "$PATCH" 2>/dev/null; then
+  # 必须看退出码：tune-runtime 做完 dump-config 校验才返回 0；只看文本会在「写了块但没生效」时报成功。
+  if node "$HERE/scripts/tune-runtime.mjs" --apply --profile "$PROFILE" --no-backup >/dev/null 2>&1 \
+     && grep -q 'executionMode: persistent-in-memory' "$PATCH" 2>/dev/null; then
     echo "  已写入 ptc-runtime: persistent-in-memory（profile 级覆盖，对该 profile 的所有预设生效）"
     echo "  改过配置需重启 dsh 才生效；卸载时会被一并撤掉。"
   else

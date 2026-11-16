@@ -96,7 +96,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 
 - `lean-v3` 是 0.2.5 时期的 13 条规则版，与现在发行的 `flash-lean-ptc-v3`（lean-v3）规则相同。
 - 「相对标准模式」同时包含了 PTC 工具面的收益。只看预设本身，应与 PTC 模式比：两个套件上分别约为 −59.6% 与 −69.2%（由表中数字算出）。
-- 表里只有 token 消耗是因为运行记录里每一轮都判为全对，故不把正确率单独列出。出题与评分使用同一个模型（`GPT-6.1-Sol`），答题与评分环节隔离以防止作弊。
+- 表里只有 token 消耗：逐题正确率没有留在本仓库（`docs/实测证据.md` 里另有一批 68.9167/100 的办公床记录，与上表不是同一批运行），所以不单列正确率。出题与评分使用同一个模型（`GPT-6.1-Sol`），答题与评分环节隔离以防止作弊。
 - 评分规则公开在 [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading)，真值与评分器放在私有仓库。
 
 ## 安装
@@ -109,7 +109,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 # 0.2.9：npm 上按版本号装（锁死版本）
 dsh plugin --profile web add dsh-flash-presets@0.3.1
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
 ```
 
 > **0.3.2 的 tag 还没推**（按计划先入库、后发版）：现在要从仓库装，把上面的 `#v0.3.2` 换成 `#main`。
@@ -166,7 +166,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
 - 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 规则与 v3 完全相同，由运行时兼容层映射到 `flash-lean-ptc-v3`；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
-- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看组合包里有没有 `flash-presets-alias` 这一行（只 inject `agentPresets` 的独立插件）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.1`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - **脚本路径升级会移除旧卡**：托管块是整块替换的，0.2.5 时代的三卡（`flash-lean-ptc-v1` / `-v2` / `-v3`）升级后只剩 `flash-lean-ptc-v3` 与 `-balance`。这条路径**没有旧 id 兜底**（别名层只随插件卡发行），引用 `-v1` / `-v2` 的旧会话升级后会 `agent-preset/not-found`。升级脚本会打印警告；需要旧会话继续可打开，请改装插件卡（`dsh plugin --profile <名称> add dsh-flash-presets`），它带兼容层。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
@@ -187,8 +187,8 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 为什么需要：P15654 的实测里，三份实现都在结束语里**如实**写了「17–19 超时 / 未覆盖」，然后照常交付 —— 缺的不是自述，是「不达标就不许结束」。
 - 打开方式：把该行的 `enabled` 改成 `true`（`cordis.patch.yml` 末段的 `delivery-gate` 行），或临时设 `DSH_DELIVERY_GATE=1`；关掉用 `enabled: false` 或 `DSH_DELIVERY_GATE=0`。
 - 脚本约定：默认找工作区根目录的 `verify.sh`（可用 `scripts` 配置改），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
-- 注意：出厂配置把这行写成 `enabled: false`，而插件自身默认是**开**的 —— 想保持关闭就别删 `config` 块。
-- **版本提示**：交付门是 0.3.0 之后才加进 `main` 的，**npm 上的 0.3.0 里没有它**（包内既无 `lib/delivery-gate.js`，`cordis.patch.yml` 里也没有这一行）。想现在就用，从 git 装：`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`；走 npm 的话请等下一版。
+- 注意：出厂配置把这行写成 `enabled: false`，插件 schema 的默认值也是**关**（0.3.1 是 `true`，0.3.2 改回 `false` —— 那一版会让普通对话也被验收门追着跑）。0.3.1 的代码只认 `DSH_DELIVERY_GATE=0`，设 `1` 打不开；从 0.3.2 起 `=1` 才真正生效。
+- **版本提示**：交付门 0.3.0 里没有，**0.3.1 起随 npm 发布**（包内含 `lib/delivery-gate.js`，`cordis.patch.yml` 里也有这一行）。0.3.0 想用只能从 git 装：`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`；走 npm 的话请等下一版。
 
 ## 注意事项
 
@@ -272,7 +272,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
   停在 `pending` 而完全跑不到。关闭：`DSH_FLASH_PRESETS_CONCURRENCY=0` ＞ 行内 `toolConcurrency.enabled=false` ＞ 默认开启。
 - **修复子代理「选模型 / 列模型」在 DSH 0.2.2 上一直是关的**（#21）：两份预设补 `modelSelection` / `modelDiscovery`，
   删掉 4 处没有任何代码读的 `backgroundMode`。
-- **新增交付门 `delivery-gate`**（默认关闭，需显式 `enabled: true`）与 `doctor` 第 9 项（profile 里会被静默禁用的插件）。
+- **新增交付门 `delivery-gate`**（schema 默认 `true`，与当时文档写的「默认关闭」相反；0.3.2 已改回 `false`）与 `doctor` 第 9 项（profile 里会被静默禁用的插件）。
 - 旧会话兼容：新增 `verify-session-compat.mjs` 守卫（A5）；`doctor` / `audit-compat` 的空环境误报全修（A3）；
   别名行与两份预设行不许 `disabled`（A8）。
 - **预设 id、规则文本、压缩阈值与裁剪参数均未改动**，装法不变（插件卡 / bundle / 脚本三条路照旧）。

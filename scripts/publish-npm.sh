@@ -27,7 +27,7 @@ fi
 # 必须就是本次要发的版本；0.3.1 就在这里吃过亏 —— 包里的 README 还在叫用户装 0.3.0，且已发出、改不了。
 README_VER="$(sed -n 's/.*当前版本：v\([0-9][0-9.]*\).*/\1/p' README.md | head -1)"
 [ "$README_VER" = "$VER" ] || fail "README 的「当前版本」是 ${README_VER}，与要发的 ${VER} 不一致" "先改 README 顶部再发"
-grep -q "dsh-flash-presets${VER}" README.md || fail "README 里没有 dsh-flash-presets${VER} 的安装命令" "npm 页面照抄会装到别的版本"
+grep -qF "dsh-flash-presets@${VER}" README.md || fail "README 里没有 dsh-flash-presets${VER} 的安装命令" "npm 页面照抄会装到别的版本"
 STALE="$(grep -oE 'dsh-flash-presets@[0-9]+\.[0-9]+\.[0-9]+' README.md | sort -u | grep -v "@${VER}" || true)"
 [ -z "$STALE" ] || fail "README 里还留着旧版本安装命令：${STALE}" "只允许出现 @${VER}"
 

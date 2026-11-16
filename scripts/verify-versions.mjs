@@ -86,9 +86,12 @@ for (const f of tagSources) {
   const npmRefs = [...text.matchAll(/dsh-flash-presets@(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const gitRefs = [...text.matchAll(/dsh-flash-presets#v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const badNpm = [...new Set(npmRefs.filter((v) => !npmOk.has(v)))];
-  const badGit = [...new Set(gitRefs.filter((v) => v !== base))];
+  // 版本号先落地、tag 后打时，安装器必须指向"真正存在的 tag"（= 已发布版本），
+  // 否则照抄命令会 404。所以两者都接受；发版后 run scripts/publish.sh 会把它拉回当前版本。
+  const gitOk = new Set([base, pub].filter(Boolean));
+  const badGit = [...new Set(gitRefs.filter((v) => !gitOk.has(v)))];
   check(badNpm.length === 0, f + " 的 npm 引用 ∈ {" + [...npmOk].join(", ") + "}", "出现 " + badNpm.join(", "));
-  check(badGit.length === 0, f + " 的 git tag 引用 = " + base, "出现 " + badGit.join(", "));
+  check(badGit.length === 0, f + " 的 git tag 引用 ∈ {" + [...gitOk].join(", ") + "}", "出现 " + badGit.join(", "));
 }
 
 if (problems.length > 0) {

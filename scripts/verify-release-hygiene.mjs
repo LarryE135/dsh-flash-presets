@@ -79,6 +79,11 @@ if (!existsSync(pub) || !/插件（\x60dsh-plan-mode-ui\x60）不单独建 Relea
 }
 
 for (const u of unverified) console.log("  ! 未验证：" + u);
+// CI 里不允许「未验证」蒙混过关：没有 token 时这些检查等于没跑，绿勾是假的。
+if (process.env.CI === 'true' && unverified.length > 0) {
+  console.log("✗ CI 环境下有 " + unverified.length + " 项未验证（缺 GH_TOKEN？）");
+  process.exit(1);
+}
 if (problems.length === 0) {
   console.log(unverified.length === 0 ? "✓ 发布面卫生检查通过" : "✓ 可检查部分通过（有 " + unverified.length + " 项未验证）");
 } else {

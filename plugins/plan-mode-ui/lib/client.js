@@ -832,7 +832,13 @@ window.__ModuleLoader__.load({
       if (typeof document === "undefined") return null;
       var id = "pmo-hud";
       var old = document.getElementById(id);
-      if (on !== true) { if (old !== null) old.remove(); return null; }
+      if (on !== true) {
+        if (old !== null) {
+          if (old.__pmoTimer !== undefined) { try { window.clearInterval(old.__pmoTimer); } catch (e) {} }
+          old.remove();
+        }
+        return null;
+      }
       if (old !== null) return old;
       var box = document.createElement("div");
       box.id = id;

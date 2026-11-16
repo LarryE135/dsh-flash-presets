@@ -84,11 +84,17 @@ if ! remote_tags="$(git ls-remote --tags origin "refs/tags/$TAG" 2>/dev/null)"; 
   exit 1
 fi
 if [ -n "$remote_tags" ]; then
-  echo "✖ 远端已存在标签 $TAG —— 版本号一经发布不得复用。" >&2
-  echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑本脚本。" >&2
-  echo "  已发布的 tag 一律不移动（GitHub 的 tag 规则集也会拒绝 force push）。本脚本不提供移动入口，" >&2
-  echo "  要修就升版本号。" >&2
-  exit 1
+  # 两个发布脚本的分工：publish-npm.sh 先推 tag 再发 npm，publish.sh 随后建 Release。
+  # 所以「远端已有同名 tag」本身不是错误 —— 只有它指向别的提交（想移动已发布的版本）才是。
+  remote_sha="$(printf '%s\n' "$remote_tags" | awk '{print $1}' | head -1)"
+  local_sha="$(git rev-parse "$TAG" 2>/dev/null || true)"
+  if [ -n "$local_sha" ] && [ "$remote_sha" = "$local_sha" ]; then
+    echo "✓ 远端标签 $TAG 已存在且指向本地同一提交（publish-npm.sh 推的），继续建 Release。"
+  else
+    echo "✖ 远端标签 $TAG 指向别的提交（$remote_sha ≠ ${local_sha}）—— 已发布的版本号不得复用。" >&2
+    echo "  升版本号（package.json / README / CHANGELOG）后重新打标签再跑。" >&2
+    exit 1
+  fi
 fi
 
 if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
@@ -99,13 +105,13 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
 
   # ⑤ npm 必须先发（2026-11-12 审计 D2）：Release 早于 npm，会让正文里的安装命令指向一个装不到的版本。
   # 判定一律走 node scripts/verify-published.mjs（内部用 npm view）：直连 registry 会命中边缘缓存，别自写探测。
-  if [ "\${ALLOW_MISSING_NPM:-0}" != "1" ] && command -v node >/dev/null 2>&1; then
+  if [ "${ALLOW_MISSING_NPM:-0}" != "1" ] && command -v node >/dev/null 2>&1; then
     if ! node scripts/verify-published.mjs --version "$PKG_VERSION" --timeout 8 --quiet >/dev/null 2>&1; then
-      fail "npm 上查不到 \${PKG_VERSION}（Release 会给出装不到的版本）" \
+      fail "npm 上查不到 ${PKG_VERSION}（Release 会给出装不到的版本）" \
         "先跑 bash scripts/publish-npm.sh（发布 + 复核），再回来建 Release" \
         "确实只发 git、不发 npm：ALLOW_MISSING_NPM=1 bash scripts/publish.sh"
     fi
-    echo "npm 侧已确认 \${PKG_VERSION} 生效"
+    echo "npm 侧已确认 ${PKG_VERSION} 生效"
   fi
   mkdir -p dist
   # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
