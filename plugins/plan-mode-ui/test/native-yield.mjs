@@ -75,14 +75,27 @@ const bridged = async (c) => {
   console.log("PASS T2 off 档 native=false");
 }
 
-// T3：full 档批准（plan/mode active=false）→ native=false 且 phase=executing
+// T3：full 档批准（plan/mode active=false，且规划阶段确实写过计划文本）→ native=false 且 phase=executing
 {
   const c = await boot("full", true);
   if ((await bridged(c)).native !== true) throw new Error("T3 前置失败：full 没桥接");
+  // 0.3.2：先让规划阶段产出助手文本，才算"真的有计划被批准"
+  c.fire("session/event", c.session, { type: "assistant/message", message: { content: [{ type: "text", text: "计划：先读源码，再改交付门默认值。" }] } });
   c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
   const d = await c.get(c.session.id);
   if (d.native !== false || d.phase !== "executing") throw new Error("T3 期望 false/executing，实际 " + d.native + "/" + d.phase);
   console.log("PASS T3 full 批准后 native=false、phase=executing");
+}
+
+// T3b（0.3.2 回归）：没有计划产出时，plan/mode 关闭不算批准 —— 不投递 PHASE 2、不留执行记录。
+// 这正是用户报的"普通对话里突然冒出一段 PHASE 2"。
+{
+  const c = await boot("full", true);
+  if ((await bridged(c)).native !== true) throw new Error("T3b 前置失败：full 没桥接");
+  c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
+  const d = await c.get(c.session.id);
+  if (d.phase === "executing") throw new Error("T3b 期望不进 executing，实际 phase=" + d.phase);
+  console.log("PASS T3b 空跑一场关闭不当批准（phase=" + d.phase + "）");
 }
 
 // T4：面板「退出」= POST action=plan-off → 真的执行 /plan off，native 立刻为 false

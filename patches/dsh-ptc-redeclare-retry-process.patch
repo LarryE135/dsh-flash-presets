@@ -1,0 +1,54 @@
+--- dsh-ptc-process.js.orig	2026-11-15 20:40:40.408359501 +0800
++++ dsh-ptc-process.js.patched	2026-11-15 21:00:31.972462821 +0800
+@@ -1350,16 +1350,16 @@
+ 		globals: repl.context,
+ 		evaluate(code, finish) {
+ 			const program = code.trimStart().startsWith("{") ? `;${code}` : code;
++				const __ptcWrap = `;{\n${code}\n}`;
+ 			const evaluate = () => {
+-				repl.eval(`${program}\n`, repl.context, "ptc-repl", (error, value) => {
+-					finish(error ? {
+-						ok: false,
+-						error
+-					} : {
+-						ok: true,
+-						value
+-					});
++			const __ptcRun = (prog, retried) => repl.eval(`${prog}\n`, repl.context, "ptc-repl", (error, value) => {
++					if (error && !retried && /already been declared/.test(String(error.message))) {
++						__ptcRun(__ptcWrap, true);
++						return;
++					}
++					finish(error ? { ok: false, error } : { ok: true, value });
+ 				});
++				__ptcRun(program, false);
+ 			};
+ 			if (imports === void 0) evaluate();
+ 			else imports.runRepl(resolve(process.cwd(), "ptc-program.js"), evaluate);
+@@ -7180,12 +7180,22 @@
+ */
+ async function evaluateScript(code, context, imports) {
+ 	const filename = resolve(process.cwd(), "ptc-program.js");
+-	const compiled = compileScript(code, {
++	const options = {
+ 		filename,
+ 		importModuleDynamically: imports === void 0 ? constants.USE_MAIN_CONTEXT_DEFAULT_LOADER : imports.forFile(filename)
+-	});
+-	const value = await compiled.script.runInContext(context);
+-	return compiled.transformed ? await value?.value : value;
++	};
++	const runOnce = async (source) => {
++		const compiled = compileScript(source, options);
++		const value = await compiled.script.runInContext(context);
++		return compiled.transformed ? await value?.value : value;
++	};
++	try {
++		return await runOnce(code);
++	} catch (error) {
++		/* 同一 vm 上下文里顶层 const/let 跨调用保留：命中重声明就用块级作用域重试一次 */
++		if (!/already been declared/.test(String(error?.message))) throw error;
++		return await runOnce(`;{\n${code}\n}`);
++	}
+ }
+ /** Detect top-level await before native compilation can interpret await as an identifier. */
+ function compileScript(code, options) {

@@ -21,3 +21,6 @@ pnpm-lock.yaml
 !package-lock.json
 !plugins/plan-rounds/package-lock.json
 internal-dev/
+
+# 本地回滚快照（第三方原始文件副本，不入库；可回滚的补丁在 patches/）
+backups/

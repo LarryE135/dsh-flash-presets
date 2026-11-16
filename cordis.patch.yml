@@ -399,3 +399,13 @@
         scripts:
           - verify.sh
         maxRounds: 2
+# 技能目录里每条描述的截断长度（默认整段；60 足够表达用途）。
+- id: tool-skill
+  config:
+    catalogDescriptionMaxLength: 60
+
+# 关掉两项 DeepSeek 专用请求体上报（不进上下文，只省上传）。
+- id: session-log-deepseek
+  disabled: true
+- id: plugin-package-inventory-deepseek
+  disabled: true

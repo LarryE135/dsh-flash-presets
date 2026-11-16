@@ -16,7 +16,7 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.3.1（2026-11-12）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.3.2（2026-11-16，仓库内版本；按用户要求未发 npm、未发 Release，npm latest 仍是 0.3.1）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
 > `dsh-flash-presets@0.3.1` 已发布到 npm（`npm view dsh-flash-presets version` 复核，`latest` = 0.3.1）；GitHub Release 排在发布前审计之后补。0.3.1 收口了 0.3.0 之后那三批「不升版号」的修正 —— 其中最关键的是 `run_code` 优化随安装即生效。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 

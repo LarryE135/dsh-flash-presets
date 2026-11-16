@@ -89,6 +89,8 @@ const userMsg = (turn) => ({ type: "user/message", data: { turn, content: [{ typ
   const c = await boot("full");
   c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
   c.fire("session/event", c.session, userMsg(2));
+  // 0.3.2：批准前必须有计划产出（助手文本），否则关闭会被当作取消
+  c.fire("session/event", c.session, { type: "assistant/message", message: { content: [{ type: "text", text: "计划：三条验收项。" }] } });
   c.fire("session/event", c.session, { type: "plan/mode", data: { turn: 2, active: false } });
   const d = await c.state();
   if (d.native !== false || d.indicator !== "executing") throw new Error("I4 期望 false/executing，实际 " + d.native + "/" + d.indicator);

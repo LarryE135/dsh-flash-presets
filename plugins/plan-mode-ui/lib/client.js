@@ -47,10 +47,10 @@ window.__ModuleLoader__.load({
       { id: "full", label: "全量", line: "同样走原生评审，批准后接管 PHASE 2 与 P0 验收" }
     ];
 
-    var S = { open: false, commitError: "", tier: "light", scope: "always", max: false, autoApprove: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
+    var S = { open: false, commitError: "", tier: "light", scope: "auto", max: false, autoApprove: false, phase: "idle", sid: null, source: "default", rect: null, listeners: new Set(), loaded: false, closeToken: 0, focusPanel: false,
       // 全局默认值（设置页专用）：来自响应里的 settings.default，不受会话行覆盖。
       // 与 tier/scope/max 分开存，否则设置页会被"当前会话的有效值"盖住，点完看着像没生效。
-      gTier: "light", gScope: "always", gMax: false, gAutoApprove: false,
+      gTier: "light", gScope: "auto", gMax: false, gAutoApprove: false,
       // 每个会话一份设置：切走再切回来还是自己的值；by 只存面板关心的几项
       by: {}, error: "" };
     function stow() { if (S.sid) S.by[S.sid] = { tier: S.tier, scope: S.scope, max: S.max, autoApprove: S.autoApprove, source: S.source }; }
@@ -146,6 +146,14 @@ window.__ModuleLoader__.load({
       // 面板底部的操作按钮与右侧分段控件右边缘对齐
       ".pmo-rowlbl{font-size:11.5px;color:#8a8f98}",
       ".pmo-maxcell{display:inline-flex;align-items:center;gap:7px;flex:none}",
+      // 4：自动批准按钮（纯 SVG 双向箭头环）。关闭时静止，开启时匀速旋转。
+      ".paa-btn{ display:inline-flex;align-items:center;justify-content:center; width:26px;height:26px;border:none;border-radius:7px;background:transparent;padding:0; color:var(--dsw-alias-label-primary,#111827);cursor:pointer; transition:background 140ms ease,color 140ms ease,transform 120ms ease; } .paa-btn:hover{background:color-mix(in srgb,currentColor 10%,transparent)} .paa-btn:active{transform:scale(.93)} .paa-btn[data-state='on'],.paa-btn[data-state='on']:hover{color:#4074e4} .paa-glyph{position:relative;display:inline-block;width:var(--paa-size,15px);height:var(--paa-size,15px);flex:none} .paa-burst,.paa-glyph>svg{position:absolute;left:0;top:0;width:100%;height:100%} .paa-glyph svg{overflow:visible;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round} .paa-burst>svg{width:100%;height:100%;display:block} .paa-ring{stroke-width:2} .paa-head{fill:currentColor;stroke:none} .paa-ck{stroke-width:2.2} .paa-burst,.paa-ring,.paa-ck{transform-origin:50% 50%} .paa-ring{animation:paa-spin 3s linear infinite;animation-play-state:paused} .paa-glyph[data-state='on'] .paa-ring{animation-play-state:running} @keyframes paa-spin{to{transform:rotate(360deg)}} .paa-ck{opacity:0;transform:scale(.6);transition:opacity 160ms ease-out,transform 160ms ease-out} .paa-glyph[data-state='on'] .paa-ck{opacity:1;transform:scale(1);transition-duration:200ms} .paa-glyph[data-state='on'] .paa-ck path{stroke-dasharray:10 12;animation:paa-check 320ms 140ms cubic-bezier(.3,0,.2,1) both} @keyframes paa-check{from{stroke-dashoffset:10}to{stroke-dashoffset:0}} .paa-glyph[data-state='on'] .paa-burst{animation:paa-engage 560ms cubic-bezier(.2,.7,.2,1) both} .paa-glyph[data-state='on'][data-fire='a'] .paa-burst{animation:paa-fire-a 480ms cubic-bezier(.2,.8,.25,1) both} .paa-glyph[data-state='on'][data-fire='b'] .paa-burst{animation:paa-fire-b 480ms cubic-bezier(.2,.8,.25,1) both} .paa-glyph[data-state='on'][data-fire='a'] .paa-ck{animation:paa-pop-a 480ms cubic-bezier(.3,0,.2,1)} .paa-glyph[data-state='on'][data-fire='b'] .paa-ck{animation:paa-pop-b 480ms cubic-bezier(.3,0,.2,1)} .paa-btn:hover .paa-glyph[data-state='off'] .paa-burst{animation:paa-nudge 420ms cubic-bezier(.3,0,.2,1)} @keyframes paa-engage{0%{transform:rotate(0) scale(.92)}22%{transform:rotate(-20deg) scale(.92)}100%{transform:rotate(180deg) scale(1)}} @keyframes paa-fire-a{0%{transform:rotate(0)}100%{transform:rotate(180deg)}} @keyframes paa-fire-b{0%{transform:rotate(0)}100%{transform:rotate(180deg)}} @keyframes paa-pop-a{0%,100%{transform:scale(1)}35%{transform:scale(1.22)}} @keyframes paa-pop-b{0%,100%{transform:scale(1)}35%{transform:scale(1.22)}} @keyframes paa-nudge{0%,100%{transform:rotate(0)}45%{transform:rotate(24deg)}} @media (prefers-reduced-motion:reduce){ .paa-glyph *{animation:none !important;transition:none !important} } .paa-static .paa-glyph *{animation:none !important;transition:none !important}.pmo-aa{display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;border:0;background:transparent;cursor:pointer;color:#8a8f98;border-radius:6px;flex:none}",
+      ".pmo-aa:hover{background:rgba(17,24,39,.06)}",
+      ".pmo-aa:focus-visible{outline:2px solid #2563eb;outline-offset:1px}",
+      "",
+      ".pmo-aa[data-on='true']{color:#2563eb}",
+      "",
+      "@keyframes pmo-aa-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}",
       ".pmo-seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(17,24,39,.06)}",
       ".pmo-segbtn{border:none;background:transparent;font-size:11px;line-height:1;padding:5px 9px;border-radius:7px;color:#6b7280;cursor:pointer;transition:background 150ms ease,color 150ms ease,box-shadow 150ms ease}",
       ".pmo-segbtn[data-active='true']{background:#ffffff;color:#111827;box-shadow:0 1px 3px rgba(15,23,42,.14)}",
@@ -617,6 +625,30 @@ window.__ModuleLoader__.load({
               "aria-label": "Max 模式", title: "Max 模式：注入「不用担心预算，你的 Token 是无限的」，抑制模型在预算受限时提前收手",
               onClick: function () { commit({ max: !s.max }, "session"); }
             }, React.createElement("span", { className: "pmo-knob" }))
+          ),
+          React.createElement("button", {
+            type: "button", role: "switch",
+            className: "pmo-aa paa-btn",
+            "aria-checked": s.autoApprove ? "true" : "false",
+            "data-on": s.autoApprove ? "true" : "false",
+            "data-state": s.autoApprove ? "on" : "off",
+            "aria-label": "自动批准",
+            title: "自动批准",
+            onClick: function () { commit({ autoApprove: !s.autoApprove }, "session"); }
+          },
+            React.createElement("span", { className: "paa-glyph", "data-state": s.autoApprove ? "on" : "off", "data-fire": "", style: { "--paa-size": "20px" }, "aria-hidden": "true" },
+              React.createElement("span", { className: "paa-burst" },
+                React.createElement("svg", { className: "paa-ring", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", focusable: "false" },
+                  React.createElement("path", { d: "M5.05 9.47A7.4 7.4 0 0 1 17.83 7.44" }),
+                  React.createElement("path", { d: "M18.95 14.53A7.4 7.4 0 0 1 6.17 16.56" }),
+                  React.createElement("path", { className: "paa-head", transform: "translate(17.83 7.44) rotate(52)", d: "M3.4 0-.6 2.5V-2.5Z" }),
+                  React.createElement("path", { className: "paa-head", transform: "translate(6.17 16.56) rotate(232)", d: "M3.4 0-.6 2.5V-2.5Z" })
+                )
+              ),
+              React.createElement("svg", { className: "paa-ck", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "aria-hidden": "true", focusable: "false" },
+                React.createElement("path", { d: "M8.6 12.3l2.3 2.3 4.6-4.8" })
+              )
+            )
           ),
           React.createElement("div", { className: "pmo-seg" },
             [

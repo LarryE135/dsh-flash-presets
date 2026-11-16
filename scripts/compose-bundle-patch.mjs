@@ -102,13 +102,33 @@ const GATE_ROW = [
   '          - verify.sh',
   '        maxRounds: 2',
 ].join('\n');
+// 0.3.2 上下文瘦身（第二轮研究实测，见 docs/研究-DSH-0.2.2-rc.3-上下文注入.md）：
+//   · tool-skill 默认把整段技能描述塞进目录；技能一多就是上千字符。压到 60 字符，语义保留。
+//   · 两项 DeepSeek 专用上报不进上下文，但每请求会把整份会话日志（实测 34KB）与插件清单（6KB）
+//     再传一遍。默认关掉；要用服务端分析时删掉这两条即可。
+// 注意：这里是 patch（不是 insert），DSH 的 applyPatches 对非 insert 条目是「有则改、无则只警告」，
+// 所以放到没有这些行的 profile 里也不会让启动失败。
+const LEAN_ROWS = [
+  '',
+  '# 技能目录里每条描述的截断长度（默认整段；60 足够表达用途）。',
+  '- id: tool-skill',
+  '  config:',
+  '    catalogDescriptionMaxLength: 60',
+  '',
+  '# 关掉两项 DeepSeek 专用请求体上报（不进上下文，只省上传）。',
+  '- id: session-log-deepseek',
+  '  disabled: true',
+  '- id: plugin-package-inventory-deepseek',
+  '  disabled: true',
+].join('\n');
+
 function compose() {
   const parts = SOURCES.map(rel => {
     const abs = path.join(repo, rel);
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + CORE_ROW + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + CORE_ROW + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + LEAN_ROWS + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {
