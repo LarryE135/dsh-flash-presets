@@ -31,7 +31,9 @@ const ONLY = (() => {
   }
   return v;
 })();
-const ROOT = path.join(os.homedir(), '.dsh', 'profiles');
+// 与 tune-runtime 一致：尊重 DSH_HOME（隔离环境/测试里绝不能去动真实的 ~/.dsh）
+const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
+const ROOT = path.join(DSH_HOME, 'profiles');
 
 if (!fs.existsSync(ROOT)) {
   console.log('找不到 ' + ROOT);
@@ -72,7 +74,8 @@ for (const dir of dirs) {
   const file = path.join(dir, 'cordis.patch.yml');
   if (!fs.existsSync(file)) continue;
   let text = fs.readFileSync(file, 'utf8');
-  const hits = RETIRED.filter((id) => text.includes('id: ' + id));
+  // 行内 id 有两种写法：`- id: preset-<id>` 与 `id: <id>`（config 里那份）。两种都算命中。
+  const hits = RETIRED.filter((id) => new RegExp('^[ \\t]*-[ \\t]*id:[ \\t]*(?:preset-)?' + id + '[ \\t]*$', 'm').test(text));
   if (!hits.length) {
     console.log(path.basename(dir).padEnd(12) + '干净');
     continue;
