@@ -2,6 +2,20 @@
 
 面向维护者。仓库改动 → 自检 → 发 npm → 打标签 → 建 Release → 收尾。每一步都写明了**为什么**和**实测踩过的坑**。
 
+## 发版前必跑：`npm run verify:full`
+
+`npm run verify` 只覆盖 CI 的第一步。CI 还会单独跑 `lint-presets`（版本真源：`package.json` / `marketplace/plugin.json` / lock / 版本表 / 各文件 git tag 引用）、`selftest.sh`（断言 README 必须有 `### v<当前版本>` 小节）等
+—— 0.3.2 就因只跑 `verify` 而两次「本地绿、CI 红」。
+
+**因此发版前（以及任何改版号、README 版本行、install 脚本 tag 引用的提交前）请跑：**
+
+```bash
+npm run verify:full
+```
+
+它按 `.github/workflows/verify.yml` 的 ubuntu 分支顺序串起 12 步不依赖平台/不依赖装 DSH 的检查。
+Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install / integration 仍只在 CI 跑。
+
 ## 0. 前置
 
 - 仓库在 WSL 的 `~/Common/dsh-flash-presets`；**npm 发布只能在 WSL 做**（凭据在 `~/.npmrc`，profile 在 `~/.dsh`），
