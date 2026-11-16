@@ -80,7 +80,9 @@ if (!existsSync(pub) || !/插件（\x60dsh-plan-mode-ui\x60）不单独建 Relea
 
 for (const u of unverified) console.log("  ! 未验证：" + u);
 // CI 里不允许「未验证」蒙混过关：没有 token 时这些检查等于没跑，绿勾是假的。
-if (process.env.CI === 'true' && unverified.length > 0) {
+// 只在「本来有能力验证」时把未验证当失败：CI 步骤会注入 GH_TOKEN；
+// 没有 token 的场合（如 npm pack 触发的 prepublishOnly）维持原来的只告警行为。
+if (process.env.CI === 'true' && process.env.GH_TOKEN && unverified.length > 0) {
   console.log("✗ CI 环境下有 " + unverified.length + " 项未验证（缺 GH_TOKEN？）");
   process.exit(1);
 }
