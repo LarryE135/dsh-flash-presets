@@ -205,6 +205,13 @@ DSH_PLAN_MODE_UI_HEADLESS=off dsh headless "把 1+1 写进 /tmp/x.txt"
 8. **安装位置**：请用 `dsh plugin --profile web add <tarball>` 装。**不要**用 `file:` 指向桌面/临时目录的
    tgz —— pnpm 会把依赖记成 `file:C:/Users/.../Desktop/xxx.tgz`，那个文件一旦移动/删除，profile 就装不回来。
    要留在本机就先把 tgz 拷到 `$DSH_HOME/plugins/` 再 `add`。
+9. **light 档会主动进计划模式**：`tier=light` 且 `scope=auto/always` 时，第 1 回合插件会替你打开原生 `/plan`，
+   所以即使没输入 `/plan`，也会看到计划评审卡。不想要就把档位切到「关闭」，或把 scope 改成 `first`（#29）。
+10. **PTC 预设下的评审超时（#29）**：lean-v3 预设只能通过 `run_code` 调工具，而 `run_code` 默认 120 秒截止，
+   这 120 秒**包括你阅读计划的时间**。插件会在派发前拦下「调用了 `exit_plan_mode` / `ask_user_question`
+   却没给 `timeoutMs ≥ 600000`」的 `run_code`，让模型带上超时重发（只多一个回合，不弹卡、不执行代码）。
+   自动批准开着时不拦；`DSH_FLASH_PRESETS_REVIEW_GUARD=0` 可关闭；宿主没有 `tools.guard` 时自动跳过。
+   评审仍然只有 10 分钟上限（宿主 `maxTimeoutMs`），超时不等于拒绝，模型会提示你而不是自己重交。
 
 ## 卸载
 
