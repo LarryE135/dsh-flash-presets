@@ -235,7 +235,7 @@ curl -s -X POST -H "Authorization: token $T" -H 'Accept: application/vnd.github+
 
 ### 插件（`dsh-plan-mode-ui`）不单独建 Release
 
-插件版本号（当前 `0.5.2`）独立演进，但**发布面跟着主版本走**：
+插件版本号（当前 `1.0.0`）独立演进，但**发布面跟着主版本走**：
 
 - **不打 `plan-mode-ui-*` tag**，也不单独建 Release。一旦打了，Releases 页会多出一条，
   而且按提交时间排序时它常常变成 `Latest`，把主版本顶下去（2026-10-31 实测踩过，已撤销）。
@@ -269,7 +269,7 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 ```bash
 # 0) 打包插件 + 自检（6 个文件：lib/ cordis.patch.yml README.md LICENSE package.json）
 node scripts/pack-plugin.mjs            # → dist/dsh-plan-mode-ui-A.B.C.tgz
-npm test --prefix plugins/plan-mode-ui  # 11 个测试全跑
+npm test --prefix plugins/plan-mode-ui  # 29 个测试全跑
 
 # 1) 插件先上 npm（需要 OTP；两个包用同一个 OTP 窗口内连发）
 npm publish plugins/plan-mode-ui --otp <code> --access public

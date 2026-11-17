@@ -74,7 +74,15 @@ function buildLiteCompatBody() {
   return body;
 }
 
+// 从一条预设正文里取出它的 preset id（"- id: preset-xxx"）。
+function idOfBody(body) {
+  const m = /^\s*-\s*id:\s*(preset-\S+)\s*$/m.exec(String(body));
+  return m === null ? '' : m[1];
+}
+
+// opts.skipIds：用户改过的那几条 id —— 不再写我们的一份，否则同 id 会有两张卡。
 function buildBlock(eol = '\n', opts = {}) {
+  const skip = opts.skipIds instanceof Set ? opts.skipIds : new Set(opts.skipIds || []);
   const bodies = FILES.map(name => {
     const file = path.join(presetsDir, name);
     if (!fs.existsSync(file)) throw new Error('缺少预设文件: ' + file);
@@ -83,8 +91,11 @@ function buildBlock(eol = '\n', opts = {}) {
     if (!m) throw new Error(name + ': 找不到行首的 - insert: 条目');
     // 落盘前把 !!js 平台标签解成布尔：用户机器上的补丁必须是普通 YAML
     return resolvePlatformTags(text.slice(m.index + m[0].length).replace(/\s+$/, ''));
-  });
-  if (opts.legacyLite === true) bodies.push(buildLiteCompatBody());
+  }).filter((body) => !skip.has(idOfBody(body)));
+  if (opts.legacyLite === true) {
+    const lite = buildLiteCompatBody();
+    if (!skip.has(idOfBody(lite))) bodies.push(lite);
+  }
   return (BEGIN + '\n- insert:\n' + bodies.join('\n') + '\n' + END + '\n').replace(/\n/g, eol);
 }
 
@@ -120,14 +131,70 @@ function stripBlock(raw) {
 // 认领等于静默删除（第六轮审计 U1-2）。
 const INSTALLER_IDS = new Set(['preset-flash-lean-ptc-v3', 'preset-flash-lean-ptc-v3-balance', 'preset-flash-lean-ptc-v3-lite']);
 
-// 认领前先比对结构：必须是「preset-<id> 包装行 + config.id 与之一致」的完整预设条目；
-// 对不上（用户改过，或从旧版本整段拷来）就原样保留，并如实说明。
-function isInstallerRow(presetId, blockText) {
-  if (!INSTALLER_IDS.has(presetId)) return false;
-  const id = presetId.replace(/^preset-/, '');
-  const hasWrap = /^\s*name:\s*'@deepseek-ai\/dsh-agent-preset'\s*$/m.test(blockText);
-  const hasConfig = new RegExp('^\\s*id:\\s*' + id + '\\s*$', 'm').test(blockText);
-  return hasWrap && hasConfig;
+// 去行尾空白、去空行、抹掉公共缩进：用户复制粘贴常改缩进，语义一样就不该算「改过」。
+function normalizeEntry(text) {
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l.trim() !== '');
+  let min = Infinity;
+  for (const l of lines) min = Math.min(min, l.match(/^(\s*)/)[1].length);
+  if (!Number.isFinite(min)) return '';
+  return lines.map((l) => l.slice(min)).join('\n');
+}
+
+// 按「- id: preset-xxx」切条目（indent 是条目行的缩进），返回 [{ id, text }]。
+function splitEntries(lines, indent) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*)-\s*id:\s*(\S+)\s*$/);
+    if (!m || m[1].length !== indent) continue;
+    const chunks = [lines[i]];
+    let j = i + 1;
+    while (j < lines.length && (lines[j].trim() === '' || lines[j].match(/^(\s*)/)[1].length > indent)) {
+      chunks.push(lines[j]);
+      j++;
+    }
+    out.push({ id: m[2], text: chunks.join('\n') });
+    i = j - 1;
+  }
+  return out;
+}
+
+// 安装器自己会写进去的每一条（按 id 索引）。认领前拿它做逐行比对 ——
+// 这是本轮 P1：只比结构的话，用户把 thresholdRatio 改成 0.9 的条目也「结构相符」，
+// 于是被当成残留删掉，还打印「内容与安装器写入的一致」（实测复现）。
+let installerEntries = null;
+function installerEntryMap() {
+  if (installerEntries !== null) return installerEntries;
+  const map = new Map();
+  const block = buildBlock('\n', { legacyLite: keepLegacyLite === true });
+  for (const e of splitEntries(block.split('\n'), 4)) map.set(e.id, normalizeEntry(e.text));
+  installerEntries = map;
+  return map;
+}
+
+// 判据分两层（第六轮审计 U1-2 + 第三轮自查 P1-1）：
+//   ① 结构：包装行 + config.id 与 id 对应；
+//   ② 内容：用户这一条里的**每一行**都必须是安装器也会写的那一行 —— 只要有一行是安装器不会写的
+//      （比如把 thresholdRatio 从 0.25 改成 0.9），就认定「用户改过」，整条保留。
+// 用子集而不是逐字相等，是因为老版本安装器写的条目更短（少几个键）；逐字相等会把那些历史条目
+// 判成「用户自加」而留下两份同 id 的卡（selftest 的 -lite 升级用例正是这种情形）。
+// 代价：用户手工**删掉**某个键时，会被当作老安装器的短条目而补齐 —— 这是无法区分的，取不重复。
+function entryLineSet(text) {
+  return new Set(normalizeEntry(text).split('\n').map((l) => l.replace(/\s+/g, ' ')));
+}
+
+function isInstallerEntry(id, text) {
+  if (!INSTALLER_IDS.has(id)) return false;
+  const bare = id.replace(/^preset-/, '');
+  const body = String(text);
+  if (!/^\s*name:\s*'@deepseek-ai\/dsh-agent-preset'\s*$/m.test(body)) return false;
+  if (!new RegExp('^\\s*id:\\s*' + bare + '\\s*$', 'm').test(body)) return false;
+  const expect = installerEntryMap().get(id);
+  if (expect === undefined) return false;
+  const theirs = entryLineSet(expect);
+  for (const line of entryLineSet(body)) if (!theirs.has(line)) return false;
+  return true;
 }
 
 function adoptForeignRows(text) {
@@ -142,25 +209,27 @@ function adoptForeignRows(text) {
       let j = i + 1;
       const body = [];
       while (j < lines.length && !/^-\s/.test(lines[j])) { body.push(lines[j]); j++; }
-      const hits = body
-        .map(l => l.match(/^(\s*)-\s*id:\s*(\S+)\s*$/))
+      const flat = body.map((l) => l.replace(/\n$/, ''));
+      const hits = flat
+        .map((l) => l.match(/^(\s*)-\s*id:\s*(\S+)\s*$/))
         .filter(Boolean)
-        .map(m => ({ indent: m[1].length, id: m[2] }));
-      const minIndent = hits.length > 0 ? Math.min(...hits.map(h => h.indent)) : Infinity;
-      const ids = hits.filter(h => h.indent === minIndent).map(h => h.id);
-      if (ids.length > 0 && ids.every(id => isInstallerRow(id, body.join('')))) {
-        removed.push(...ids);
+        .map((m) => ({ indent: m[1].length, id: m[2] }));
+      const minIndent = hits.length > 0 ? Math.min(...hits.map((h) => h.indent)) : Infinity;
+      const entries = Number.isFinite(minIndent) ? splitEntries(flat, minIndent) : [];
+      if (entries.length > 0 && entries.every((e) => isInstallerEntry(e.id, e.text))) {
+        removed.push(...entries.map((e) => e.id));
         while (j < lines.length && lines[j].trim() === '') j++;
         i = j;
         continue;
       }
+      for (const e of entries) if (/^preset-flash-lean-ptc/.test(e.id)) kept.push(e.id);
     } else {
       const m = line.match(/^-\s*id:\s*(\S+)\s*$/);
       if (m) {
         const blockLines = [line];
         let j = i + 1;
         while (j < lines.length && /^\s+\S/.test(lines[j])) { blockLines.push(lines[j]); j++; }
-        if (isInstallerRow(m[1], blockLines.join(''))) {
+        if (isInstallerEntry(m[1], blockLines.map((l) => l.replace(/\n$/, '')).join('\n'))) {
           removed.push(m[1]);
           i = j;
           while (i < lines.length && lines[i].trim() === '') i++;
@@ -174,7 +243,6 @@ function adoptForeignRows(text) {
   }
   return { text: out.join(''), removed, kept };
 }
-
 let raw = fs.existsSync(patchPath) ? fs.readFileSync(patchPath, 'utf8') : '[]\n';
 const eol = detectEol(raw);
 // 旧托管块 / 旧裸行里出现过 -lite → 这次升级要带一行兼容行（除非显式 --no-legacy-lite）
@@ -212,9 +280,9 @@ try {
     const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
     if (body.length === 0 || (body.length === 1 && isEmptyArray(body[0]))) {
       const kept = raw.split(/\r?\n/).filter(l => !isEmptyArray(l)).join(eol).replace(/\s+$/, '');
-      out = (kept.trim() ? kept + eol + eol : '') + buildBlock(eol, { legacyLite: keepLegacyLite });
+      out = (kept.trim() ? kept + eol + eol : '') + buildBlock(eol, { legacyLite: keepLegacyLite, skipIds: new Set(keptCustom) });
     } else if (body[0].trimStart().startsWith('- ')) {
-      out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol, { legacyLite: keepLegacyLite });
+      out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol, { legacyLite: keepLegacyLite, skipIds: new Set(keptCustom) });
     } else {
       console.error('✖ 该补丁文件不是「块状数组」形式（可能是 [{...}] 之类的流式写法）。');
       console.error('  请先把这个文件改回块状数组（形如 `[]` 或 `- ...` 开头），再跑一次。');
@@ -231,7 +299,14 @@ if (adopted.length > 0) {
   console.log('已认领托管块外的历史残留: ' + adopted.join(', ') + '（内容与安装器写入的一致，已由托管块取代）');
 }
 if (keptCustom.length > 0) {
-  console.log('已保留你自己加的预设行: ' + keptCustom.join(', ') + '（不在安装器管理的 id 内，或内容被改过；不动它）');
+  const managed = keptCustom.filter((id) => /^preset-flash-lean-ptc-v3(-balance|-lite)?$/.test(id));
+  const foreign = keptCustom.filter((id) => !managed.includes(id));
+  if (managed.length > 0) {
+    console.log('你改过这几条 → 本次不覆盖、也不另写一份（同 id 只留你的）：' + managed.join(', '));
+  }
+  if (foreign.length > 0) {
+    console.log('已保留你自己加的预设行: ' + foreign.join(', ') + '（不在安装器管理的 id 内；不动它）');
+  }
 }
 if (flag('--check')) {
   console.log('将写入的预设行: ' + (rows.length ? rows.join(', ') : '（无）'));

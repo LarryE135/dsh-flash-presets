@@ -52,6 +52,7 @@ async function boot(tier, scope) {
   c.fire("session/event", c.session, { type: "turn/start" });
   c.fire("session/event", c.session, { type: "turn/end" });          // 记录被清
   c.fire("session/event", c.session, { type: "plan/mode", data: { active: false } }); // 之后才批准
+  await new Promise((r) => setTimeout(r, 0)); // PHASE 2 是宏任务投递，等一拍再断言
   const hit = c.steers.filter((s) => s.includes("PHASE 2")).length;
   if (hit === 0) throw new Error("F2 批准后没有投递 PHASE 2");
   console.log("PASS F2 驳回后批准仍能投递 PHASE 2（" + hit + " 次）");

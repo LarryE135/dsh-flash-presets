@@ -80,6 +80,8 @@ ${MARK}
 
 function backup(file) {
   if (NO_BACKUP) return null;
+  // 目标不存在就别备份：多 profile 循环里一个没有 cordis.patch.yml 的 profile 会把整轮打断。
+  if (!fs.existsSync(file)) return null;
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const dst = `${file}.bak-tune-${stamp}`;
   fs.copyFileSync(file, dst);

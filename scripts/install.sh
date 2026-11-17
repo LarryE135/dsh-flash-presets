@@ -125,7 +125,7 @@ install_modern() {
   echo "  升级须知：本脚本整块替换旧托管块 —— 0.2.5 时代的三卡（flash-lean-ptc-v1 / -v2）会被移除，"
   echo "  且这条路没有旧 id 兜底（别名层只随插件卡发行）。需要旧会话继续可打开，请改装插件卡。"
   echo "  未安装：计划模式组件、旧 id 兼容层、glob/grep 只读并发 —— 这三项只在插件管理器安装时才有："
-  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.3.2"
+  echo "    dsh plugin --profile $PROFILE add github:LarryE135/dsh-flash-presets#v0.3.3"
   echo "    两者二选一：本脚本写过预设之后要改装插件卡，请先 --uninstall（都装会被默认拒绝：预设会重复注册）。"
   echo "  自检：dsh --profile $PROFILE --dump-config | grep -A3 'id: preset-flash-lean-ptc-v3'"
   echo "  体检：node scripts/doctor.mjs --profile $PROFILE   （版本/重复行/!!js/解析 一次过）"
@@ -150,6 +150,9 @@ install_runtime() {
   else
     echo "  ⚠ 未能写入常驻运行时；两个预设不受影响，可手动跑 node scripts/tune-runtime.mjs --apply --profile $PROFILE"
   fi
+  # 备份文件只在安装时才会产生（每次改 patch 都留一份 .bak-<时间戳>），
+  # 以前只有卸载路径调 prune：连装十几次会攒一堆。install.ps1 早就两边都清。
+  prune_backups
 }
 
 install_legacy() {

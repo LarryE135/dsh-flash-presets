@@ -98,7 +98,9 @@ node scripts/audit-compat.mjs --dsh-home /mnt/c/Users/<you>/.dsh   # Windows 侧
 一条命令做完 ③ 的对齐（含装包与复审）：
 
 ```bash
-bash ~/.dsh/scripts/align-presets.sh            # 演练
-bash ~/.dsh/scripts/align-presets.sh --apply    # 停服务 → 改写 → 摘冒烟会话 → 装包 → 起服务 → 复审
+node scripts/audit-align.mjs                                      # 只读体检：列出还写着历史 id 的会话
+node scripts/retarget-session-presets.mjs --apply --yes --force    # 一次性改写（先停 dsh）
 ```
+
+（旧文档写的 `~/.dsh/scripts/align-presets.sh` 从来不在发行物里，本轮审计已改正。）
 

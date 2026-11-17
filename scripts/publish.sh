@@ -39,10 +39,10 @@ if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$TAG^{commit}")" ]; then
     "已经发过 npm 的版本，包内容不可改 —— 出问题就升版本号"
 fi
 
-# ③b 标签那次 CI 必须是绿的（0.2.9 的 tag run 是红的，npm 仍在 1 分钟后发出去了；没装 gh 时跳过）
-# 本机 GitHub 访问统一走 v2rayN 的 10808：gh 偶发的 TLS handshake timeout 来自代理链路抖动。
-# 只给 gh 这一条命令加环境前缀（不 export、不写 ~/.bashrc）；10808 没人监听时退回继承环境
-# （例如 v2rayN 没开，就照旧走系统已经配好的路）。
+# ③b 标签那次 CI 必须是绿的（0.2.9 的 tag run 是红的，npm 仍在 1 分钟后发出去了）。
+# 本轮修正：原来是「有 gh 就查、查不到就跳过、conclusion 为空也放行」——这三条都会在
+# 真正需要拦的时候放行（gh 没登录、run 还在跑、run 列表为空）。现在改成 fail-closed：
+# 证明不了绿就不发，确要跳过必须显式 ALLOW_UNKNOWN_CI=1。
 GH_PROXY="${GH_PROXY:-http://127.0.0.1:10808}"
 gh_() {
   if (exec 3<>/dev/tcp/127.0.0.1/10808) 2>/dev/null; then
@@ -54,14 +54,45 @@ gh_() {
 
 if command -v gh >/dev/null 2>&1; then
   RUNS_JSON="$(mktemp)"
-  if gh_ run list --commit "$(git rev-parse "$TAG^{commit}")" --limit 30 --json conclusion,event >"$RUNS_JSON" 2>/dev/null; then
-    if grep -q '"conclusion":"failure"' "$RUNS_JSON" || grep -q '"conclusion":"cancelled"' "$RUNS_JSON"; then
+  if gh_ run list --commit "$(git rev-parse "$TAG^{commit}")" --limit 30 --json conclusion,status,event >"$RUNS_JSON" 2>/dev/null; then
+    if grep -qE '"conclusion":"(failure|cancelled|timed_out|action_required|startup_failure)"' "$RUNS_JSON"; then
       rm -f "$RUNS_JSON"
-      fail "标签提交的 CI 有失败或取消的 run" "等 main 的 CI 绿了再打标签；红灯下发版正是 0.2.9 犯过的错"
+      fail "标签提交的 CI 有失败/取消/超时的 run" "等 main 的 CI 绿了再打标签；红灯下发版正是 0.2.9 犯过的错"
+    fi
+    COMPLETED="$(grep -c '"status":"completed"' "$RUNS_JSON" 2>/dev/null || true)"
+    if [ "${COMPLETED:-0}" = "0" ]; then
+      rm -f "$RUNS_JSON"
+      fail "标签提交上找不到任何已完成的 CI run（无法证明它是绿的）" \
+        "等这个 tag 的 verify / pack 跑完再发；确要跳过：ALLOW_UNKNOWN_CI=1 bash scripts/publish.sh"
+    fi
+    if grep -qE '"status":"(queued|in_progress|pending|waiting|requested)"' "$RUNS_JSON"; then
+      rm -f "$RUNS_JSON"
+      if [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ]; then
+        echo "⚠ 标签提交的 CI 还有未完成的 run，已按 ALLOW_UNKNOWN_CI=1 跳过"
+      else
+        fail "标签提交的 CI 还有未完成的 run（现在发版等于赌它绿）" \
+          "等跑完再发；确要跳过：ALLOW_UNKNOWN_CI=1 bash scripts/publish.sh"
+      fi
+    else
+      echo "标签提交的 CI：${COMPLETED} 个 run 已完成，无失败/取消"
+    fi
+  else
+    rm -f "$RUNS_JSON"
+    if [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ]; then
+      echo "⚠ 查询标签提交的 CI 失败，已按 ALLOW_UNKNOWN_CI=1 跳过"
+    else
+      fail "查询标签提交的 CI 状态失败（gh run list 出错）" \
+        "确认 gh 已登录、代理可用后重试；确要跳过：ALLOW_UNKNOWN_CI=1 bash scripts/publish.sh"
     fi
   fi
   rm -f "$RUNS_JSON"
+elif [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ]; then
+  echo "⚠ 没装 gh，无法核对标签 CI，已按 ALLOW_UNKNOWN_CI=1 跳过"
+else
+  fail "没装 gh，无法核对标签提交的 CI 是否绿" \
+    "装 gh 并登录（gh auth login）后重试；确要跳过：ALLOW_UNKNOWN_CI=1 bash scripts/publish.sh"
 fi
+
 
 # ④ 远端 main 不能有本地没有的提交（否则 Release 与用户拉到的 main 不一致）
 if git remote get-url origin >/dev/null 2>&1; then
@@ -70,9 +101,8 @@ if git remote get-url origin >/dev/null 2>&1; then
     git merge-base --is-ancestor origin/main HEAD || fail "远端 main 有本地没有的提交" "先 git pull --rebase origin main（解决冲突）再重试；没对齐就不要发版"
   fi
 fi
-echo "前置守卫通过（版本 ${PKG_VERSION}，标签在 HEAD 历史上）"
-if [ "$DRY_RUN" = "1" ]; then echo "DRY_RUN=1：只做检查，不推送。"; exit 0; fi
-git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE"
+
+git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REMOTE" 2>/dev/null || true
 
 # 硬规则：远端已有的同名 tag 不得移动。
 # 第二轮审计 N1-1：v0.2.6 一晚被移过 5 次，同一个版本号对应了 6 个提交，按 tag 安装的用户
@@ -96,6 +126,8 @@ if [ -n "$remote_tags" ]; then
     exit 1
   fi
 fi
+echo "前置守卫通过（版本 ${PKG_VERSION}，标签在 HEAD 历史上，远端标签未被移动）"
+if [ "$DRY_RUN" = "1" ]; then echo "DRY_RUN=1：只做检查（含远端标签检查），不推送、不发 npm、不建 Release。"; exit 0; fi
 
 if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
   gh_ repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
@@ -125,7 +157,7 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
   mkdir -p dist
   # 打 tag 而不是 HEAD：HEAD 与 tag 不一致时附件就对不上（第三轮审计 R1-1 之⑤）。
   # 每次重打：复用 dist/ 里的旧附件会让 Release 内容与 tag 悄悄不一致（第六轮审计 U3-7）。
-  rm -f "dist/dsh-flash-presets-$TAG.zip"
+rm -f dist/dsh-flash-presets-*.zip   # dist/ 只放本次附件，免得旧包混进 Release
   git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
   gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
   echo "完成：https://github.com/$GH_USER/$REPO"

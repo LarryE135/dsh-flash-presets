@@ -69,10 +69,16 @@ check(wrong.length === 0, "兼容性-rc5.md 引用的插件版本 = " + plugin, 
 //    - 插件附件（若要单独发）按插件版本命名：dsh-plan-mode-ui-1.0.0.zip
 if (existsSync(join(REPO, "dist"))) {
   const zips = readdirSync(join(REPO, "dist")).filter((f) => f.endsWith(".zip"));
-  const badPlugin = zips.filter((f) => f.includes("plan-mode-ui") && !f.includes(plugin));
-  check(badPlugin.length === 0, "dist/ 插件附件文件名带插件版本 " + plugin, badPlugin.join(", "));
-  const badBundle = zips.filter((f) => f.startsWith("dsh-flash-presets-") && !f.includes(base));
-  check(badBundle.length === 0, "dist/ 组合包附件文件名带版本 " + base, badBundle.join(", "));
+  const expectBundle = "dsh-flash-presets-v" + base + ".zip";
+  const expectPlugin = "dsh-plan-mode-ui-" + plugin + ".zip";
+  // 只拦「名字里带着当前版本、却又不完全对」的附件。上一版留下的 zip 是历史附件：
+  // 旧写法会把它们一起判红，于是 npm 的 prepublishOnly 被自家 dist/ 卡死（本轮 P2）。
+  const nearBundle = zips.filter((f) => f.startsWith("dsh-flash-presets-") && f.includes(base) && f !== expectBundle);
+  const nearPlugin = zips.filter((f) => f.startsWith("dsh-plan-mode-ui-") && f.includes(plugin) && f !== expectPlugin);
+  check(nearBundle.length === 0, "dist/ 组合包附件名必须是 " + expectBundle, nearBundle.join(", "));
+  check(nearPlugin.length === 0, "dist/ 插件附件名必须是 " + expectPlugin, nearPlugin.join(", "));
+  const stale = zips.filter((f) => !f.includes(base) && (f.startsWith("dsh-flash-presets-") || f.startsWith("dsh-plan-mode-ui-")));
+  if (stale.length > 0) console.log("  · dist/ 里的历史附件（不参与校验；publish.sh 发版前会清掉组合包）：" + stale.join(", "));
 }
 
 // ⑦ 安装器 / marketplace / README 里写死的引用（第三轮审计 R3-4）
@@ -85,6 +91,9 @@ for (const f of tagSources) {
   const text = read(f);
   const npmRefs = [...text.matchAll(/dsh-flash-presets@(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const gitRefs = [...text.matchAll(/dsh-flash-presets#v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  // 离线安装入口（git clone --depth 1 -b vX.Y.Z）同样把用户钉在某个 tag 上：
+  // 本轮审计发现 README 写着 0.3.2、clone 却还在拉 v0.3.0，而下面的闸门看不见这种写法。
+  const cloneRefs = [...text.matchAll(/-b v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const badNpm = [...new Set(npmRefs.filter((v) => !npmOk.has(v)))];
   // 版本号先落地、tag 后打时，安装器必须指向真正存在的 tag（= 已发布版本），否则照抄命令
   // 会 404，所以两者都接受。注意没有任何脚本会替你改这些引用：发版提交里要手改，
@@ -93,6 +102,8 @@ for (const f of tagSources) {
   const badGit = [...new Set(gitRefs.filter((v) => !gitOk.has(v)))];
   check(badNpm.length === 0, f + " 的 npm 引用 ∈ {" + [...npmOk].join(", ") + "}", "出现 " + badNpm.join(", "));
   check(badGit.length === 0, f + " 的 git tag 引用 ∈ {" + [...gitOk].join(", ") + "}", "出现 " + badGit.join(", "));
+  const badClone = [...new Set(cloneRefs.filter((v) => !gitOk.has(v)))];
+  check(badClone.length === 0, f + " 的 git clone -b 引用 ∈ {" + [...gitOk].join(", ") + "}", "出现 " + badClone.join(", "));
 }
 
 if (problems.length > 0) {

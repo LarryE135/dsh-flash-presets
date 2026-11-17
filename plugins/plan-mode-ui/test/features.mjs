@@ -39,6 +39,8 @@ function api(method, path, body, headers) {
 const state = (sid) => api("GET", "/api/plan-mode/state?session=" + sid);
 const mkSession = (id, extra) => Object.assign({ id: id, cwd: tmpCwd }, extra || {});
 const steers = [];
+// 纠偏与 PHASE 2 都是宏任务投递（宿主 session/event 里不能同步 append），断言前先让出一拍。
+const flush = () => new Promise((r) => setTimeout(r, 0));
 function mkAgent(session) {
   return { session, steer(msg) { steers.push(msg && msg.content && msg.content[0] ? String(msg.content[0].text) : String(msg)); } };
 }
@@ -82,12 +84,14 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   clearPlan();
   steers.length = 0;
   emit({ type: "tool/call", name: "write", turn: 1 }, session);
+  await flush();
   check("B2 规划期先动手被纠偏（PLAN FIRST）", steers.length === 1 && steers[0].indexOf("PLAN FIRST") === 0, steers[0] && steers[0].slice(0, 24));
 
   // 计划落地后不再纠偏
   planFile(sid);
   emit({ type: "turn/start", turn: 1 }, session);   // 同回合重复 start 不重置
   emit({ type: "tool/call", name: "edit", turn: 1 }, session);
+  await flush();
   check("B3 计划已落地则不再纠偏", steers.length === 1, steers.length);
 
   // 回合收尾 → 同一回合内投递 PHASE 2，阶段切到 executing
@@ -130,6 +134,7 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "turn/start", turn: 1 }, ab);
   planFile("abort-1");
   emit({ type: "tool/call", name: "read", turn: 1 }, ab);
+  await flush();
   steers.length = 0;
   await STOP({ agent: mkAgent(ab), turn: 1, signal: { aborted: true } });
   check("C3 signal.aborted 时不续跑", steers.length === 0, steers.length);
@@ -140,6 +145,7 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "turn/start", turn: 1 }, missing);
   clearPlan();
   emit({ type: "tool/call", name: "write", turn: 1 }, missing);
+  await flush();
   steers.length = 0;
   await STOP({ agent: mkAgent(missing), turn: 1, signal: { aborted: false } });
   check("C4 缺计划时先索要计划（PLAN NOT FOUND）", steers.length === 1 && steers[0].indexOf("PLAN NOT FOUND") === 0, steers[0] && steers[0].slice(0, 20));
@@ -154,7 +160,9 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "turn/start", turn: 1 }, busy);
   planFile("busy-1");
   emit({ type: "tool/call", name: "run_code", turn: 1 }, busy);
+  await flush();
   emit({ type: "tool/call", name: "run_code", turn: 1 }, busy);
+  await flush();
   steers.length = 0;
   await STOP({ agent: mkAgent(busy), turn: 1, signal: { aborted: false } });
   const st = await state("busy-1");
@@ -168,6 +176,7 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "turn/start", turn: 1 }, light);
   planFile("busy-2");
   emit({ type: "tool/call", name: "read", turn: 1 }, light);
+  await flush();
   steers.length = 0;
   await STOP({ agent: mkAgent(light), turn: 1, signal: { aborted: false } });
   check("C7 计划后只做一步 → 仍然注入 PHASE 2", steers.length === 1 && steers[0].indexOf("PHASE 2") === 0, steers.length);
@@ -238,8 +247,10 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "turn/start", turn: 1 }, s);
   steers.length = 0;
   emit({ type: "tool/call", name: "write", turn: 1 }, s);
+  await flush();
   check("F1 没有计划文件时动手 → 纠偏", steers.length === 1);
   emit({ type: "tool/call", name: "edit", turn: 1 }, s);
+  await flush();
   check("F1b 纠偏只发一次（不刷屏）", steers.length === 1, steers.length);
   // 根目录 P0-EXEC.yml 不算计划（防项目自带同名文件放空）
   writeFileSync(join(tmpCwd, "P0-EXEC.yml"), "version: 1\n");
@@ -249,6 +260,7 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "user/message", source: { kind: "user" }, content: [{ type: "text", text: "实现导出" }], turn: 1 }, s2);
   emit({ type: "turn/start", turn: 1 }, s2);
   emit({ type: "tool/call", name: "write", turn: 1 }, s2);
+  await flush();
   check("F2 根目录 P0-EXEC.yml 不算计划 → 仍纠偏", steers.length === 1);
   // .plan-mode/ 下任意 md/yml 算计划
   clearPlan();
@@ -260,9 +272,36 @@ function clearPlan() { rmSync(join(tmpCwd, ".plan-mode"), { recursive: true, for
   emit({ type: "user/message", source: { kind: "user" }, content: [{ type: "text", text: "实现导出" }], turn: 1 }, s3);
   emit({ type: "turn/start", turn: 1 }, s3);
   emit({ type: "tool/call", name: "write", turn: 1 }, s3);
+  await flush();
   check("F3 .plan-mode/EVIDENCE.md 也算计划 → 不纠偏", steers.length === 0, steers.length);
   rmSync(join(tmpCwd, "P0-EXEC.yml"), { force: true });
   clearPlan();
+}
+
+/* ---------- F4. PTC 模式下嵌套调用同样算「动手」 ---------- */
+{
+  clearPlan();
+  const sid = "ptc-1";
+  const s = mkSession(sid);
+  const agent = mkAgent(s);
+  handlers.get("agent/created")({ agent });
+  emit({ type: "user/message", source: { kind: "user" }, content: [{ type: "text", text: "实现导出" }], turn: 1 }, s);
+  emit({ type: "turn/start", turn: 1 }, s);
+  steers.length = 0;
+  // 宿主在 ptc 模式下发的是这两个事件，嵌套调用根本没有 tool/call
+  emit({ type: "tool/ptc-dispatch-start", name: "write", turn: 1 }, s);
+  emit({ type: "tool/ptc-dispatch", name: "write", turn: 1 }, s);
+  await flush();
+  check("F4 PTC 嵌套调用也算动手 → 纠偏", steers.length === 1 && steers[0].indexOf("PLAN FIRST") === 0, steers[0] && steers[0].slice(0, 20));
+  emit({ type: "tool/ptc-dispatch-start", name: "edit", turn: 1 }, s);
+  emit({ type: "tool/ptc-dispatch", name: "edit", turn: 1 }, s);
+  await flush();
+  check("F4b PTC 下纠偏只发一次", steers.length === 1, steers.length);
+  // 结束事件回减在飞计数：再来一次普通 tool/call + result 不应把会话判成「还在跑」
+  emit({ type: "tool/ptc-dispatch-start", name: "read", turn: 1 }, s);
+  emit({ type: "tool/ptc-dispatch", name: "read", turn: 1 }, s);
+  await flush();
+  check("F4c 只读取值不算动手", steers.length === 1, steers.length);
 }
 
 /* ---------- G. 无人工审批残留 ---------- */
