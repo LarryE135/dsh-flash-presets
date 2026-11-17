@@ -12,8 +12,10 @@ permissions:
   contents: read
 
 # 同一分支的连续推送取消前一次运行：省 CI 额度，也不会让旧提交的红灯盖住新提交的绿灯。
+# 必须把 event_name 也算进 group：schedule 触发的 run 的 ref 就是默认分支，
+# 以前它会取消 main 上正在跑的 push run，而 publish.sh 把 cancelled 判成红灯（本轮 P3）。
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
+  group: verify-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:

@@ -91,15 +91,14 @@ const ALIAS_ROW = [
 // 会话里跑工作区的脚本，属于要用户显式打开的开关。实测见 docs/实测证据.md。
 const GATE_ROW = [
   '',
-  '# 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌。',
+  '# 交付门（delivery-gate）：工作区里有验收脚本时，回合收尾自动跑一次；不通过就把失败清单回灌。',
   '# 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。',
+  '# 脚本默认按平台取（Windows 先 verify.ps1，其余先 verify.sh）；要指定自己的脚本再加 scripts: [..]。',
   '- insert:',
   '    - id: delivery-gate',
   "      name: 'dsh-flash-presets/delivery-gate'",
   '      config:',
   '        enabled: false',
-  '        scripts:',
-  '          - verify.sh',
   '        maxRounds: 2',
 ].join('\n');
 // 0.3.2 上下文瘦身（第二轮研究实测，见 docs/研究-DSH-0.2.2-rc.3-上下文注入.md）：

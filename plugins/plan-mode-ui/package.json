@@ -37,7 +37,8 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.15"
+    "node": ">=22.15",
+    "dsh": ">=0.2.1-rc.5 <0.2.3-0"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*"
@@ -48,9 +49,6 @@
     }
   },
   "dsh": {
-    "engines": {
-      "dsh": ">=0.2.1-rc"
-    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

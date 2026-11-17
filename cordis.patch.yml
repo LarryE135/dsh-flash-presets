@@ -389,15 +389,14 @@
 - insert:
     - id: flash-presets-alias
       name: 'dsh-flash-presets/alias'
-# 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌。
+# 交付门（delivery-gate）：工作区里有验收脚本时，回合收尾自动跑一次；不通过就把失败清单回灌。
 # 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。
+# 脚本默认按平台取（Windows 先 verify.ps1，其余先 verify.sh）；要指定自己的脚本再加 scripts: [..]。
 - insert:
     - id: delivery-gate
       name: 'dsh-flash-presets/delivery-gate'
       config:
         enabled: false
-        scripts:
-          - verify.sh
         maxRounds: 2
 # 技能目录里每条描述的截断长度（默认整段；60 足够表达用途）。
 - id: tool-skill

@@ -6,7 +6,28 @@
 >
 > **日期口径**：本文件的日期是本机时区（UTC+8）的日期；npm registry 的 `time` 是 UTC，因此 0.2.1 / 0.2.3 / 0.2.4 三个版本在两边会差一天，属正常，不是笔误。
 
-## 0.3.2（2026-11-17 发布：npm 0.3.2 + GitHub Release）
+## 0.3.3（2026-11-17：tag `v0.3.3`；npm 0.3.3 + GitHub Release 同日发布 —— npm 侧以 `npm view dsh-flash-presets version` 为准）
+
+> **0.3.2 只打了 tag**：npm 与 Release 都跳过那一版，内容并入本版。本版是第三轮全量自查（P0 1 / P1 3 / P2 10 / P3 12）的整改，
+> 逐条证据与「未修/延后」清单见 `docs/审计-第三轮-自查-20261117.md`。预设 id、压缩/裁剪参数、persona 规则正文均未改动。
+
+### 条目一览
+
+| # | 类别 | 条目 | 影响面 |
+|---|---|---|---|
+| 1 | 修复 | **安装器静默删掉用户改过的预设行**（P1）：`merge-presets` 的认领只比结构（包装行 + `config.id`），把用户改过 `thresholdRatio` 的同 id 条目当残留整条替换，还打印「内容与安装器写入的一致」 | 脚本安装 |
+| 2 | 修复 | **full 档「批准后转执行」在 rc.3 投递不到**（P1）：`agent.steer()` 在 `session/event` 里同步调用会撞宿主 append 重入守卫（异常被吞）；改为宏任务投递，中途纠偏同样处理 | 计划模式 full 档 |
+| 3 | 修复 | **PTC 下「规划期先动手」检测失效**（P2）：嵌套调用不发 `tool/call`，补上 `tool/ptc-dispatch-start` / `tool/ptc-dispatch` 两个分支（含回归测试 F4/F4b/F4c） | 计划模式（默认预设即 PTC） |
+| 4 | 修复 | **两处服务访问静默失效**（P2）：`ctx.webServer` / `ctx.sessionProjections` 未 inject 时直接取会抛、兜底永远轮不到 → 改走 `ctx.get`；core 状态路由与内置 `/plan` 让位闸恢复 | 运行时 |
+| 5 | 修复 | **发版脚本 fail-closed**（P2）：`publish.sh` 的 CI 闸门不再「查不到就跳过」（`ALLOW_UNKNOWN_CI=1` 才放行）；`DRY_RUN` 挪到远端 tag 守卫之后；`verify-versions` 不再被 `dist/` 旧 zip 卡死；`tune-runtime` 缺补丁文件时不再 ENOENT 崩 | 发版流程 |
+| 6 | 修复 | **交付门按平台选脚本**（P2）：出厂补丁不再钉死 `scripts: [verify.sh]`，Windows 上 schema 默认 `verify.ps1` | 交付门 |
+| 7 | 修复 | **离线安装入口钉在 v0.3.0**（P1）：README 中英的 `git clone -b` 改到当前 tag，`verify-versions` 新增 `-b vX.Y.Z` 断言 | 安装文档 |
+| 8 | 修复 | **发版物口径**（P0）：所有「已发布」措辞改成可复核表述（以 `npm view` 为准 + `#vX.Y.Z` 兜底）；`publishedVersion` 跟上 0.3.3 | 文档 |
+| 9 | 修复 | **文档口径与指向**（P2/P3）：撤掉「300k 以上」「0.25 每次都真压缩」；53 项自测 / 29 个插件测试 / 插件 1.0.0；`align-presets.sh` 指向不存在的脚本；v1/v2 别名说明；README 中文缺失的排障日志块 | 文档 |
+| 10 | 修复 | **评审守卫误拦**（P3）：方括号形式必须后跟 `(` 才算调用 —— 只取值 / 注释 / 字符串里出现工具名不再触发（三种真调用仍拦） | 计划模式 |
+| 11 | 修复 | **杂项加固**（P3）：`install.sh` 安装路径也 prune 备份；`verify.yml` concurrency 计入 `event_name`（schedule 不再取消 push 的 run）；badge job 加 10 分钟与 fetch 20 秒超时；插件包 `engines.dsh` 挪到顶层并收窄区间 | CI / 安装器 |
+
+## 0.3.2（2026-11-17，只打 tag：npm 与 GitHub Release 都跳过这一版，内容并入 0.3.3）
 
 > 预设 id 与压缩/裁剪参数未改动；persona 规则正文未改，**但 v3 的规则 7 措辞调整了**（需要单调用时也走一行 run_code 程序，与 PTC 一致），
 > 计划模式行另补了 #29 的政策句（PTC 下调 `exit_plan_mode` 要带 `timeoutMs: 600000`），见下表第 8 条。

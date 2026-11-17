@@ -40,8 +40,9 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 
   **不要把 token 写进仓库或贴在聊天里**。
 
-## 0.5 历史发布状态（0.3.0 / 0.3.1）
+## 0.5 历史发布状态（0.3.0 / 0.3.1 / 0.3.2）
 
+> **0.3.2（2026-11-17）**：**只打了 tag，npm 与 GitHub Release 都跳过**（与 0.2.7 同样的处置：tag 已推且被 tag 规则集冻结在 `8f4d349`，内容随 0.3.3 一起发）。
 > **0.3.1（2026-11-12）**：npm 已发（`latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。
 > 下表是 **0.3.0（2026-11-07）** 当时的记录，原样保留作对照。
 
@@ -235,7 +236,7 @@ curl -s -X POST -H "Authorization: token $T" -H 'Accept: application/vnd.github+
 
 ### 插件（`dsh-plan-mode-ui`）不单独建 Release
 
-插件版本号（当前 `0.5.2`）独立演进，但**发布面跟着主版本走**：
+插件版本号（当前 `1.0.0`）独立演进，但**发布面跟着主版本走**：
 
 - **不打 `plan-mode-ui-*` tag**，也不单独建 Release。一旦打了，Releases 页会多出一条，
   而且按提交时间排序时它常常变成 `Latest`，把主版本顶下去（2026-10-31 实测踩过，已撤销）。
@@ -269,7 +270,7 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 ```bash
 # 0) 打包插件 + 自检（6 个文件：lib/ cordis.patch.yml README.md LICENSE package.json）
 node scripts/pack-plugin.mjs            # → dist/dsh-plan-mode-ui-A.B.C.tgz
-npm test --prefix plugins/plan-mode-ui  # 11 个测试全跑
+npm test --prefix plugins/plan-mode-ui  # 29 个测试全跑
 
 # 1) 插件先上 npm（需要 OTP；两个包用同一个 OTP 窗口内连发）
 npm publish plugins/plan-mode-ui --otp <code> --access public

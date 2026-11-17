@@ -441,7 +441,10 @@ function builtinPlanActive(ctx, session) {
   // 本身是会话投影里的数据 —— loggedActive() 内部也是读它。直接读同一份，结论才一致；
   // 否则这个守卫恒为 false，full 档会在用户手动 /plan 之后再注入一段 PHASE 1。
   try {
-    const proj = ctx.sessionProjections;
+    // sessionProjections 不在 inject 里，直接取会抛、被下面的 catch 吞掉 → 兜底恒为 false。
+    // 与上面两处一致：先走 ctx.get（不抛），拿不到再按未激活处理。
+    let proj = null;
+    try { proj = typeof ctx.get === "function" ? (ctx.get("sessionProjections") ?? null) : null; } catch (error) { proj = null; }
     if (proj !== null && proj !== undefined && typeof proj.stateOf === "function") {
       const st = proj.stateOf(session, "plan");
       if (st !== null && st !== undefined && typeof st.active === "boolean") return st.active;
@@ -544,7 +547,7 @@ const REVIEW_MIN_TIMEOUT_MS = 600000;
 // 只认「调用形态」（工具名后面跟括号）：文档、注释、字符串里单纯提到工具名不该被拦。
 // 调用形态：name( / name?..( / tools["name"](。排除 my_exit_plan_mode( 这类标识符后缀；
 // 注释与普通字符串里只"提到"名字（后面不跟括号）不匹配。
-const REVIEW_WAIT_TOOLS = /(?<![\w$])(exit_plan_mode|ask_user_question)\s*(?:\?\.)?\s*\(|\[\s*['"](exit_plan_mode|ask_user_question)['"]\s*\]/;
+const REVIEW_WAIT_TOOLS = /(?<![\w$])(exit_plan_mode|ask_user_question)\s*(?:\?\.)?\s*\(|\[\s*['"](exit_plan_mode|ask_user_question)['"]\s*\]\s*(?:\.(?:\?\.)?)?\s*\(/;
 const reviewGuardStats = { blocked: 0, unavailable: false, disabled: false };
 /** 纯函数，便于测试：返回拒绝理由，或 undefined（放行）。skip(agent) 为 true 时放行。 */
 function reviewTimeoutReason(exec, skip) {
@@ -652,14 +655,19 @@ const phase2Turn = new Map();          // sessionKey → turn：同一回合只�
 function sendPhase2(agent, key, turn) {
   if (agent === undefined) return false;
   if (key !== undefined && turn !== undefined && phase2Turn.get(key) === turn) return false; // 同回合不重复
-  try {
-    agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE2 }], source: { kind: "user" } }));
-    if (key !== undefined && turn !== undefined) phase2Turn.set(key, turn);
-    return true;
-  } catch (error) {
-    console.error("[plan-mode-ui] native-approved steer failed:", error);
-    return false;
-  }
+  if (key !== undefined && turn !== undefined) phase2Turn.set(key, turn);
+  // 宿主 0.2.2-rc.3 的 session/event 监听器是在 append 窗口内被同步调用的（dsh-session
+  // publicationEntry() 里有 appending 重入守卫），在那里同步 steer 一定抛
+  // "session append cannot reenter while another append is being published"。
+  // 异常会被 catch 吞掉，表现就是「计划批准了但模型没收到执行指令」，所以改到宏任务投递。
+  defer(() => {
+    try {
+      agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE2 }], source: { kind: "user" } }));
+    } catch (error) {
+      console.error("[plan-mode-ui] native-approved steer failed:", error);
+    }
+  });
+  return true;
 }
 function flushPendingPhase2(key, agent) {
   if (key === undefined || !pendingPhase2.has(key)) return;
@@ -1343,10 +1351,54 @@ export default {
                   const agent = key === undefined ? undefined : agents.get(key);
                   if (agent !== undefined) {
                     live.nudged = true;
-                    try {
-                      agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE_PLAN_FIRST }], source: { kind: "user" } }));
-                    } catch (error) {
-                      console.error("[plan-mode-ui] mid-turn steer failed:", error);
+                    // 同上：session/event 里同步 steer 会撞 append 重入守卫，改到宏任务投递。
+                    defer(() => {
+                      try {
+                        agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE_PLAN_FIRST }], source: { kind: "user" } }));
+                      } catch (error) {
+                        console.error("[plan-mode-ui] mid-turn steer failed:", error);
+                      }
+                    });
+                  }
+                }
+              }
+            }
+          }
+        } else if (type === "tool/ptc-dispatch-start" || type === "tool/ptc-dispatch") {
+          // 本包默认预设是 ptc 模式：run_code 内部调起的工具在宿主里**不发 tool/call**
+          // （dsh-tools 的 pipeline.start() 在 input.log 缺失时直接返回），真正的信号是
+          // dsh-tool-executor-ptc 的 tool/ptc-dispatch-start（开始）与 tool/ptc-dispatch（结束）。
+          // 只认 tool/call 的话，规划期「先动手」检测与在飞工具计数在自家预设下全是死的（本轮 P2）。
+          if (live !== undefined) {
+            const name = String(pd?.name !== undefined ? pd.name : (event?.name ?? ""));
+            if (type === "tool/ptc-dispatch-start") {
+              live.sawToolCall = true;
+              if (key !== undefined) pendingTools.set(key, (pendingTools.get(key) ?? 0) + 1);
+            } else {
+              if (key !== undefined) {
+                const n = (pendingTools.get(key) ?? 0) - 1;
+                if (n > 0) pendingTools.set(key, n); else pendingTools.delete(key);
+              }
+              if (live.phase === "planning" && live.planSeen === true) live.callsAfterPlan = (live.callsAfterPlan ?? 0) + 1;
+              if (live.phase === "planning" && WRITE_TOOL_RE.test(name)) {
+                live.wroteDuringPlan = true;
+                if (key !== undefined && bridgeTier.has(key)) { /* 桥接中：原生政策负责"先计划后动手" */ }
+                else if (live.nudged !== true) {
+                  const planned = hasPlanFile(session, live.startedAt);
+                  if (planned === true) live.planSeen = true;
+                  if (planned === false) {
+                    live.wroteBeforePlan = true;
+                    const agent = key === undefined ? undefined : agents.get(key);
+                    if (agent !== undefined) {
+                      live.nudged = true;
+                      // 与 tool/call 分支同理：不能在 session/event 里同步 steer（append 重入守卫）。
+                      defer(() => {
+                        try {
+                          agent.steer(createUserMessage({ content: [{ type: "text", text: PHASE_PLAN_FIRST }], source: { kind: "user" } }));
+                        } catch (error) {
+                          console.error("[plan-mode-ui] ptc mid-turn steer failed:", error);
+                        }
+                      });
                     }
                   }
                 }

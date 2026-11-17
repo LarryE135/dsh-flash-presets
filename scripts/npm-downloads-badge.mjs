@@ -17,7 +17,8 @@ const start = new Date(end.getTime() - 6 * DAY);
 const fmt = (d) => d.toISOString().slice(0, 10);
 const url = `https://api.npmjs.org/downloads/point/${fmt(start)}:${fmt(end)}/${encodeURIComponent(pkg.name)}`;
 
-const res = await fetch(url, { headers: { "user-agent": "dsh-flash-presets-badge" } });
+// 这条 fetch 跑在 CI 里：没有超时的话网络挂住会白占 runner 直到 6 小时上限（本轮 P3）。
+const res = await fetch(url, { headers: { "user-agent": "dsh-flash-presets-badge" }, signal: AbortSignal.timeout(20000) });
 if (!res.ok) {
   console.error(`npm downloads API ${res.status} for ${url}`);
   process.exit(1);
