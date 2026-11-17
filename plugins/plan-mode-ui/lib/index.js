@@ -587,18 +587,30 @@ const autoFires = new Map();
 // #29：run_code 里等人答复（计划评审 / 提问）需要的最短截止时间。
 // 600000 = ptc-runtime-node 的 maxTimeoutMs 默认值；超过上限的值会被宿主截到上限，所以要求"≥ 它"即可。
 const REVIEW_MIN_TIMEOUT_MS = 600000;
-// 只认「调用形态」（工具名后面跟括号）：文档、注释、字符串里单纯提到工具名不该被拦。
-// 调用形态：name( / name?..( / tools["name"](。排除 my_exit_plan_mode( 这类标识符后缀；
-// 注释与普通字符串里只"提到"名字（后面不跟括号）不匹配。
+// 判定标准：**代码里**出现工具名就要求 timeoutMs（注释与纯文本字符串先被抹掉）。
+// 不再尝试逐字面识别「调用形态」—— 那永远漏（Reflect.apply、先取值后调用、解构别名、
+// 模板串插值、正则字面量里的撇号），而误拦的代价只是模型多写一个 timeoutMs（第五轮审计 P3-1、
+// 第三轮全量审计 P2-1）。
 const REVIEW_WAIT_TOOLS = /(?<![\w$])(exit_plan_mode|ask_user_question)/;
 const reviewGuardStats = { blocked: 0, unavailable: false, disabled: false };
-// 扫描前把注释与「纯文本字符串」抹成空白（保留长度与换行），只保留方括号键里的字符串。
-// 否则「在字符串或注释里写了一句调用形态」会被当成真调用拦下（本轮审计 P3）：写文档、
-// 写提示词、贴旧示例都会踩。tools["…"] 里的名字必须留下 —— 那是真调用的另一半。
+// 扫描前把注释与「纯文本字符串」抹成空白（保留长度与换行），只保留方括号键里的字符串
+// 与模板串 ${…} 插值里的代码。否则「在字符串或注释里写了一句调用形态」会被当成真调用拦下
+// （写文档、写提示词、贴旧示例都会踩）；反过来，抹得太狠会把真调用一起吃掉：
+// ① 模板串插值里的调用（${await exit_plan_mode(…)}）以前整段被抹掉 → 漏拦；
+// ② 正则字面量里的撇号（const re = /'/; await exit_plan_mode(…)）以前被当成字符串开头，
+//    后面整行代码都被抹掉 → 漏拦。现在：插值内容按代码保留；引号只有在**同一行**能找到配对的
+//    收尾引号时才进入字符串模式，否则当成普通字符（宁误拦，不漏拦）。
 function maskCodeForReview(code) {
   let out = "";
   let i = 0;
   let lastSignificant = "";
+  const closesOnThisLine = (from, quote) => {
+    for (let k = from; k < code.length && code[k] !== "\n"; k++) {
+      if (code[k] === "\\") { k++; continue; }
+      if (code[k] === quote) return true;
+    }
+    return false;
+  };
   while (i < code.length) {
     const c = code[i];
     const n = code[i + 1];
@@ -612,9 +624,33 @@ function maskCodeForReview(code) {
       if (i < code.length) { out += "  "; i += 2; }
       continue;
     }
-    if (c === '"' || c === "'" || c === '`') {
+    if (c === "`") {
+      const keep = lastSignificant === "[";
+      out += c; i++;
+      while (i < code.length && code[i] !== "`") {
+        if (code[i] === "$" && code[i + 1] === "{") {
+          // 插值里是代码：原样复制到配对的 }（按花括号深度配平）
+          out += "${"; i += 2;
+          let depth = 1;
+          while (i < code.length && depth > 0) {
+            const ch = code[i];
+            if (ch === "{") depth++;
+            else if (ch === "}") { depth--; if (depth === 0) { out += "}"; i++; break; } }
+            out += ch; i++;
+          }
+          continue;
+        }
+        if (code[i] === "\\" && i + 1 < code.length) { out += keep ? code[i] + code[i + 1] : "  "; i += 2; continue; }
+        out += keep ? code[i] : (code[i] === "\n" ? "\n" : " ");
+        i++;
+      }
+      if (i < code.length) { out += "`"; i++; }
+      continue;
+    }
+    if (c === '"' || c === "'") {
       const quote = c;
       const keep = lastSignificant === "[";
+      if (!closesOnThisLine(i + 1, quote)) { out += c; i++; lastSignificant = c; continue; }
       out += c; i++;
       while (i < code.length && code[i] !== quote) {
         if (code[i] === "\\" && i + 1 < code.length) { out += keep ? code[i] + code[i + 1] : "  "; i += 2; continue; }
@@ -629,7 +665,6 @@ function maskCodeForReview(code) {
   }
   return out;
 }
-
 /** 纯函数，便于测试：返回拒绝理由，或 undefined（放行）。skip(agent) 为 true 时放行。 */
 function reviewTimeoutReason(exec, skip) {
   if (exec === null || exec === undefined || exec.name !== "run_code") return undefined;
@@ -1544,11 +1579,12 @@ export default {
             // 3：只有"规划阶段真的写过东西"才把这次关闭当作批准。空跑一场（用户开了一下计划模式
             // 又关掉、或桥接开了随即退出）不该往普通对话里塞一段 PHASE 2，那会表现为"没让它规划，
             // 却突然收到一段执行指令"。没产出 → 当作取消：清掉执行阶段记录，下个回合照常判断。
-            // 回合号未知（turn === undefined）时不能算「已产出」：以前 undefined === undefined 会命中，
-            // 于是在 idle 状态关掉计划模式也会凭空唤醒一个执行回合（第五轮审计 P2-3）。
-            // turn 未知时仍按「已产出」处理：这条路径要保住「记录被 turn/end 清掉之后才批准，
-            // 仍应投递 PHASE 2」（test/bridge-fixes.mjs 的 F2）。代价是「只在 idle 关一次开关」也会
-            // 被当成批准 —— 第五轮审计 P2-3 提了这一点，权衡后保留旧行为，改动记在发版清单 P3。
+            // 「已产出」的判据：本回合的 planningProduced 命中，或存的是 null（规划阶段确有助手输出、
+            // 只是回合号未知），或记录里已标 produced。
+            // 已知取舍：turn 未知时 planningProduced 可能是 undefined，而 undefined === undefined 会命中，
+            // 于是「只在 idle 关一次开关」也会被当成批准（第五轮审计 P2-3）。保留这一行为是为了不丢
+            // 「记录被 turn/end 清掉之后才批准仍要投递 PHASE 2」的能力（test/bridge-fixes.mjs 的 F2），
+            // 代价与结论记在 docs/下一版发版清单.md 第 5 节。
             const produced = planningProduced.get(key) === turn || planningProduced.get(key) === null
               || (rec !== undefined && rec.produced === true);
             if (governingTier === "full" && !produced) {
