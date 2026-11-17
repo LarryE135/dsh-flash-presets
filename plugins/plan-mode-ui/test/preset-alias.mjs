@@ -16,7 +16,8 @@ assert.equal(map.canonical, 'flash-lean-ptc-v3');
 for (const id of ['flash-lean-ptc-v3-lite', 'flash-lean-ptc-v1', 'flash-lean-ptc-v2', 'flash-lean-ptc', 'flash-lean']) {
   assert.ok(Object.prototype.hasOwnProperty.call(map.aliases, id), '别名表必须含 ' + id);
 }
-assert.equal(map.aliases['flash-lean-ptc-v3-lite'].rulesDiffer, false);
+// 0.3.2 起 v3 的规则 7 措辞调整，lite 已不再与 canonical 逐字相同 → 首次命中会提示（契约 5）
+assert.equal(map.aliases['flash-lean-ptc-v3-lite'].rulesDiffer, true);
 assert.equal(map.aliases['flash-lean-ptc-v1'].rulesDiffer, true);
 assert.equal(map.aliases['flash-lean-ptc-v2'].rulesDiffer, true);
 

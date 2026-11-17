@@ -7,8 +7,8 @@
   "aliases": {
     "flash-lean-ptc-v3-lite": {
       "since": "v0.2.8",
-      "rulesDiffer": false,
-      "note": "0.2.6–0.2.8 的 lite id，规则与 flash-lean-ptc-v3 完全相同；打过 tag 的版本都是 13 条（11-04 main 上那两天是 3 条版，见 CHANGELOG）"
+      "rulesDiffer": true,
+      "note": "0.2.6–0.2.8 的 lite id。0.3.2 起 v3 的规则 7 措辞有调整，两者已不再逐字相同（映射后按 v3 规则运行，首次命中会在启动日志里提示）；打过的 tag 都是 13 条（11-04 main 上那两天是 3 条版，见 CHANGELOG）"
     },
     "flash-lean-ptc-v1": {
       "since": "v0.2.5",

@@ -77,7 +77,7 @@ Both share the same compaction/trimming framework and plugin set; only the perso
   They still **resolve** to `flash-lean-ptc-v3` through the alias layer (opening old sessions wins over rule
   fidelity); they carry `rulesDiffer: true` and print a warning on first hit. Add a row to your own profile patch
   if you want the original rules. Source files: tag `v0.2.5`.
-- `flash-lean-ptc-v3-lite` (0.2.6–0.2.8) and the older `flash-lean` / `flash-lean-ptc`: identical (or superseded)
+- `flash-lean-ptc-v3-lite` (0.2.6–0.2.8) and the older `flash-lean` / `flash-lean-ptc`: mapped to the current id by the alias layer (since 0.3.2 rule 7 of v3 is worded differently, so -lite is no longer byte-identical; the first hit logs a notice)
   rules, resolved to `flash-lean-ptc-v3` by the runtime alias layer — no card needed.
 
 Lite's 13 rules fall into five groups: budget (count turns, not steps; aim for 20 or fewer, and stop to re-plan past roughly 60), sequencing (think briefly, run one cheap probe, and for submission tasks ship the smallest working artifact first), verification (one consolidated acceptance pass, then deliver — no extra random or stress rounds), tools and output (read files with read/glob/grep, batch calls, edit incrementally), and scope (answer in the user's language, stay in scope, keep secrets out of the session, switch approach after two failures).

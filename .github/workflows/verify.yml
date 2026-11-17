@@ -273,7 +273,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dsh: ["0.2.1-rc.5", "0.2.2-rc.1"]   # 声明的下限 + npm latest（用户实际装到的版本）
+        dsh: ["0.2.1-rc.5", "0.2.2-rc.1", "0.2.2-rc.3"]   # 声明的下限 + npm latest + npm next（#29 报告者用的就是 rc.3；rc.1 起要求 Node ≥ 24.9，上面已 pin 24）
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

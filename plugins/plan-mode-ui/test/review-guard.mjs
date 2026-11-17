@@ -104,6 +104,11 @@ console.log("review-guard");
     "解构别名形态被拦");
   ok(f(runCode("await tools.my_" + NAME + "_helper({ plan })")) === undefined,
     "名字里含工具名的别的工具不误拦（词边界）");
+  // 第三轮全量审计 P2-1：两种真实绕过（模板串插值、正则字面量里的撇号）—— 以前掩码把真调用一起抹掉
+  ok(typeof f(runCode("const r = " + BT + "x${await " + NAME + "({ plan })}y" + BT + "; await run_code(r)")) === "string",
+    "模板串插值里的调用被拦");
+  ok(typeof f(runCode("const re = /'/; await " + NAME + "({ plan })")) === "string",
+    "正则字面量里的撇号不再把后面整行抹掉");
   // 第五轮审计 P3-2：以前 10 万字符输入要 1.8 s（\s* 嵌套在可选组里，Θ(k²)），量词改成有界后是毫秒级
   {
     const big = "await tools.read({ path: '" + "a".repeat(100000) + "' });";
