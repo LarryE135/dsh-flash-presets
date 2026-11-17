@@ -270,7 +270,7 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 Released: npm `dsh-flash-presets@0.3.3` (verify with `npm view dsh-flash-presets version`), GitHub Release `v0.3.3`, tag `v0.3.3`. 0.3.2 was tag-only — npm and the Release both skipped it.
 
-Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the audit note](docs/审计-第三轮-自查-20261117.md):
+Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the audit note](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-第三轮-自查-20261117.md):
 
 - **The installer no longer deletes preset rows you edited**: `merge-presets` used to match by shape only (wrapper row + `config.id`) and would drop an out-of-block row with the same id while printing "identical to what the installer writes". It now compares line by line: an edited row is kept verbatim, and we don't write a second copy of that id.
 - **Full-tier "approve → execute" never arrived on rc.3**: `agent.steer()` was called synchronously inside a `session/event` listener, tripping the host's append re-entrancy guard; the throw was swallowed into a single log line. Delivery now goes through a macrotask, and so does the mid-turn "you started writing during planning" nudge.

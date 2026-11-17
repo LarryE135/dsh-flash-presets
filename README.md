@@ -265,7 +265,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 发布：npm `dsh-flash-presets@0.3.3`（以 `npm view dsh-flash-presets version` 为准）、GitHub Release `v0.3.3`、tag `v0.3.3`。0.3.2 只打了 tag、npm 与 Release 都跳过这一版。
 
-第三轮自查（P0 1 / P1 3 / P2 10 / P3 12）的修复，逐条见 [审计-第三轮-自查](docs/审计-第三轮-自查-20261117.md)：
+第三轮自查（P0 1 / P1 3 / P2 10 / P3 12）的修复，逐条见 [审计-第三轮-自查](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-第三轮-自查-20261117.md)：
 
 - **安装器不再删掉你改过的预设行**：`merge-presets` 以前只比结构（包装行 + `config.id`）就把托管块外的同 id 条目当残留删掉，还打印「内容与安装器写入的一致」；现在逐行比对——改过的那条原样保留，也不再另写一份我们自己的（同 id 只留你的）。
 - **full 档「批准后转执行」在 rc.3 上投递不到**：`agent.steer()` 放在 `session/event` 监听器里同步调用，会撞宿主的 append 重入守卫，异常被 `catch` 吞成一条日志；改为宏任务投递，「规划期动手」的中途纠偏同样处理。
