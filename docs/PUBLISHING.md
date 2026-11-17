@@ -214,7 +214,10 @@ npm deprecate dsh-flash-presets@0.0.0-stage "staging placeholder; install <lates
 git add -A
 git commit -m "feat|fix: ..."
 git tag -a vX.Y.Z -m "vX.Y.Z：一句话说明"
-git push origin main --follow-tags          # 用一个好的凭据助手推 main + 该 tag
+# main 受分支保护（ruleset「protect main」）：不能直推，改动必须走 PR 并通过
+#   verify (ubuntu-24.04) / plugin-tests (24) / integration / pack-doctor 四个检查。
+# 发版顺序：先合并 PR → 本地 main 与 origin/main 一致 → 再只推 tag：
+git push origin "$TAG"                       # 用一个好的凭据助手推 tag
 ```
 
 远端确认：`git ls-remote --tags origin | grep vX.Y.Z`。
