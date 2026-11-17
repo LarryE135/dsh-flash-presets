@@ -16,7 +16,7 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.3.2（2026-11-17 追认为正式版 —— npm 的 `latest` dist-tag 指向它，npm 侧一律以 `npm view dsh-flash-presets version` 为准）· 误发版本 v0.3.3（`package.json` 里现写的号：npm 上仍可安装、已 `deprecate`，**不是正式版**）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.3.2（2026-11-17 追认为正式版 —— npm 的 `latest` dist-tag 指向它，npm 侧一律以 `npm view dsh-flash-presets version` 为准）· 误发版本 v0.3.3（npm 上仍可安装、已 `deprecate`，**不是正式版**；它的包**比 0.3.2 少第四轮 6 项修复**，别当等价替代 —— 仓库 `package.json` 现在写的就是 0.3.2）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
 > 正式版：tag `v0.3.2` + npm 0.3.2 + GitHub Release 同日落地（用 `npm view dsh-flash-presets version` 复核；若还显示 0.3.1，说明镜像/缓存未刷，可用 `#v0.3.2` 装同一份代码）。上一版正式版是 0.3.1。**0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish` —— 现在的处置是把 0.3.2 追认为正式版，0.3.3 在 npm 上 `deprecate`（仍可安装，但不是正式版）。所以**装包务必写死版本号**：`^0.3` 这类范围仍可能解析到 0.3.3。0.3.2 收口两轮外部审计、第三轮自查与第四轮审计的修复：宿主事件形态、改档位丢自动批准、评审守卫、交付门挂起与 Windows 支持、面板 Host 白名单、发布脚本互锁、安装器认领边界 —— 其中 `run_code` 优化随安装即生效。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
@@ -117,13 +117,13 @@ dsh plugin --profile web add dsh-flash-presets@0.3.2
 dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
 ```
 
-> 想跟仓库最新（含尚未发版的提交）就把 `#v0.3.3` 换成 `#main`。
+> 想跟仓库最新（含尚未发版的提交）就把 `#v0.3.2` 换成 `#main`。
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
 预设直接决定 agent 的行为，需要可复现时请写死版本号。用 npm 包名且不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.3.x 的最新版；`github:` 安装写的是 git 引用（`#v<版本>`），不会自己漂移。
 
-> 版本号怎么填：**正式版是 0.3.2**（`…@0.3.2` 或 `github:…#v0.3.2`）。上面示例里钉的 0.3.3 是 npm 上仍可安装的**误发版**（已 `deprecate`）；要正式版就把号换成 0.3.2。无论装哪个都别用 `^0.3` 这类范围 —— 它仍可能解析到 0.3.3。
+> 版本号怎么填：**正式版是 0.3.2**（`…@0.3.2` 或 `github:…#v0.3.2`）。上面示例钉的就是正式版 0.3.2。npm 上还有个仍可安装的**误发版 0.3.3**（已 `deprecate`，且比 0.3.2 少第四轮 6 项修复）—— 别装它。**写死版本号**：`^0.3` 这类范围会随 registry 漂移；pnpm 11 默认的 `minimumReleaseAge` 冷却还会让发布不足 24h 的版本装不到（裸装 / `@latest` 会静默退到上一版 0.3.1）。
 
 ### 离线或用脚本安装
 
@@ -194,7 +194,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 
 - 为什么需要：P15654 的实测里，三份实现都在结束语里**如实**写了「17–19 超时 / 未覆盖」，然后照常交付 —— 缺的不是自述，是「不达标就不许结束」。
 - 打开方式：把该行的 `enabled` 改成 `true`（`cordis.patch.yml` 末段的 `delivery-gate` 行），或临时设 `DSH_DELIVERY_GATE=1`；关掉用 `enabled: false` 或 `DSH_DELIVERY_GATE=0`。
-- 脚本约定：默认找工作区根目录的 `verify.sh`（可用 `scripts` 配置改），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
+- 脚本约定：默认按平台取候选（Windows 先 `verify.ps1`、其余先 `verify.sh`，可用 `scripts` 配置固定），超时按失败处理；它只读回退出码与输出尾部，不改你的文件。
 - 注意：出厂配置把这行写成 `enabled: false`，插件 schema 的默认值也是**关**（0.3.1 是 `true`，0.3.2 改回 `false` —— 0.3.1 那一版会让普通对话也被验收门追着跑）。0.3.1 的代码只认 `DSH_DELIVERY_GATE=0`，设 `1` 打不开；从 0.3.2 起 `=1` 才真正生效。
 - **版本提示**：交付门 0.3.0 里没有，**0.3.1 起随 npm 发布**（包内含 `lib/delivery-gate.js`，`cordis.patch.yml` 里也有这一行：`enabled: false` / `maxRounds: 2`，脚本按平台选 —— Windows 先 `verify.ps1`、其余先 `verify.sh`）。0.3.0 想用只能从 git 装（`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`）；npm 上的 0.3.1、0.3.2（正式版）与 0.3.3（误发版）都带这一行，**不需要再等下一版**。
 
@@ -266,7 +266,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 ### v0.3.2（2026-11-17，当前正式版）
 
-发布：npm 上的 0.3.2（`…@0.3.2` —— 以 `npm view dsh-flash-presets version` 为准，`latest` 指向它）、GitHub Release `v0.3.2`、tag `v0.3.2`（= `8f4d349`）。上一版正式版是 0.3.1。
+发布：npm 上的 0.3.2（`…@0.3.2` —— 以 `npm view dsh-flash-presets version` 为准，`latest` 指向它）、GitHub Release `v0.3.2`、tag `v0.3.2`（= `ea8c3d8`）。上一版正式版是 0.3.1。
 
 - **自动批准按钮换 v1.1 字形**：两段环箭头 + 中心对勾，`off / on / fire` 三态生效（每真正自动批准一次，外圈甩半圈、对勾弹一下），20px；修掉旧 `.pmo-aa svg` 规则强制 15px 与「按钮里所有 svg 一起旋转」——那正是对勾跟着外圈转、图标始终长不大的原因。
 - **默认上下文瘦身**：`tool-skill.catalogDescriptionMaxLength: 60`，关闭 `session-log-deepseek` / `plugin-package-inventory-deepseek`（两份上报合计每请求少传约 40 KB，不进上下文）。
@@ -289,14 +289,14 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 - **PTC 预设下 `run_code` 内部的工具调用不发 `tool/call`**：改用 `tool/ptc-dispatch-start` 与 `tool/ptc-dispatch`，纠偏与「已在执行」判定与 `tool/call` 同语义。
 - **评审超时守卫（`tools.guard`）**：不再把「注释 / 字符串里写了调用形态」当真调用；同时补上 `tools["<名字>"]?.()`、模板键、`.call(` 等真调用形态。
 - **`scripts/merge-presets.mjs` 认领历史残留**：按缩进算条目边界（以前按第一个空行 → 199 行条目只读到 13 行、被判成安装器写的、删头留尾写坏 YAML）；`- insert:` 数组改成逐条摘（别人的条目与数组内注释都保住）；卸载路径加「顶层必须是块状数组」结构闸；全部条目都被用户改过时不再写空托管块。
-- **新增 `scripts/test-merge-presets.mjs`**（24 条断言）并接进 `scripts/selftest.sh`（自测 54 项）。
+- **新增 `scripts/test-merge-presets.mjs`**（24 条断言，第五轮扩到 32 条）并接进 `scripts/selftest.sh`（自测 54 项）。
 
 ### v0.3.3（2026-11-17，误发版本：npm 上仍有、已 deprecate）
 
 > **这一版是版本号写错的产物**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`。处置：**0.3.2 追认为正式版**（npm `latest` 指向它），0.3.3 标为误发并在 npm 上 `deprecate`（仍可安装，但不是正式版）。
-> 内容与 0.3.2 是同一批修复（第三轮自查整改 + 第四轮），逐条见上一节 —— 差别只在版本号。
+> **包内容与 0.3.2 不同**：0.3.3 是第三轮整改的提交（`54fc895`）打的包；0.3.2 在其上又并入了第四轮 6 项修复（计划模式宏任务投递、PTC 事件语义、评审守卫注释/字符串遮罩、PHASE 2 记账回滚、`merge-presets` 认领边界、卸载结构闸）。两个包有 11 个文件不同（`lib/index.js`、`scripts/merge-presets.mjs`、两个安装器、若干文档），复核：`git diff --stat v0.3.2 v0.3.3`。
 > 误发当时的横幅原文是「当前版本：v0.3.3（tag `v0.3.3` 已打，npm 0.3.3 + GitHub Release 同日发布）」，已按 0.3.2 口径改写。
-> **装包请写死版本号**：0.3.3 已 deprecate，但 `^0.3` 这类范围仍可能解析到它。
+> **装包请写死版本号**：范围会随 registry 漂移；pnpm 11 默认冷却期（`minimumReleaseAge`）里，刚发布的版本裸装 / `@latest` 会退到上一版。
 
 ### v0.3.1（2026-11-12，上一版正式版）
 

@@ -5,7 +5,8 @@
  *   node scripts/test-merge-presets.mjs
  *
  * 只用 Node 内置模块 + 仓库里的 node scripts/verify-yaml.mjs，不依赖 js-yaml 之外的包：
- * 重复卡片靠「缩进的 id: 行」计数判断，不靠 YAML 解析（CI 里不一定装了 js-yaml）。
+ * 重复卡片靠「缩进的 id: 行」计数判断，不靠 YAML 解析。机器上没有 js-yaml 时
+ * verify-yaml 会 exit 2（跳过校验），这里按「跳过」而不是「失败」处理。
  *
  * 覆盖的是真实踩过的坑：
  *   ① 裸行完整条目（199 行）以前被截成 13 行 → 判成「安装器写的」→ 删头留尾、写出坏 YAML；
@@ -15,7 +16,7 @@
  *   ⑤ 两条都被用户改过 → 以前写一个空托管块（insert: null）。
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,11 +27,15 @@ const MERGE = join(here, "merge-presets.mjs");
 const VERIFY = join(here, "verify-yaml.mjs");
 const PRESETS = join(REPO, "presets");
 const dir = mkdtempSync(join(tmpdir(), "merge-presets-test-"));
+// 临时目录必须自己收：以前只建不删，CI（自托管 runner）与本地每跑一次漏一个目录
+process.on("exit", () => { try { rmSync(dir, { recursive: true, force: true }); } catch (error) {} });
 let seq = 0;
 const rows = [];
 const check = (name, cond, extra) => rows.push({ name, ok: !!cond, extra: extra === undefined ? "" : String(extra).slice(0, 120) });
 
 // 同一张卡的重复：config.id 是缩进行，包装行是 "- id: preset-…"，两者都在同一文件里各出现一次
+// verify-yaml 在没有 js-yaml 的机器上 exit 2 = 跳过校验，不能当成失败（第五轮审计 P2-2）
+const verifyOk = (v) => v === 0 || v === 2;
 const idCount = (text, id) => [...text.matchAll(new RegExp("^[ \\t]+id: " + id + "$", "gm"))].length;
 const managedBlock = (text) => {
   const m = /# >>> dsh-flash-presets[^\n]*\n([\s\S]*?)# <<< dsh-flash-presets/.exec(text);
@@ -66,7 +71,7 @@ const v3Bare = (v3 === null ? "" : v3[1]).replace(/^    /gm, "");
 {
   const r = run(v3Bare, [], "bare");
   check("裸行完整条目：exit 0", r.code === 0, "exit=" + r.code + " " + r.err.trim().slice(0, 60));
-  check("裸行完整条目：YAML 合法", r.verifyCode === 0, "verify=" + r.verifyCode);
+  check("裸行完整条目：YAML 合法", verifyOk(r.verifyCode), "verify=" + r.verifyCode);
   check("裸行完整条目：只有一张 v3 卡", idCount(r.after, "flash-lean-ptc-v3") === 1, "count=" + idCount(r.after, "flash-lean-ptc-v3"));
   check("裸行完整条目：托管块里是完整条目", /suffix/.test(managedBlock(r.after) || ""), "");
 }
@@ -76,12 +81,12 @@ const v3Bare = (v3 === null ? "" : v3[1]).replace(/^    /gm, "");
   const text = "- id: keep-me\n  name: '@me/keep'\n\n" + v3Bare;
   const r = run(text, [], "bare2");
   check("用户行在前：exit 0", r.code === 0, "exit=" + r.code);
-  check("用户行在前：YAML 合法", r.verifyCode === 0, "verify=" + r.verifyCode);
+  check("用户行在前：YAML 合法", verifyOk(r.verifyCode), "verify=" + r.verifyCode);
   check("用户行在前：用户行还在", /id: keep-me/.test(r.after), "");
   check("用户行在前：v3 只有一张", idCount(r.after, "flash-lean-ptc-v3") === 1, "count=" + idCount(r.after, "flash-lean-ptc-v3"));
   const rm = run(text, ["--remove"], "remove");
   check("--remove：exit 0", rm.code === 0, "exit=" + rm.code);
-  check("--remove：YAML 合法", rm.verifyCode === 0, "verify=" + rm.verifyCode);
+  check("--remove：YAML 合法", verifyOk(rm.verifyCode), "verify=" + rm.verifyCode);
   check("--remove：用户行还在", /id: keep-me/.test(rm.after), "");
   check("--remove：v3 残留清掉", !/preset-flash-lean-ptc-v3/.test(rm.after), rm.after.trim().slice(0, 60));
 }
@@ -99,7 +104,7 @@ const v3Bare = (v3 === null ? "" : v3[1]).replace(/^    /gm, "");
   const text = "- insert:\n    # 我的备注\n    - id: preset-flash-lean-ptc-v3\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: flash-lean-ptc-v3\n    - id: preset-flash-lean-ptc-v3b\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        id: flash-lean-ptc-v3b\n";
   const r = run(text, [], "mixed");
   check("混合数组：exit 0", r.code === 0, "exit=" + r.code);
-  check("混合数组：YAML 合法", r.verifyCode === 0, "verify=" + r.verifyCode);
+  check("混合数组：YAML 合法", verifyOk(r.verifyCode), "verify=" + r.verifyCode);
   check("混合数组：别人的条目还在", /preset-flash-lean-ptc-v3b/.test(r.after), "");
   check("混合数组：注释还在", /我的备注/.test(r.after), "");
   check("混合数组：v3 是完整卡", /name: "精简·PTC v3（lean-v3）"/.test(r.after), "");
@@ -127,6 +132,39 @@ const v3Bare = (v3 === null ? "" : v3[1]).replace(/^    /gm, "");
   }
   check("--check：exit 0", code === 0, "exit=" + code);
   check("--check：不写盘", readFileSync(file, "utf8") === before, "");
+}
+
+/* ⑦ 第五轮审计 P1-1：CRLF + 包装行行尾注释 —— 以前 CR 让 (?:#.*)?$ 失配，同一预设写成两份 */
+{
+  const CR = String.fromCharCode(13);
+  const LF = String.fromCharCode(10);
+  const text = ["- insert:", "    - id: preset-flash-lean-ptc-v3  # 我自己加的注释",
+    "      name: '@deepseek-ai/dsh-agent-preset'", "      config:", "        id: flash-lean-ptc-v3", ""].join(CR + LF);
+  const r = run(text, [], "crlf-comment");
+  const lf = r.after.split(CR + LF).join(LF);
+  check("CRLF+注释：exit 0", r.code === 0, "exit=" + r.code);
+  check("CRLF+注释：只有一张 v3 卡", idCount(lf, "flash-lean-ptc-v3") === 1, "count=" + idCount(lf, "flash-lean-ptc-v3"));
+  const lfOnly = r.after.split(LF).slice(0, -1).some((s) => !s.endsWith(CR));
+  check("CRLF+注释：没有混入裸 LF 行", lfOnly === false, "");
+  check("CRLF+注释：YAML 合法", verifyOk(r.verifyCode), "verify=" + r.verifyCode);
+}
+
+/* ⑧ 第五轮审计 P1-3：根序列整体缩进 = YAML 非法，宁可拒绝也不写半个文件 */
+{
+  const LF = String.fromCharCode(10);
+  const text = ["  - id: preset-flash-lean-ptc-v3", "    name: '@deepseek-ai/dsh-agent-preset'",
+    "    config:", "      id: flash-lean-ptc-v3", ""].join(LF);
+  const r = run(text, [], "indented-root");
+  check("缩进根序列：明确拒绝（exit 3）", r.code === 3, "exit=" + r.code);
+  check("缩进根序列：文件一字未改", r.after === text, "");
+}
+
+/* ⑨ 空文件能装，且重装逐字节幂等 */
+{
+  const r1 = run("", [], "empty-file");
+  check("空文件：exit 0", r1.code === 0, "exit=" + r1.code);
+  const r2 = run(r1.after, [], "empty-file-again");
+  check("重装幂等：第二次逐字节相同", r2.after === r1.after, "");
 }
 
 const pass = rows.filter((r) => r.ok).length;

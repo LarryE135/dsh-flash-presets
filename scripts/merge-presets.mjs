@@ -203,7 +203,7 @@ function entryRange(lines, start, indent) {
   let end = start;
   let j = start + 1;
   while (j < lines.length) {
-    const raw = lines[j].replace(/\n$/, '');
+    const raw = lines[j].replace(/\r?\n$/, '');
     if (raw.trim() === '') {
       let k = j + 1;
       while (k < lines.length && lines[k].trim() === '') k++;
@@ -229,7 +229,9 @@ function entryRange(lines, start, indent) {
  */
 function adoptForeignRows(text) {
   const lines = text.split(/(?<=\n)/);
-  const bare = (i) => lines[i].replace(/\n$/, '');
+  // 去掉行尾的 CRLF/LF 再匹配：CRLF 文件里 \r 会让 (?:#.*)?$ 失配，带行尾注释的包装行就漏认，
+  // 结果是同 id 两份（第五轮审计 P1-1，Windows 用户直接命中）。
+  const bare = (i) => lines[i].replace(/\r?\n$/, '');
   const drop = new Set();
   const removed = [];
   const kept = [];
@@ -299,8 +301,14 @@ const looksLikeYamlArray = (s) => {
   const rows = s.split(/\r?\n/).filter((l) => l.trim() !== '' && !l.trimStart().startsWith('#'));
   if (rows.length === 0) return true;
   if (rows.length === 1 && isEmptyArray(rows[0])) return true;
-  for (const line of rows) {
-    if (/^\s/.test(line)) continue;                      // 缩进行属于上一条目
+  for (let i = 0; i < rows.length; i++) {
+    const line = rows[i];
+    if (/^\s/.test(line)) {
+      // 缩进行只有在「已经出现过顶层 - 行」之后才算上一条目的续行；
+      // 一上来就缩进 = 根序列缩进，YAML 非法（第五轮审计 P1-3）。
+      if (i === 0) return false;
+      continue;
+    }
     if (/^\[\s*\]$/.test(line.trim())) return false;     // "[]" 后面还跟着内容
     if (!/^-(?:\s|$)/.test(line)) return false;          // 顶层出现非数组行
   }

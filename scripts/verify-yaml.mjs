@@ -203,10 +203,13 @@ if (args.length) {
       console.log('  · 不是脚本安装的托管块（插件卡安装或手写），跳过预设行断言'
         + (rows.length ? '；本包预设行：' + rows.join(', ') : ''));
     } else {
-      check(rows.includes('flash-lean-ptc-v3'),
-            '托管块含 v3 预设行（实际: ' + (rows.join(', ') || '无') + '）');
-      check(rows.includes('flash-lean-ptc-v3-balance'),
-            '托管块含 balance 预设行（实际: ' + (rows.join(', ') || '无') + '）');
+      // 用户改过的那一条会「保留他的、我们不另写一份」（同 id 只留你的），于是托管块里可能少一条。
+      // 只要这个 id 在文件里出现过（块内或块外的裸行），就算这条预设就位（第五轮审计 P1-2）。
+      const present = (id) => rows.includes(id) || new RegExp('id:\\s*' + id + '\\s*$', 'm').test(text);
+      check(present('flash-lean-ptc-v3'),
+            '文件里有 v3 预设行（块内: ' + (rows.join(', ') || '无') + '）');
+      check(present('flash-lean-ptc-v3-balance'),
+            '文件里有 balance 预设行（块内: ' + (rows.join(', ') || '无') + '）');
       const known = ['flash-lean-ptc-v3', 'flash-lean-ptc-v3-balance', 'flash-lean-ptc-v3-lite'];
       const unknown = [...new Set(rows.filter(id => !known.includes(id)))];
       if (unknown.length > 0) {

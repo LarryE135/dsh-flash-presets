@@ -16,7 +16,7 @@ The idea is simple: compact the context earlier, keep only the head and tail of 
 
 Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. **Three things do apply to the whole profile at runtime**: the resident PTC runtime (the `ptc-runtime` override in the patch, which affects **every** preset in that profile — the only way to switch it off is to remove this plugin card), the `glob` / `grep` concurrency marks (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them), and legacy preset-id resolution (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.3.2 (declared the official release on 2026-11-17 — npm's `latest` dist-tag points at it; for npm, always trust `npm view dsh-flash-presets version`) · mis-published version 0.3.3 (the number currently in `package.json`: still installable from npm, `deprecated`, **not an official release**) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.3.2 (declared the official release on 2026-11-17 — npm's `latest` dist-tag points at it; for npm, always trust `npm view dsh-flash-presets version`) · mis-published version 0.3.3 (still installable from npm, `deprecated`, **not an official release**; it ships **six round-four fixes fewer** than 0.3.2 — `package.json` now says 0.3.2) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
 > Official release: tag `v0.3.2` + npm 0.3.2 + GitHub Release, all on the same day (check with `npm view dsh-flash-presets version`; if a mirror still shows 0.3.1, `#v0.3.2` installs the same code). 0.3.1 was the previous official release. **0.3.3 was published by mistake**: the plan was to release 0.3.2, but `package.json` was written as 0.3.3 and `npm publish` went out with it — so 0.3.2 is now treated as the official release and 0.3.3 is `deprecate`d on npm (still installable, not official). Pin the version: a `^0.3` range can still resolve to 0.3.3. 0.3.2 closes out two external audits, the round-three self-audit and round four: host event shape, auto-approve being dropped on tier change, the review guard, delivery-gate hangs and Windows support, the panel Host allowlist, the publish-script interlocks, and installer adoption boundaries — and the `run_code` optimisation takes effect on install. **Do not install 0.2.5** — it cannot create sessions on DSH 0.2.2-rc.1 (#19).
 
@@ -131,7 +131,7 @@ dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
 
 Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.3.x; a `github:` install records a git ref (`#v<version>`) instead and won't drift.
 
-> Which number to fill in: **the official release is 0.3.2** (`…@0.3.2` or `github:…#v0.3.2`). The 0.3.3 in the example above is installable but was published by mistake (`deprecated`); swap it for 0.3.2. Either way, avoid `^0.3` ranges — they can still resolve to 0.3.3.
+> Which number to fill in: **the official release is 0.3.2** (`…@0.3.2` or `github:…#v0.3.2`). The example above pins the official 0.3.2. npm also still carries a mis-published 0.3.3 (`deprecated`, and six round-four fixes short) — do not use it. **Pin the exact version**: `^0.3` ranges drift with the registry, and pnpm 11's default `minimumReleaseAge` cooldown hides releases younger than 24h (a bare install / `@latest` silently falls back to 0.3.1).
 
 ### Offline, or with the install script
 
@@ -204,7 +204,7 @@ The same card also ships a delivery gate, `delivery-gate`. It needs no rule text
 
 - Why: in the P15654 runs all three implementations *honestly* wrote "17-19 timed out / not covered" in their closing message and shipped anyway. What was missing was not self-reporting but a "you may not finish while it fails" mechanism.
 - Turning it on: set `enabled: true` on that row (the `delivery-gate` row near the end of `cordis.patch.yml`), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
-- Script contract: it looks for `verify.sh` in the workspace root by default (change it via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
+- Script contract: the default candidates are platform-dependent (Windows tries `verify.ps1` first, everything else `verify.sh`; pin them via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
 - Note: the shipped row sets `enabled: false`, and the schema default is also `false` (0.3.1 shipped `true`, which chased ordinary chats with an acceptance gate; 0.3.2 flipped it back). 0.3.1 only honoured `DSH_DELIVERY_GATE=0`; `=1` starts working in 0.3.2.
 - **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row — `enabled: false` / `maxRounds: 2`, with the acceptance script picked per platform: `verify.ps1` first on Windows, `verify.sh` elsewhere). On 0.3.0 the only route is git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`. npm 0.3.1, 0.3.2 (official) and the mis-published 0.3.3 all carry it, so there is **no need to wait for a future release**.
 
@@ -270,7 +270,7 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 ### v0.3.2 (2026-11-17, current official release)
 
-Released: npm 0.3.2 (`…@0.3.2` — verify with `npm view dsh-flash-presets version`, whose `latest` tag points at it), GitHub Release `v0.3.2`, tag `v0.3.2` (= `8f4d349`). 0.3.1 was the previous official release.
+Released: npm 0.3.2 (`…@0.3.2` — verify with `npm view dsh-flash-presets version`, whose `latest` tag points at it), GitHub Release `v0.3.2`, tag `v0.3.2` (= `ea8c3d8`). 0.3.1 was the previous official release.
 
 Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the audit note](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/审计-第三轮-自查-20261117.md):
 
@@ -288,7 +288,7 @@ Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the aud
 - **Under the PTC presets, tool calls inside `run_code` never emit `tool/call`**: the plugin listens on `tool/ptc-dispatch-start` and `tool/ptc-dispatch` instead, with the same semantics for the mid-turn nudge and for "already running" accounting.
 - **The review guard (`tools.guard`)** no longer treats a tool name written in a comment or a string as a call, and now catches real call shapes such as `tools["<name>"]?.()`, template keys and `.call(`.
 - **`scripts/merge-presets.mjs` claims legacy leftovers by indentation**: item boundaries are no longer taken at the first blank line (a 199-line item used to read as 13 lines, get judged installer-written, and be rewritten into broken YAML with its head dropped); `- insert:` arrays are claimed one entry at a time (other people's entries and in-array comments survive); the uninstall path gained a "top level must be a block array" structural gate; a block the user edited entirely is no longer replaced with an empty managed block.
-- **New `scripts/test-merge-presets.mjs`** (24 assertions), wired into `scripts/selftest.sh` (now 54 checks).
+- **New `scripts/test-merge-presets.mjs`** (24 assertions, 32 after the fifth round), wired into `scripts/selftest.sh` (now 54 checks).
 
 **0.3.2's own fixes** (this batch):
 
@@ -300,9 +300,9 @@ Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the aud
 ### v0.3.3 (2026-11-17, published by mistake: still on npm, now deprecated)
 
 > **This version exists because the version number was wrong**: the plan was to release 0.3.2, but `package.json` was written as 0.3.3 and `npm publish` went out with it. The decision: **0.3.2 is the official release** (npm `latest` points at it), and 0.3.3 is marked as a mis-publish and `deprecate`d on npm (still installable, not official).
-> The content is the same fix batch as 0.3.2 (round-three self-audit plus round four) — only the number differs; see the section above.
+> **The shipped content differs from 0.3.2**: 0.3.3 was packed from the round-three commit (`54fc895`); 0.3.2 adds the six round-four fixes on top (macro-task steer, PTC event semantics, review-guard comment/string masking, PHASE 2 bookkeeping rollback, the `merge-presets` claim boundary, the uninstall structural gate). Eleven shipped files differ (`lib/index.js`, `scripts/merge-presets.mjs`, both installers, several docs); check with `git diff --stat v0.3.2 v0.3.3`.
 > The banner published at the time read "Current version: 0.3.3 (tag `v0.3.3` pushed 2026-11-17; npm 0.3.3 + GitHub Release go out the same day)" and has been rewritten to the 0.3.2 wording.
-> **Pin the version**: 0.3.3 is deprecated, but a `^0.3` range can still resolve to it.
+> **Pin the version**: ranges drift with the registry, and under pnpm 11's default cooldown (`minimumReleaseAge`) a freshly published version is invisible to bare installs / `@latest` (they fall back to the previous release).
 
 ### v0.3.1 (2026-11-12, previous official release)
 
@@ -310,7 +310,7 @@ Round-three self-audit fixes (P0 1 / P1 3 / P2 10 / P3 12), itemised in [the aud
   (`flash-presets-core`, injecting only `tools`/`agents`) instead of riding on `plan-mode-ui`, which silently dropped it in
   headless or partial installs. Opt out with `DSH_FLASH_PRESETS_CONCURRENCY=0`.
 - **Fixed subagent model selection / discovery being off on DSH 0.2.2** (#21).
-- **New delivery gate** `delivery-gate` (disabled by default) and `doctor`'s 9th check.
+- **New delivery gate** `delivery-gate` (schema default `true` in 0.3.1 — flipped back to `false` in 0.3.2) and `doctor`'s 9th check.
 - Old-session compat guard (A5), empty-environment false alarms (A3), alias and preset rows must not be `disabled` (A8).
 - Preset ids, rule text and tuning values are unchanged.
 

@@ -44,8 +44,9 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 
 ## 0.5 历史发布状态（0.3.0 / 0.3.1 / 0.3.2 / 0.3.3）
 
-> **当前（2026-11-17 第四轮审计后）**：正式版是 **0.3.2** —— npm `latest` 指向它（现查 `npm view dsh-flash-presets version`）、tag `v0.3.2` = `8f4d349`、GitHub Release 同日发布。
-> **0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`（tag `v0.3.3` = `54fc895`）。处置：0.3.2 追认为正式版，0.3.3 用 `npm deprecate dsh-flash-presets@0.3.3 "<原因>"` 标弃用 —— **仍可安装**，但 `^0.3` 这类范围仍可能解析到它，所以文档一律要求写死版本号。仓库 `package.json` 的 `version` / `publishedVersion` 仍是 0.3.3，下一个正式版本发布时再升。
+> **当前（2026-11-17 第四轮审计后）**：正式版是 **0.3.2** —— npm `latest` 指向它（现查 `npm view dsh-flash-presets version`）、tag `v0.3.2` = `ea8c3d8`、GitHub Release 同日发布。
+> **0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`（tag `v0.3.3` = `54fc895`）。处置：0.3.2 追认为正式版（tag 从 `8f4d349` 移到 `ea8c3d8` 后重发，附件重出），0.3.3 用 `npm deprecate dsh-flash-presets@0.3.3 "<原因>"` 标弃用 —— **仍可安装，但包内容比 0.3.2 少第四轮 6 项修复**（`git diff --stat v0.3.2 v0.3.3` 可见 11 个文件差异），所以文档一律要求写死版本号。仓库 `package.json` 的 `version` / `publishedVersion` 现在都是 **0.3.2**
+> **残留在 npm 上的一个 dist-tag**：`restore032` → 0.3.2（2026-11-17 追认 0.3.2 时用它绕过「新版本号低于已发布最高版本」的限制）。granular token 删它返回 403（`Granular access tokens that bypass two-factor authentication may not perform this action`），要清理得换 classic automation token 或在网页上删；它不影响任何安装路径（`npm i` / `@latest` 只看 `latest`）。（下一版是 0.3.4 之类的更高号，别再写回 0.3.3 —— 它已 deprecate，registry 会以 E403 拒绝覆盖）。
 > **0.3.1（2026-11-12）**：npm 已发（当时的 `latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。上一版正式版。
 > 下表是 **0.3.0（2026-11-07）** 当时的记录，原样保留作对照。
 
@@ -116,11 +117,11 @@ npm run verify     # verify-yaml + verify-presets --repo-only
 bash scripts/selftest.sh
 ```
 
-四项全绿再往下走。`prepublishOnly` 会把这四项再跑一遍（含 selftest），**任何一项失败都会中止发布**。
+上面几步全绿再往下走。`prepublishOnly` 会把整条链（`package.json` 里串联的 12 步，含 selftest）再跑一遍，**任何一步失败都会中止发布**。
 
 另外**人工过一遍文档陈述**：README 与 `docs/` 都在包里，脚本查不出"这句话还与事实相反"。发布前对照实测核一遍安装渠道、版本号、依赖写法、已知限制——0.2.2 → 0.2.3 就是因为 `docs/版本与兼容性.md` 还写着"npm 未发布"才需要重发。
 
-## 2. 升版本号（两处必须一致）
+## 2. 升版本号（**三处**必须一致：`version` / `publishedVersion` / README「当前版本」）
 
 ```bash
 npm version patch --no-git-tag-version      # package.json
@@ -161,6 +162,8 @@ npm whoami          # 应打印你的 npm 用户名
 
 ## 4. 发布
 
+**先按 §5 打 tag 并 `git push origin $TAG`** —— `scripts/publish-npm.sh` 会断言「tag 已推到 origin 且等于 HEAD」，否则直接 fail。推荐整条用 `bash scripts/publish-npm.sh`（= 本节 + `verify-published` 复核）。
+
 先跑一次试发布（不改 registry，但会执行 `prepublishOnly` 整条链）：
 
 ```bash
@@ -171,7 +174,7 @@ npm publish --otp=<6 位码>    # 真发；token 勾了 Bypass 2FA 时直接 npm
 成功标志：`+ dsh-flash-presets@X.Y.Z`。**发布不可逆**（72 小时内可 unpublish），所以 `--dry-run` 那一步不要跳。
 `--dry-run` 打出来的 `total files` / `package size` / `shasum` 就是 `npm view dsh-flash-presets dist.fileCount dist.unpackedSize dist.shasum` 该对上的值。
 
-**发完立刻同步已发布版本号**（否则 lint 的"允许引用版本"白名单还停在上一版，文档锁旧版不会被拦）：
+**发完核对已发布版本号**：正常流程里 `publishedVersion` 在发版提交里就已经改成新号（`publish-npm.sh` 会断言它等于 `version`），所以这一步应为空操作；只有在补发/回滚时才需要它把白名单拉回来：
 
 ```bash
 node scripts/sync-published-version.mjs   # 把 package.json 的 publishedVersion 写成当前 version
@@ -271,7 +274,7 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 `dsh plugin add dsh-plan-mode-ui`（而不只是本地 tgz）：
 
 ```bash
-# 0) 打包插件 + 自检（6 个文件：lib/ cordis.patch.yml README.md LICENSE package.json）
+# 0) 打包插件 + 自检（11 个文件：lib/ 下 7 个 + cordis.patch.yml、README.md、LICENSE、package.json）
 node scripts/pack-plugin.mjs            # → dist/dsh-plan-mode-ui-A.B.C.tgz
 npm test --prefix plugins/plan-mode-ui  # 30 个测试文件全跑（test/run.sh 遍历 test/*.mjs）
 
@@ -282,7 +285,8 @@ npm publish plugins/plan-mode-ui --otp <code> --access public
 npm publish --otp <code>
 
 # 3) 主版本 Release（正文写「插件 dsh-plan-mode-ui vA.B.C 见附件」）
-gh release create vX.Y.Z dist/dsh-flash-presets-X.Y.Z.tgz --title "vX.Y.Z" --notes-file /tmp/notes.md
+gh release create vX.Y.Z dist/dsh-flash-presets-vX.Y.Z.zip --title "vX.Y.Z" --notes-file /tmp/notes.md
+# 附件是 **zip**（`git archive --format=zip`，见 `scripts/publish.sh` 的 Release 段），不是 tgz
 
 # 4) 插件 zip 作为同一 Release 的附件（不单独建 Release、不打 plan-mode-ui-* tag）
 gh release upload vX.Y.Z ~/.dsh/artifacts/dsh-plan-mode-ui-vA.B.C.zip

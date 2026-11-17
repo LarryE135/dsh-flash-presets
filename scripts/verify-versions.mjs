@@ -106,6 +106,17 @@ for (const f of tagSources) {
   check(badClone.length === 0, f + " 的 git clone -b 引用 ∈ {" + [...gitOk].join(", ") + "}", "出现 " + badClone.join(", "));
 }
 
+// ⑧ 裸写 #vX.Y.Z（不带包名）一样会把用户钉在某个版本上，上面三条闸都看不见这种写法：
+//    README 里一句「把 `#v0.3.3` 换成 `#main`」就足以让 npm 页面上的安装建议指向一个无关版本
+//    （第四轮审计 P1-2 就是这么漏过去的）。
+const refOk = new Set([base, pub].filter(Boolean));
+for (const f of tagSources) {
+  if (!existsSync(join(REPO, f))) continue;
+  const bareRefs = [...read(f).matchAll(/(?<![\w./-])#v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+  const badBare = [...new Set(bareRefs.filter((v) => !refOk.has(v)))];
+  check(badBare.length === 0, f + " 的裸 #vX.Y.Z 引用 ∈ {" + [...refOk].join(", ") + "}", "出现 " + badBare.join(", "));
+}
+
 if (problems.length > 0) {
   console.error("✖ 版本号不一致（" + problems.length + " 处）：");
   for (const p of problems) console.error("  - " + p);
