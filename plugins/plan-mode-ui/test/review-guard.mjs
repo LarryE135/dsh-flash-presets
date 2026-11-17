@@ -75,6 +75,28 @@ console.log("review-guard");
     "真正的调用形态仍然被拦");
 }
 {
+  // 第四轮：方括号 / 模板键 / .call( 也要拦；注释与字符串里的「调用形态」必须放（本轮审计 P3）
+  const { mod } = await boot();
+  const f = mod.__reviewTimeoutReasonForTest;
+  const NAME = ["ex", "it", "_plan", "_mode"].join("");
+  const BT = String.fromCharCode(96);
+  ok(typeof f(runCode("await tools[" + JSON.stringify(NAME) + "]({ plan })")) === "string",
+    "方括号取值后直接调用被拦");
+  ok(typeof f(runCode("await tools[" + JSON.stringify(NAME) + "]?.({ plan })")) === "string",
+    "方括号 + 可选调用被拦");
+  ok(typeof f(runCode("await tools[" + BT + NAME + BT + "]({ plan })")) === "string",
+    "模板字符串键被拦");
+  ok(typeof f(runCode("await tools." + NAME + ".call(tools, { plan })")) === "string",
+    ".call( 调用被拦");
+  ok(f(runCode("/* await " + NAME + "({ plan }) */ await tools.read({ path: 'a' })")) === undefined,
+    "块注释里的调用形态不再误拦");
+  ok(f(runCode("await tools.write({ content: '调 tools." + NAME + "({ plan }) 提交' })")) === undefined,
+    "字符串里的调用形态不再误拦");
+  ok(f(runCode("const k = '" + NAME + "' + ''; tools[k]")) === undefined,
+    "只取值不调用仍然放行");
+}
+
+{
   const { mod, warns } = await boot({ withGuard: false });
   const st = mod.__reviewGuardStatsForTest;
   ok(st.unavailable === true, "宿主无 tools.guard 时标记 unavailable");

@@ -238,6 +238,14 @@ if (exec 3<>/dev/tcp/127.0.0.1/10808) 2>/dev/null; then WANT="proxy=http://127.0
 [ "$GOT" = "$WANT" ] && ok "gh_ 的环境前缀随端口有无切换（当前期望 ${WANT}）" \
   || bad "gh_ 环境前缀不对：拿到 [$GOT]，期望 [$WANT]"
 
+step "merge-presets 认领/卸载回归（第四轮 P0）"
+if node scripts/test-merge-presets.mjs >"$TMP/merge.log" 2>&1; then
+  ok "merger 的 24 个回归用例全过"
+else
+  bad "merger 回归用例失败"
+  grep -E '^FAIL' "$TMP/merge.log" | head -4
+fi
+
 step "发布路径守卫"
 if TAG=v9.9.9-test bash scripts/publish.sh >"$TMP/pub.log" 2>&1; then
   bad "publish.sh 对不存在的 tag 竟然放行"; tail -3 "$TMP/pub.log"

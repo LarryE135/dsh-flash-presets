@@ -46,8 +46,8 @@ jobs:
         timeout-minutes: 6
         run: npm install --no-save --silent js-yaml@4
 
-      # 权威闸门：`npm run verify` 是 10 个检查串联的唯一入口（sync-lib 一致性 / YAML / 结构 / 文本审计 /
-      # 基准防泄漏 / 版本一致 / 兼容闸门 / 基准表 / bash3.2 / ps1）。第六轮审计 U2-4：以前 CI 是逐项手抄，
+      # 权威闸门：`npm run verify` 是 12 个检查串联的唯一入口（sync-lib 一致性 / 核心行 / 会话兼容 / YAML / 结构 /
+      # 文本审计 / 基准防泄漏 / 版本一致 / 兼容闸门 / 基准表 / bash3.2 / ps1）。第六轮审计 U2-4：以前 CI 是逐项手抄，
       # 漏了 sync-lib --check、guard-bench-leak、verify-versions、render-bench-table --check 四个，
       # 于是「lib/ 忘了同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里是绿的。
       - name: 权威闸门（npm run verify）
@@ -391,7 +391,7 @@ jobs:
       - name: 整体组合自测（有 dsh 分支）
         run: bash scripts/selftest-integration.sh
 
-  # 插件自测：11 个 test/*.mjs 全跑（v0.5.3 起从 2 个扩到 11 个；之前 CI 完全不跑插件测试）。
+  # 插件自测：30 个 test/*.mjs 全跑（v0.5.3 起从 2 个扩到 11 个，之后逐轮加；之前 CI 完全不跑插件测试）。
   plugin-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
