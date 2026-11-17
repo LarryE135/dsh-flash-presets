@@ -1,39 +1,18 @@
 # 变更日志
 
 > **版本口径（2026-11-07 发布整理）**：对外发布过 **0.2.6**（GitHub tag）、**0.2.7**（GitHub tag，npm 跳过）、
-> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）、**0.3.1**（GitHub tag `04b889e` + Release + npm，2026-11-12 发布；npm `latest` 当前就是它）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
+> **0.2.8**（GitHub tag + npm）、**0.2.9**（GitHub tag + Release + npm，2026-11-07 02:23 CST 发布）、**0.3.0**（GitHub tag + Release + npm，2026-11-07 发布；原计划名为 0.2.10）、**0.3.1**（GitHub tag `04b889e` + Release + npm，2026-11-12 发布）、**0.3.2**（GitHub tag `8f4d349` + Release + npm，2026-11-17 发布，**当前正式版**：npm `latest` 指向它）、**0.3.3**（2026-11-17 **误发**：`npm publish` 已发出，现已 `npm deprecate`，不是正式版；内容与 0.3.2 相同）。0.2.6 定稿时并入的迭代号 0.2.7–0.2.14 从未单独发布，与 0.2.7
 > 这个正式版本号无关 —— 那批内容现已改名为 `0.2.6-iterN`，仍作为「同日迭代」下的四级标题保留。
 >
 > **日期口径**：本文件的日期是本机时区（UTC+8）的日期；npm registry 的 `time` 是 UTC，因此 0.2.1 / 0.2.3 / 0.2.4 三个版本在两边会差一天，属正常，不是笔误。
 
-## 0.3.3（2026-11-17：tag `v0.3.3`；npm 0.3.3 + GitHub Release 同日发布 —— npm 侧以 `npm view dsh-flash-presets version` 为准）
-
-> **0.3.2 只打了 tag**：npm 与 Release 都跳过那一版，内容并入本版。本版是第三轮全量自查（P0 1 / P1 3 / P2 10 / P3 12）的整改，
-> 逐条证据与「未修/延后」清单见 `docs/审计-第三轮-自查-20261117.md`。预设 id、压缩/裁剪参数、persona 规则正文均未改动。
-
-### 条目一览
-
-| # | 类别 | 条目 | 影响面 |
-|---|---|---|---|
-| 1 | 修复 | **安装器静默删掉用户改过的预设行**（P1）：`merge-presets` 的认领只比结构（包装行 + `config.id`），把用户改过 `thresholdRatio` 的同 id 条目当残留整条替换，还打印「内容与安装器写入的一致」 | 脚本安装 |
-| 2 | 修复 | **full 档「批准后转执行」在 rc.3 投递不到**（P1）：`agent.steer()` 在 `session/event` 里同步调用会撞宿主 append 重入守卫（异常被吞）；改为宏任务投递，中途纠偏同样处理 | 计划模式 full 档 |
-| 3 | 修复 | **PTC 下「规划期先动手」检测失效**（P2）：嵌套调用不发 `tool/call`，补上 `tool/ptc-dispatch-start` / `tool/ptc-dispatch` 两个分支（含回归测试 F4/F4b/F4c） | 计划模式（默认预设即 PTC） |
-| 4 | 修复 | **两处服务访问静默失效**（P2）：`ctx.webServer` / `ctx.sessionProjections` 未 inject 时直接取会抛、兜底永远轮不到 → 改走 `ctx.get`；core 状态路由与内置 `/plan` 让位闸恢复 | 运行时 |
-| 5 | 修复 | **发版脚本 fail-closed**（P2）：`publish.sh` 的 CI 闸门不再「查不到就跳过」（`ALLOW_UNKNOWN_CI=1` 才放行）；`DRY_RUN` 挪到远端 tag 守卫之后；`verify-versions` 不再被 `dist/` 旧 zip 卡死；`tune-runtime` 缺补丁文件时不再 ENOENT 崩 | 发版流程 |
-| 6 | 修复 | **交付门按平台选脚本**（P2）：出厂补丁不再钉死 `scripts: [verify.sh]`，Windows 上 schema 默认 `verify.ps1` | 交付门 |
-| 7 | 修复 | **离线安装入口钉在 v0.3.0**（P1）：README 中英的 `git clone -b` 改到当前 tag，`verify-versions` 新增 `-b vX.Y.Z` 断言 | 安装文档 |
-| 8 | 修复 | **发版物口径**（P0）：所有「已发布」措辞改成可复核表述（以 `npm view` 为准 + `#vX.Y.Z` 兜底）；`publishedVersion` 跟上 0.3.3 | 文档 |
-| 9 | 修复 | **文档口径与指向**（P2/P3）：撤掉「300k 以上」「0.25 每次都真压缩」；53 项自测 / 29 个插件测试 / 插件 1.0.0；`align-presets.sh` 指向不存在的脚本；v1/v2 别名说明；README 中文缺失的排障日志块 | 文档 |
-| 10 | 修复 | **评审守卫误拦**（P3）：方括号形式必须后跟 `(` 才算调用 —— 只取值 / 注释 / 字符串里出现工具名不再触发（三种真调用仍拦） | 计划模式 |
-| 11 | 修复 | **杂项加固**（P3）：`install.sh` 安装路径也 prune 备份；`verify.yml` concurrency 计入 `event_name`（schedule 不再取消 push 的 run）；badge job 加 10 分钟与 fetch 20 秒超时；插件包 `engines.dsh` 挪到顶层并收窄区间 | CI / 安装器 |
-
-## 0.3.2（2026-11-17，只打 tag：npm 与 GitHub Release 都跳过这一版，内容并入 0.3.3）
+## 0.3.2（2026-11-17，当前正式版：npm `latest` 指向它；`v0.3.3` 是误发版）
 
 > 预设 id 与压缩/裁剪参数未改动；persona 规则正文未改，**但 v3 的规则 7 措辞调整了**（需要单调用时也走一行 run_code 程序，与 PTC 一致），
 > 计划模式行另补了 #29 的政策句（PTC 下调 `exit_plan_mode` 要带 `timeoutMs: 600000`），见下表第 8 条。
 > 2026-11-17 补：第二轮外部审计的 P1（发版物版本口径）与建议同版修的 P2 已一并处理，见第 10、11 条。
 
-### 条目一览
+### 条目一览（第二批：图标 v1.1 / 上下文瘦身 / 交付门默认关闭 / 计划模式）
 
 | # | 类别 | 条目 | 影响面 |
 |---|---|---|---|
@@ -53,7 +32,41 @@
 
 实测（`docs/研究-DSH-0.2.2-rc.3-上下文注入.md`）：技能目录按每条描述全文注入，技能一多就是上千字符；两项 DeepSeek 专用上报虽不进上下文，但每请求都会把整份会话日志与插件清单**再传一遍**。两者都是纯输入侧开销，压缩到 60 字符与直接关掉不改变行为。两条都是 `patch`（非 `insert`）条目，DSH 的 `applyPatches` 对它们是「有则改、无则只警告」，放进没有这些行的 profile 也不会让启动失败。
 
-## 0.3.1（2026-11-12，npm 已发布 · GitHub Release 已发）
+### 第三轮自查整改（P0 1 / P1 3 / P2 10 / P3 12）
+
+| # | 类别 | 条目 | 影响面 |
+|---|---|---|---|
+| 1 | 修复 | **安装器静默删掉用户改过的预设行**（P1）：`merge-presets` 的认领只比结构（包装行 + `config.id`），把用户改过 `thresholdRatio` 的同 id 条目当残留整条替换，还打印「内容与安装器写入的一致」 | 脚本安装 |
+| 2 | 修复 | **full 档「批准后转执行」在 rc.3 投递不到**（P1）：`agent.steer()` 在 `session/event` 里同步调用会撞宿主 append 重入守卫（异常被吞）；改为宏任务投递，中途纠偏同样处理 | 计划模式 full 档 |
+| 3 | 修复 | **PTC 下「规划期先动手」检测失效**（P2）：嵌套调用不发 `tool/call`，补上 `tool/ptc-dispatch-start` / `tool/ptc-dispatch` 两个分支（含回归测试 F4/F4b/F4c） | 计划模式（默认预设即 PTC） |
+| 4 | 修复 | **两处服务访问静默失效**（P2）：`ctx.webServer` / `ctx.sessionProjections` 未 inject 时直接取会抛、兜底永远轮不到 → 改走 `ctx.get`；core 状态路由与内置 `/plan` 让位闸恢复 | 运行时 |
+| 5 | 修复 | **发版脚本 fail-closed**（P2）：`publish.sh` 的 CI 闸门不再「查不到就跳过」（`ALLOW_UNKNOWN_CI=1` 才放行）；`DRY_RUN` 挪到远端 tag 守卫之后；`verify-versions` 不再被 `dist/` 旧 zip 卡死；`tune-runtime` 缺补丁文件时不再 ENOENT 崩 | 发版流程 |
+| 6 | 修复 | **交付门按平台选脚本**（P2）：出厂补丁不再钉死 `scripts: [verify.sh]`，Windows 上 schema 默认 `verify.ps1` | 交付门 |
+| 7 | 修复 | **离线安装入口钉在 v0.3.0**（P1）：README 中英的 `git clone -b` 改到当前 tag，`verify-versions` 新增 `-b vX.Y.Z` 断言 | 安装文档 |
+| 8 | 修复 | **发版物口径**（P0）：所有「已发布」措辞改成可复核表述（以 `npm view` 为准 + `#vX.Y.Z` 兜底）；`publishedVersion` 跟上仓库版本号（现为 0.3.3，即误发号，见 0.3.3 段） | 文档 |
+| 9 | 修复 | **文档口径与指向**（P2/P3）：撤掉「300k 以上」「0.25 每次都真压缩」；54 项自测 / 30 个插件测试文件 / 插件 1.0.0；`align-presets.sh` 指向不存在的脚本；v1/v2 别名说明；README 中文缺失的排障日志块 | 文档 |
+| 10 | 修复 | **评审守卫误拦**（P3）：方括号形式必须后跟 `(` 才算调用 —— 只取值 / 注释 / 字符串里出现工具名不再触发（三种真调用仍拦） | 计划模式 |
+| 11 | 修复 | **杂项加固**（P3）：`install.sh` 安装路径也 prune 备份；`verify.yml` concurrency 计入 `event_name`（schedule 不再取消 push 的 run）；badge job 加 10 分钟与 fetch 20 秒超时；插件包 `engines.dsh` 挪到顶层并收窄区间 | CI / 安装器 |
+
+### 第四轮审计整改（本轮）
+
+| # | 类别 | 条目 | 影响面 |
+|---|---|---|---|
+| 1 | 修复 | **计划模式下同步 steer 撞宿主的 append 重入守卫**：在 `session/event` 里同步调 `agent.steer()` 会抛（宿主 `publicationEntry()` 的 `appending` 守卫），异常被 `catch` 吞掉 → 改成宏任务投递 | 计划模式 full 档 |
+| 2 | 修复 | **PTC 预设下 `run_code` 内部的工具调用不发 `tool/call`**：改用 `tool/ptc-dispatch-start` 与 `tool/ptc-dispatch`，纠偏与「已在执行」判定与 `tool/call` 同语义 | 计划模式（默认预设即 PTC） |
+| 3 | 修复 | **评审超时守卫（`tools.guard`）**：不再把「注释 / 字符串里写了调用形态」当真调用；同时补上 `tools["<名字>"]?.()`、模板键、`.call(` 等真调用形态 | 计划模式 |
+| 4 | 修复 | **`merge-presets` 认领历史残留时按缩进算条目边界**（以前按第一个空行 → 199 行条目只读到 13 行、被判成安装器写的、删头留尾写坏 YAML）；`- insert:` 数组改成逐条摘（别人的条目与数组内注释都保住）；卸载路径加「顶层必须是块状数组」结构闸；全部条目都被用户改过时不再写空托管块 | 脚本安装 / 卸载 |
+| 5 | 测试 | 新增 `scripts/test-merge-presets.mjs`（24 条断言）并接进 `scripts/selftest.sh`（自测 54 项） | 校验 |
+| 6 | 文档 | 本轮文档口径整理：0.3.2 追认为正式版、0.3.3 标为误发（npm 上已 deprecate）；`npm run verify` 的检查条数、插件测试文件数、`scripts/` 文件数按实测改写 | 文档 |
+
+## 0.3.3（2026-11-17，误发版本：npm 上仍有、已 `deprecate`）
+
+> **这一版是版本号写错的产物**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`。
+> 处置：**0.3.2 追认为正式版**（npm `latest` 指向它），0.3.3 标为误发并在 npm 上 `npm deprecate` —— 仍可安装，但不是正式版。
+> 内容与 0.3.2 是同一批修复（第三轮全量自查 + 第四轮审计），逐条见上一节 —— 差别只在版本号。
+> **装包请写死版本号**：0.3.3 已 deprecate，但 `^0.3` 这类范围仍可能解析到它。
+
+## 0.3.1（2026-11-12，npm 已发布 · GitHub Release 已发；上一版正式版）
 
 > 0.3.0 之后，`main` 上还积累了三批当时按「不升版号、不发 Release」记的修正（11-08 / 11-09 / 11-10）。本版把它们一次性收口成一个正式版本。
 >
@@ -293,7 +306,7 @@ Windows 基准（660 次作答）里 polyglot 题族只有 30% 通过、105 次�
 
 #### CI 收口（以前 CI 绿，不等于仓库闸门绿）
 
-- `verify` job 现在直接跑 `npm run verify`（10 个检查的唯一入口）。此前 CI 是逐项手抄，**漏了 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check` 四个** —— 也就是「`lib/` 忘了从 `plugins/plan-mode-ui/lib/` 同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里完全看不见。
+- `verify` job 现在直接跑 `npm run verify`（当时 10 个检查的唯一入口，这条链现在已经加到 12 个）。此前 CI 是逐项手抄，**漏了 `sync-lib --check`、`guard-bench-leak`、`verify-versions`、`render-bench-table --check` 四个** —— 也就是「`lib/` 忘了从 `plugins/plan-mode-ui/lib/` 同步」「版本号漂移」「基准表漂移」这几类问题在 CI 里完全看不见。
 - 新增一步「发布面卫生与基准复核清单」：`verify-release-hygiene.mjs` + `bench-release-checklist.mjs`，这两个以前只挂在 `prepublishOnly` 上。
 - 修掉一条**永远成立**的断言：卸载后检查的是 `preset-flash-lean-ptc-v2`，而安装器从 0.2.6 起就不写 v2 了；现在改查 `preset-flash-lean-ptc-v3`。
 - 新增探针 `tools/probe/alias-vs-config.mjs`（也可 `npm run verify:alias`）：把别名表与**真实组合配置**对一遍 —— CI 里喂 `dsh --profile ci --dump-config` 的输出，断言别名指向的 id 真的在配置里、`flash-presets-alias` 行真的在。0.2.8 → 0.2.9 那次事故的形状（会话里的 id 解析到包内不存在的定义）从此有闸门。

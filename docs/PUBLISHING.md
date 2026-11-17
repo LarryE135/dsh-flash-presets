@@ -4,8 +4,10 @@
 
 ## 发版前必跑：`npm run verify:full`
 
-`npm run verify` 只覆盖 CI 的第一步。CI 还会单独跑 `lint-presets`（版本真源：`package.json` / `marketplace/plugin.json` / lock / 版本表 / 各文件 git tag 引用）、`selftest.sh`（断言 README 必须有 `### v<当前版本>` 小节）等
+`npm run verify` 是第一步（12 个检查串联：sync-lib / 核心行 / 会话兼容 / YAML / 结构 / 文本审计 / 基准防泄漏 / 版本一致 / 兼容闸门 / 基准表 / bash 3.2 / ps1）。CI 还会跑 `selftest.sh`（断言 README 必须有 `### v<当前版本>` 小节）、`selftest-integration.sh`、装完再校验的 `verify-presets`、`alias-vs-config`、`verify-release-hygiene` 等
 —— 0.3.2 就因只跑 `verify` 而两次「本地绿、CI 红」。
+
+两步容易混：`lint-presets.mjs` 查的是**预设文本**（规则编号 / 缩进 / 自相矛盾 / 平台路径）加**代码块里的版本引用**与 `marketplace/plugin.json` 的版本；`package.json` / lock / 版本表 / 各文件 git tag 引用这类「版本真源」对账在 `verify-versions.mjs` 里。
 
 **因此发版前（以及任何改版号、README 版本行、install 脚本 tag 引用的提交前）请跑：**
 
@@ -13,7 +15,7 @@
 npm run verify:full
 ```
 
-它按 `.github/workflows/verify.yml` 的 ubuntu 分支顺序串起 12 步不依赖平台/不依赖装 DSH 的检查。
+它按 `.github/workflows/verify.yml` 的 ubuntu 分支顺序串起 13 步不依赖平台/不依赖装 DSH 的检查（`node scripts/verify-all.mjs` 里 `run()` 的条数）。
 Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install / integration 仍只在 CI 跑。
 
 ## 0. 前置
@@ -40,10 +42,11 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 
   **不要把 token 写进仓库或贴在聊天里**。
 
-## 0.5 历史发布状态（0.3.0 / 0.3.1 / 0.3.2）
+## 0.5 历史发布状态（0.3.0 / 0.3.1 / 0.3.2 / 0.3.3）
 
-> **0.3.2（2026-11-17）**：**只打了 tag，npm 与 GitHub Release 都跳过**（与 0.2.7 同样的处置：tag 已推且被 tag 规则集冻结在 `8f4d349`，内容随 0.3.3 一起发）。
-> **0.3.1（2026-11-12）**：npm 已发（`latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。
+> **当前（2026-11-17 第四轮审计后）**：正式版是 **0.3.2** —— npm `latest` 指向它（现查 `npm view dsh-flash-presets version`）、tag `v0.3.2` = `8f4d349`、GitHub Release 同日发布。
+> **0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`（tag `v0.3.3` = `54fc895`）。处置：0.3.2 追认为正式版，0.3.3 用 `npm deprecate dsh-flash-presets@0.3.3 "<原因>"` 标弃用 —— **仍可安装**，但 `^0.3` 这类范围仍可能解析到它，所以文档一律要求写死版本号。仓库 `package.json` 的 `version` / `publishedVersion` 仍是 0.3.3，下一个正式版本发布时再升。
+> **0.3.1（2026-11-12）**：npm 已发（当时的 `latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。上一版正式版。
 > 下表是 **0.3.0（2026-11-07）** 当时的记录，原样保留作对照。
 
 | 通道 | 状态 | 证据（可复跑） |
@@ -53,7 +56,7 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 | GitHub Release | 已发，latest | 附件 `dsh-flash-presets-v0.3.0.zip`，sha256 与 `git archive v0.3.0` 一致 |
 | npm | **已发**（2026-11-07） | `npm view dsh-flash-presets version` → 0.3.0；`gitHead` = `5449ecb`（= tag）；39 个文件 / 解包 613 629 B / shasum `c276c00d`（现查：`npm view dsh-flash-presets@0.3.0 dist.*`） |
 
-**npm 认证现状（2026-11-07 实测）**：`npm whoami` 返回 `E401 Unauthorized` —— `~/.npmrc` 里的 `npm_…` token 已失效（Windows 侧 `%USERPROFILE%` 下没有 `.npmrc`）。所以发布前必须先 `npm login`（浏览器授权 + 账号 PIN；本机账号没有 TOTP），之后再 `npm publish`。非 TTY 里 `npm publish` 会以 `EOTP` 失败、授权 URL 被脱敏成 `***`，这一步只能人在真终端做。
+**npm 认证现状（2026-11-17 复核）**：认证书在 `~/.npmrc` 的 `//registry.npmjs.org/:_authToken=…`（granular token，勾了 Bypass 2FA），`npm whoami` 能正常返回用户名 —— 所以发布前先跑一次 `npm whoami` 确认登录态还在，别凭记忆假设。2026-11-07 那次 `E401 Unauthorized` 是旧 token 失效的现场记录（当时 Windows 侧 `%USERPROFILE%` 下也没有 `.npmrc`），现在不是常态；真报 E401 就说明 token 过期或被删，按 §3 重建 token 写回 `~/.npmrc` 再发。只有走网页授权（账号用 PIN、没有 TOTP）时，非 TTY 里 `npm publish` 才会以 `EOTP` 失败、授权 URL 被脱敏成 `***`，那种情形只能人在真终端做（见坑 1）。
 
 ## 0.6 本机的代理与网络（2026-11-07 实测，供发布时排障）
 
@@ -270,7 +273,7 @@ npm token revoke <id>                   # 实测 403：CLI 删不掉
 ```bash
 # 0) 打包插件 + 自检（6 个文件：lib/ cordis.patch.yml README.md LICENSE package.json）
 node scripts/pack-plugin.mjs            # → dist/dsh-plan-mode-ui-A.B.C.tgz
-npm test --prefix plugins/plan-mode-ui  # 29 个测试全跑
+npm test --prefix plugins/plan-mode-ui  # 30 个测试文件全跑（test/run.sh 遍历 test/*.mjs）
 
 # 1) 插件先上 npm（需要 OTP；两个包用同一个 OTP 窗口内连发）
 npm publish plugins/plan-mode-ui --otp <code> --access public

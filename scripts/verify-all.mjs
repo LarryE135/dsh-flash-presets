@@ -20,7 +20,7 @@ const run = (label, cmd, args, env) => {
   return ok;
 };
 
-// 1) 权威闸门（10 个检查串联：sync-lib / YAML / 结构 / 文本审计 / 版本 / 会话兼容 ...）
+// 1) 权威闸门（12 个检查串联：sync-lib / 核心行 / 会话兼容 / YAML / 结构 / 文本审计 / 基准防泄漏 / 版本 / 兼容闸门 / 基准表 / bash3.2 / ps1）
 run("npm run verify", "npm", ["run", "verify"]);
 
 // 2) 别名表 × 合成配置

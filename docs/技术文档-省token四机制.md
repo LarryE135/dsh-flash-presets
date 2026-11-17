@@ -225,7 +225,7 @@ dsh --profile web --dump-config | grep -A4 'compaction-basic'
 # 3. 体检安装状态（含 !!js 行号、托管块数量）
 node scripts/doctor.mjs --profile web --dump
 
-# 4. 跑一遍全部校验（取值、结构、文本、自测 53 项）
+# 4. 跑一遍全部校验（取值、结构、文本、自测 54 项）
 node scripts/verify-presets.mjs && bash scripts/selftest.sh
 ```
 

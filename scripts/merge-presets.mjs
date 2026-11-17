@@ -76,7 +76,7 @@ function buildLiteCompatBody() {
 
 // 从一条预设正文里取出它的 preset id（"- id: preset-xxx"）。
 function idOfBody(body) {
-  const m = /^\s*-\s*id:\s*(preset-\S+)\s*$/m.exec(String(body));
+  const m = /^\s*-\s*id:\s*(preset-\S+)\s*(?:#.*)?$/m.exec(String(body));
   return m === null ? '' : m[1];
 }
 
@@ -96,6 +96,7 @@ function buildBlock(eol = '\n', opts = {}) {
     const lite = buildLiteCompatBody();
     if (!skip.has(idOfBody(lite))) bodies.push(lite);
   }
+  if (bodies.length === 0) return '';   // 全被 skipIds 跳过：不写空块，写出来是 insert: null
   return (BEGIN + '\n- insert:\n' + bodies.join('\n') + '\n' + END + '\n').replace(/\n/g, eol);
 }
 
@@ -120,12 +121,6 @@ function stripBlock(raw) {
   return out.join('');
 }
 
-/**
- * 认领托管块之外的历史残留：老安装方式（写裸行、或手工粘贴）留下的
- * `- id: preset-flash-lean-ptc-vN` 条目不会被 stripBlock 识别，重复安装就会变成两份。
- * 这里把它们整条摘掉（只摘"整条都由我们的预设行组成"的条目，别人的行一个不碰），
- * 随后由托管块统一重建 —— 结果就是"装几次都只有一份"。
- */
 // 安装器真正写过的行：v3、balance，以及升级时才补的 -lite 兼容行。
 // v1 / v2 是 0.2.5 及更早的孤立行，0.2.6 起安装器不再写它们 —— 那是用户照 README 自己加回来的，
 // 认领等于静默删除（第六轮审计 U1-2）。
@@ -146,7 +141,7 @@ function normalizeEntry(text) {
 function splitEntries(lines, indent) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(\s*)-\s*id:\s*(\S+)\s*$/);
+    const m = lines[i].match(/^(\s*)-\s*id:\s*(\S+)\s*(?:#.*)?$/);
     if (!m || m[1].length !== indent) continue;
     const chunks = [lines[i]];
     let j = i + 1;
@@ -197,52 +192,96 @@ function isInstallerEntry(id, text) {
   return true;
 }
 
+const lead = (s) => (s.match(/^\s*/) || [''])[0].length;
+const isCommentLine = (s) => s.trimStart().startsWith('#');
+
+// 条目（从 start 行、缩进 indent 开始）的最后一个非空行号。
+// 关键：条目内部可能有空行（v3 的 suffix: |- 里就有一个）。以前「遇空行即结束」会把
+// 199 行的条目截成 13 行 —— 13 行前缀必然全在安装器行集里，于是判成「安装器写的」，
+// 删掉前 13 行、后面 176 行成孤儿，卸载路径还会静默写出非法 YAML（第四轮审计 P0）。
+function entryRange(lines, start, indent) {
+  let end = start;
+  let j = start + 1;
+  while (j < lines.length) {
+    const raw = lines[j].replace(/\n$/, '');
+    if (raw.trim() === '') {
+      let k = j + 1;
+      while (k < lines.length && lines[k].trim() === '') k++;
+      if (k < lines.length && lead(lines[k].replace(/\n$/, '')) > indent) { j = k; continue; }
+      break;
+    }
+    if (lead(raw) <= indent) break;
+    end = j;
+    j++;
+  }
+  return end;
+}
+
+/**
+ * 认领托管块之外的历史残留：老安装方式（写裸行、或手工粘贴）留下的
+ * `- id: preset-flash-lean-ptc-vN` 条目不会被 stripBlock 识别，重复安装就会变成两份。
+ * 这里把它们整条摘掉（只摘"整条都由我们的预设行组成"的条目，别人的行一个不碰），
+ * 随后由托管块统一重建 —— 结果就是"装几次都只有一份"。
+ *
+ * 第四轮审计后的两条硬约束：
+ *   ① 条目边界按「缩进归零」算，不按「第一个空行」算；
+ *   ② `- insert:` 数组里逐条摘，不再整数组摘 —— 别人的条目、数组内的注释都保住。
+ */
 function adoptForeignRows(text) {
   const lines = text.split(/(?<=\n)/);
-  const out = [];
+  const bare = (i) => lines[i].replace(/\n$/, '');
+  const drop = new Set();
   const removed = [];
   const kept = [];
+  const adoptOne = (start, indent, id) => {
+    const end = entryRange(lines, start, indent);
+    if (!isInstallerEntry(id, lines.slice(start, end + 1).join(''))) {
+      if (/^preset-flash-lean-ptc/.test(id)) kept.push(id);
+      return false;
+    }
+    removed.push(id);
+    for (let k = start; k <= end; k++) drop.add(k);
+    return true;
+  };
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
-    if (/^-\s*insert:\s*$/.test(line)) {
+    const line = bare(i);
+    if (/^-\s*insert:\s*(?:#.*)?$/.test(line)) {
       let j = i + 1;
-      const body = [];
-      while (j < lines.length && !/^-\s/.test(lines[j])) { body.push(lines[j]); j++; }
-      const flat = body.map((l) => l.replace(/\n$/, ''));
-      const hits = flat
-        .map((l) => l.match(/^(\s*)-\s*id:\s*(\S+)\s*$/))
-        .filter(Boolean)
-        .map((m) => ({ indent: m[1].length, id: m[2] }));
-      const minIndent = hits.length > 0 ? Math.min(...hits.map((h) => h.indent)) : Infinity;
-      const entries = Number.isFinite(minIndent) ? splitEntries(flat, minIndent) : [];
-      if (entries.length > 0 && entries.every((e) => isInstallerEntry(e.id, e.text))) {
-        removed.push(...entries.map((e) => e.id));
-        while (j < lines.length && lines[j].trim() === '') j++;
-        i = j;
-        continue;
-      }
-      for (const e of entries) if (/^preset-flash-lean-ptc/.test(e.id)) kept.push(e.id);
-    } else {
-      const m = line.match(/^-\s*id:\s*(\S+)\s*$/);
-      if (m) {
-        const blockLines = [line];
-        let j = i + 1;
-        while (j < lines.length && /^\s+\S/.test(lines[j])) { blockLines.push(lines[j]); j++; }
-        if (isInstallerEntry(m[1], blockLines.map((l) => l.replace(/\n$/, '')).join('\n'))) {
-          removed.push(m[1]);
-          i = j;
-          while (i < lines.length && lines[i].trim() === '') i++;
-          continue;
+      const bodyIdx = [];
+      while (j < lines.length && !/^-\s/.test(bare(j))) { bodyIdx.push(j); j++; }
+      const starts = bodyIdx.filter((k) => /^\s*-\s*id:\s*\S+/.test(bare(k)));
+      if (starts.length > 0) {
+        const minIndent = Math.min(...starts.map((k) => lead(bare(k))));
+        let touched = false;
+        for (const k of starts) {
+          if (lead(bare(k)) !== minIndent) continue;
+          const m = bare(k).match(/^\s*-\s*id:\s*(\S+)\s*(?:#.*)?$/);
+          if (m && adoptOne(k, minIndent, m[1])) touched = true;
         }
-        if (/^preset-flash-lean-ptc/.test(m[1])) kept.push(m[1]);
+        const survives = bodyIdx.filter((k) => !drop.has(k) && bare(k).trim() !== '');
+        if (touched && !survives.some((k) => /^\s*-\s/.test(bare(k)))) {
+          // 数组里只剩注释（或什么都不剩）：摘掉 - insert: 行本身；注释提到顶层，不连坐删除
+          drop.add(i);
+          for (const k of survives) {
+            if (isCommentLine(bare(k))) lines[k] = bare(k).trimStart() + '\n';
+          }
+        }
       }
+      i = j;
+      continue;
     }
-    out.push(line);
+    const m = /^-\s*id:\s*(\S+)\s*(?:#.*)?$/.exec(line);
+    if (m) {
+      adoptOne(i, 0, m[1]);
+      i = entryRange(lines, i, 0) + 1;
+      continue;
+    }
     i++;
   }
-  return { text: out.join(''), removed, kept };
+  return { text: lines.filter((_, k) => !drop.has(k)).join(''), removed, kept };
 }
+
 let raw = fs.existsSync(patchPath) ? fs.readFileSync(patchPath, 'utf8') : '[]\n';
 const eol = detectEol(raw);
 // 旧托管块 / 旧裸行里出现过 -lite → 这次升级要带一行兼容行（除非显式 --no-legacy-lite）
@@ -254,6 +293,19 @@ if (hadLegacyLite) {
     : '检测到旧安装写过 flash-lean-ptc-v3-lite，但已按 --no-legacy-lite 跳过兼容行');
 }
 const isEmptyArray = s => /^\[\s*\]$/.test(s.trim());
+// 写盘前的结构闸：顶层只能是块状数组（每个顶层行都以 "- " 开头）或 "[]"。
+// 卸载路径以前没有任何兜底 —— 半条残留会被静默写回，profile 直接起不来（第四轮审计 P0）。
+const looksLikeYamlArray = (s) => {
+  const rows = s.split(/\r?\n/).filter((l) => l.trim() !== '' && !l.trimStart().startsWith('#'));
+  if (rows.length === 0) return true;
+  if (rows.length === 1 && isEmptyArray(rows[0])) return true;
+  for (const line of rows) {
+    if (/^\s/.test(line)) continue;                      // 缩进行属于上一条目
+    if (/^\[\s*\]$/.test(line.trim())) return false;     // "[]" 后面还跟着内容
+    if (!/^-(?:\s|$)/.test(line)) return false;          // 顶层出现非数组行
+  }
+  return true;
+};
 
 // issue #25：脚本路径是整块替换旧托管块 —— 0.2.5 时代的三卡（v1/v2/v3）会被换成两张卡，
 // 而这条路径没有别名层，引用被移除 id 的旧会话会打不开。安装前先把「会被丢掉哪些」记下来。
@@ -278,11 +330,13 @@ try {
     }
   } else {
     const body = raw.split(/\r?\n/).filter(l => l.trim() && !l.trimStart().startsWith('#'));
+    const block = buildBlock(eol, { legacyLite: keepLegacyLite, skipIds: new Set(keptCustom) });
     if (body.length === 0 || (body.length === 1 && isEmptyArray(body[0]))) {
       const kept = raw.split(/\r?\n/).filter(l => !isEmptyArray(l)).join(eol).replace(/\s+$/, '');
-      out = (kept.trim() ? kept + eol + eol : '') + buildBlock(eol, { legacyLite: keepLegacyLite, skipIds: new Set(keptCustom) });
+      out = (kept.trim() ? kept + eol + eol : '') + block;
+      if (out.trim() === '') out = '[]' + eol;   // 全被 skipIds 跳过时别写出空文件
     } else if (body[0].trimStart().startsWith('- ')) {
-      out = raw.replace(/\s+$/, '') + eol + eol + buildBlock(eol, { legacyLite: keepLegacyLite, skipIds: new Set(keptCustom) });
+      out = block === '' ? raw.replace(/\s+$/, '') + eol : raw.replace(/\s+$/, '') + eol + eol + block;
     } else {
       console.error('✖ 该补丁文件不是「块状数组」形式（可能是 [{...}] 之类的流式写法）。');
       console.error('  请先把这个文件改回块状数组（形如 `[]` 或 `- ...` 开头），再跑一次。');
@@ -294,7 +348,13 @@ try {
   process.exit(1);
 }
 
-const rows = [...out.matchAll(/^\s+- id: (preset-\S+)$/gm)].map(m => m[1]);
+if (!flag('--check') && !looksLikeYamlArray(out)) {
+  console.error('✖ 生成的结果不是块状数组 YAML，已中止（未写入任何内容）。');
+  console.error('  请备份该文件后贴到 issue 里 —— 这类损坏我们宁可拒绝，也不写半个文件。');
+  process.exit(3);
+}
+
+const rows = [...out.matchAll(/^\s+- id: (preset-\S+)\s*(?:#.*)?$/gm)].map(m => m[1]);
 if (adopted.length > 0) {
   console.log('已认领托管块外的历史残留: ' + adopted.join(', ') + '（内容与安装器写入的一致，已由托管块取代）');
 }
