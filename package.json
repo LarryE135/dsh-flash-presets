@@ -82,7 +82,6 @@
     "docs/技术文档-精简预设实现.md",
     "docs/实测证据.md",
     "docs/预设-id-契约与升级.md",
-    "docs/审计索引.md",
     "README.md",
     "README.en.md",
     "LICENSE"
@@ -126,5 +125,5 @@
       "inject": []
     }
   },
-  "publishedVersion": "0.3.1"
+  "publishedVersion": "0.3.2"
 }

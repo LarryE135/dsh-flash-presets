@@ -16,9 +16,9 @@ The idea is simple: compact the context earlier, keep only the head and tail of 
 
 Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. **Three things do apply to the whole profile at runtime**: the resident PTC runtime (the `ptc-runtime` override in the patch, which affects **every** preset in that profile — the only way to switch it off is to remove this plugin card), the `glob` / `grep` concurrency marks (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them), and legacy preset-id resolution (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.3.2 (2026-11-16, repo only; not published to npm, no Release; npm latest is still 0.3.1) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.3.2 (released 2026-11-17: npm 0.3.2 + GitHub Release `v0.3.2`) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> `dsh-flash-presets@0.3.1` is live on npm (`npm view dsh-flash-presets version`; `latest` = 0.3.1); the GitHub Release follows the pre-release audit. 0.3.1 folds in the three "no version bump" batches that followed 0.3.0 — most importantly, the `run_code` optimization now applies as soon as the package is installed. **Do not install 0.2.5** — it cannot start a session on DSH 0.2.2-rc.1 (#19).
+> `dsh-flash-presets@0.3.2` is live on npm (`npm view dsh-flash-presets version`), with GitHub Release `v0.3.2` published alongside; 0.3.1 was the previous public version. 0.3.2 closes out both external audits: host event shape, auto-approve being dropped on tier change, the review guard, delivery-gate hangs and Windows support, the panel Host allowlist, and the publish-script interlocks — and the `run_code` optimisation takes effect on install. **Do not install 0.2.5** — it cannot create sessions on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 
@@ -108,7 +108,7 @@ Two synthetic suites of everyday office data-processing tasks: [Office benchmark
 
 How to read it:
 
-- `lean-v3` is the 13-rule preset as it stood in 0.2.5; its rules are identical to today's `flash-lean-ptc-v3` (lean-v3).
+- `lean-v3` is the 13-rule preset as it stood in 0.2.5; its rules match `flash-lean-ptc-v3` up to 0.3.1. From 0.3.2 on, rule 7 of v3 is worded slightly differently (a call that is single-use still goes through a one-line `run_code` program); the other 12 rules are unchanged.
 - "vs standard" also includes the gain from switching to PTC tools. To isolate the preset, compare against PTC mode instead: roughly −59.6% and −69.2% on the two suites (computed from the table).
 - Tokens only. Per-task accuracy is not kept in this repository (`docs/实测证据.md` has a separate office-bench batch scoring 68.9167/100, a different run set), so it isn't broken out. Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
 - `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
@@ -122,9 +122,9 @@ The plugin manager installs the whole plugin card: both presets, the plan-mode c
 
 ```console
 # 0.2.9 from npm, pinned to the version
-dsh plugin --profile web add dsh-flash-presets@0.3.1
+dsh plugin --profile web add dsh-flash-presets@0.3.2
 # or the same release as a tag, if you'd rather not use npm
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
 ```
 
 `--profile` is normally `web` or `desktop` (presets don't activate under `headless`, and `acp` is untested — see [Known limitations](#known-limitations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
@@ -182,7 +182,7 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 - **Preset ids no longer change.** The 13-rule preset is `flash-lean-ptc-v3`; the 3-rule preset is `flash-lean-ptc-v3-balance`. 0.2.7–0.2.8 renamed the first one to `flash-lean-ptc-v3-lite`; 0.2.9 reverts that and will not rename ids again — DSH persists the preset id inside the session log, so renaming it is what makes old sessions fail to open. Rule text may evolve; identifiers stay put.
 - Old sessions still open, and none of them get rewritten: `flash-lean-ptc-v3-lite` (0.2.6–0.2.8) has identical rules and is aliased to `flash-lean-ptc-v3`; older `flash-lean` / `flash-lean-ptc` are aliased too, and `flash-lean-ptc-v1` / `-v2` are aliased as well (0.2.8 already aliased them and 0.2.9 keeps that promise); their rules differ from v3, so the first hit logs a warning — add a row to your profile patch if you want the old rules, which is what this machine does for `v2`. Ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. The layer steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
 - **The install never touches sessions**: `install.sh` / `install.ps1` and plugin startup do not scan or rewrite `sessions/`. As of 0.2.9 **no code in this package writes a session file at all** (the start-up self-heal `lib/compat-heal.js` is gone: it rewrote the header without invalidating DSH's projection cache, so it barely worked and left a stale lock behind). CI asserts that a session directory is byte-identical after an install and an uninstall.
-- **Desktop app / plugin card**: whether old sessions open depends on the bundle carrying a `flash-presets-alias` row (a standalone plugin that injects only `agentPresets`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.1`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
+- **Desktop app / plugin card**: whether old sessions open depends on the bundle carrying a `flash-presets-alias` row (a standalone plugin that injects only `agentPresets`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
 - **Script install (`install.sh` / `install.ps1`)**: this path has no alias layer. If the patch mentioned `flash-lean-ptc-v3-lite` before the upgrade, `merge-presets` keeps one extra compatibility row (`order: 99`, labelled "do not pick"), otherwise those sessions would be not-found. A profile that already carries the plugin card is refused (`exit 4`) — pass `--force` to stack them anyway.
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
 - If the profile's `selectedDefault` points at `flash-lean-ptc-v3-lite`, set it to `flash-lean-ptc-v3` (the old value still resolves through the compatibility layer).
@@ -194,6 +194,7 @@ The same plugin card carries a plan-mode component, plan-mode v1 (1.0.0). Within
 - The control sits to the left of the input box, with off / light / full levels independent of the preset.
 - Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 17% more tokens (median 40.2k vs 34.3k) and about 33% more time (196 s vs 147 s) ([changelog](docs/CHANGELOG.md), Chinese).
 - If you don't want it, switch the component off on the card. The presets behave exactly the same without it.
+- **The panel only talks to loopback**: `/api/plan-mode/*` accepts requests whose `Host` is `127.0.0.1` / `localhost` / `[::1]` (DNS-rebinding guard). If you reach the Web GUI through a LAN IP or a custom hostname, the panel answers 403 and the UI tells you to set `DSH_FLASH_PRESETS_TRUST_HOST=1` and restart.
 
 ## Delivery gate (optional component, off by default)
 
@@ -203,7 +204,7 @@ The same card also ships a delivery gate, `delivery-gate`. It needs no rule text
 - Turning it on: set `enabled: true` on that row (the `delivery-gate` row near the end of `cordis.patch.yml`), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
 - Script contract: it looks for `verify.sh` in the workspace root by default (change it via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
 - Note: the shipped row sets `enabled: false`, and the schema default is also `false` (0.3.1 shipped `true`, which chased ordinary chats with an acceptance gate; 0.3.2 flipped it back). 0.3.1 only honoured `DSH_DELIVERY_GATE=0`; `=1` starts working in 0.3.2.
-- **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row). On 0.3.0, install from git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.1`.
+- **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row). On 0.3.0, install from git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2`.
 
 ## Getting the most out of it
 
@@ -265,9 +266,9 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 ## Version history
 
-### v0.3.2 (2026-11-16)
+### v0.3.2 (2026-11-17)
 
-Repo-only version: **not on npm, no GitHub Release, tag pending** (`latest` is still 0.3.1).
+Released: npm `dsh-flash-presets@0.3.2`, GitHub Release `v0.3.2`, tag `v0.3.2`.
 
 - **Auto-approve button rebuilt to glyph v1.1**: two ring arrows plus a center check, all three states (`off / on / fire`) working — every real auto-approval flings the ring half a turn and pops the check, 20 px. Fixes the old `.pmo-aa svg` rule that forced 15 px and rotated every svg in the button, which made the check spin with the ring and kept the icon tiny.
 - **Lean defaults in the bundle**: `tool-skill.catalogDescriptionMaxLength: 60`, `session-log-deepseek` / `plugin-package-inventory-deepseek` disabled (~40 KB less per request, none of it in context).

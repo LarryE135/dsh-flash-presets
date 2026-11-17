@@ -15,11 +15,13 @@ Expect an acknowledgement within 7 days, and a fix or a documented mitigation wi
 
 Installing dsh-flash-presets adds @deepseek-ai/dsh-agent-preset rows to the target DSH profile
 through a Cordis bundle patch (cordis.patch.yml) plus preset YAML. It does not patch host source
-at runtime and does not read credentials or session data. Two capabilities are worth stating
+at runtime and does not read credentials; it reads a session header only to resolve the
+workspace directory (never message content). Two capabilities are worth stating
 plainly:
 
-- `lib/delivery-gate.js` (off by default) spawns `bash verify.sh` / `pwsh verify.ps1` in the
-  workspace root when a turn stops. Only enable it in workspaces whose `verify.sh` you trust: the
+- `lib/delivery-gate.js` (off by default) spawns the workspace acceptance script when a turn stops
+  (`verify.sh` through `bash` on Linux/macOS, `verify.ps1` through `pwsh` on Windows; the
+  interpreter follows the file extension, and a missing interpreter skips the gate instead of failing it).
   script runs with your user privileges, outside DSH's sandbox and approval flow.
 - `lib/client.js` (the plan-mode panel) talks to the local DSH web server over `fetch()` on
   `127.0.0.1`. It makes no third-party network requests.

@@ -42,7 +42,7 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 
 ## 0.5 历史发布状态（0.3.0 / 0.3.1）
 
-> **0.3.1（2026-11-12）**：npm 已发（`latest` = 0.3.1，`gitHead` = `04b889e`）、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。
+> **0.3.1（2026-11-12）**：npm 已发（`latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。
 > 下表是 **0.3.0（2026-11-07）** 当时的记录，原样保留作对照。
 
 | 通道 | 状态 | 证据（可复跑） |

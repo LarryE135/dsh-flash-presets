@@ -86,8 +86,9 @@ for (const f of tagSources) {
   const npmRefs = [...text.matchAll(/dsh-flash-presets@(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const gitRefs = [...text.matchAll(/dsh-flash-presets#v(\d+\.\d+\.\d+)/g)].map((m) => m[1]);
   const badNpm = [...new Set(npmRefs.filter((v) => !npmOk.has(v)))];
-  // 版本号先落地、tag 后打时，安装器必须指向"真正存在的 tag"（= 已发布版本），
-  // 否则照抄命令会 404。所以两者都接受；发版后 run scripts/publish.sh 会把它拉回当前版本。
+  // 版本号先落地、tag 后打时，安装器必须指向真正存在的 tag（= 已发布版本），否则照抄命令
+  // 会 404，所以两者都接受。注意没有任何脚本会替你改这些引用：发版提交里要手改，
+  // scripts/publish-npm.sh 会在发布前断言它们等于本次版本（第二轮审计 P1-1）。
   const gitOk = new Set([base, pub].filter(Boolean));
   const badGit = [...new Set(gitRefs.filter((v) => !gitOk.has(v)))];
   check(badNpm.length === 0, f + " 的 npm 引用 ∈ {" + [...npmOk].join(", ") + "}", "出现 " + badNpm.join(", "));
