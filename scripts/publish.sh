@@ -100,7 +100,16 @@ fi
 if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
   gh_ repo view "$GH_USER/$REPO" >/dev/null 2>&1 || \
     gh_ repo create "$GH_USER/$REPO" --"$VISIBILITY" --description "DSH agent presets tuned for token efficiency (lite 13 rules / balance 3 rules)"
-  git push -u origin main
+  # main 开了分支保护（ruleset「protect main」：禁止删除 / 禁止非快进 / 四个必过检查，无绕过）：
+  # 带新提交直推 main 会被 GitHub 拒绝。发版前确认这些提交已经通过 PR 合进 main，这里只做幂等推送。
+  if git remote get-url origin >/dev/null 2>&1 && git rev-parse -q --verify origin/main >/dev/null 2>&1; then
+    AHEAD="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
+    if [ "${AHEAD:-0}" != "0" ]; then
+      fail "本地有 $AHEAD 个提交不在 origin/main 上（main 受分支保护，直推会被拒）" \
+        "改走 PR：git switch -c <branch> && git push -u origin <branch>，等四个必过检查绿了再合进 main，然后重跑本脚本"
+    fi
+  fi
+  git push -u origin main   # 幂等：main 已是最新时是 no-op，不会触发规则
   git push origin "$TAG"
 
   # ⑤ npm 必须先发（2026-11-12 审计 D2）：Release 早于 npm，会让正文里的安装命令指向一个装不到的版本。
