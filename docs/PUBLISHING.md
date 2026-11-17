@@ -45,7 +45,7 @@ Windows/macOS 专属步骤、plugin-tests 矩阵、装 DSH 后的 bundle-install
 ## 0.5 历史发布状态（0.3.0 / 0.3.1 / 0.3.2 / 0.3.3）
 
 > **当前（2026-11-17 第四轮审计后）**：正式版是 **0.3.2** —— npm `latest` 指向它（现查 `npm view dsh-flash-presets version`）、tag `v0.3.2` = `ea8c3d8`、GitHub Release 同日发布。
-> **0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`（tag `v0.3.3` = `54fc895`）。处置：0.3.2 追认为正式版（tag 从 `8f4d349` 移到 `ea8c3d8` 后重发，附件重出），0.3.3 用 `npm deprecate dsh-flash-presets@0.3.3 "<原因>"` 标弃用 —— **仍可安装，但包内容比 0.3.2 少第四轮 6 项修复**（`git diff --stat v0.3.2 v0.3.3` 可见 11 个文件差异），所以文档一律要求写死版本号。仓库 `package.json` 的 `version` / `publishedVersion` 现在都是 **0.3.2**
+> **0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish`（tag `v0.3.3` = `54fc895`）。处置：0.3.2 追认为正式版（tag 从 `8f4d349` 移到 `ea8c3d8` 后重发，附件重出），0.3.3 用 `npm deprecate dsh-flash-presets@0.3.3 "<原因>"` 标弃用 —— **仍可安装，但包内容比 0.3.2 少第四轮 6 项修复**（`git diff --stat v0.3.2 v0.3.3` 可见 11 个文件差异），所以文档一律要求写死版本号。仓库 `package.json` 的 `version` / `publishedVersion` 现在都是 **0.3.2** **GitHub Release v0.3.3 已于 2026-11-17 晚删除**（正文与附件一并移除，`releases/latest` 仍是 v0.3.2）；tag `v0.3.3` 按冻结规则保留，npm 0.3.3 仍可安装但已 deprecate。
 > **残留在 npm 上的一个 dist-tag**：`restore032` → 0.3.2（2026-11-17 追认 0.3.2 时用它绕过「新版本号低于已发布最高版本」的限制）。granular token 删它返回 403（`Granular access tokens that bypass two-factor authentication may not perform this action`），要清理得换 classic automation token 或在网页上删；它不影响任何安装路径（`npm i` / `@latest` 只看 `latest`）。（下一版是 0.3.4 之类的更高号，别再写回 0.3.3 —— 它已 deprecate，registry 会以 E403 拒绝覆盖）。
 > **0.3.1（2026-11-12）**：npm 已发（当时的 `latest` = 0.3.1，`gitHead` = `5d02bee`（孤儿提交，与 `04b889e` 同树））、tag `v0.3.1` = `04b889e`、GitHub Release 已发（18:03Z）。上一版正式版。
 > 下表是 **0.3.0（2026-11-07）** 当时的记录，原样保留作对照。
