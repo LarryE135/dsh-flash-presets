@@ -2,6 +2,7 @@ name: verify
 
 on:
   push:
+    branches-ignore: [badges]   # 徽章分支只存 downloads.json，不值得跑一整轮 CI
   pull_request:
   workflow_dispatch:
   schedule:
