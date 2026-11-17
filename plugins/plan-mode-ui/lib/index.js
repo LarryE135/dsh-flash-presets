@@ -1133,6 +1133,9 @@ function handleProgress(req, res, ctx) {
   try {
     const url = new URL(String(req.url ?? "/"), "http://localhost");
     const method = String(req.method ?? "GET").toUpperCase();
+    // 跨站防护与 /state 一致（第二轮审计 P2-3）：/progress 能读 todo 文本、能写 nudge/dismiss，
+    // 同样必须过 Host 白名单，否则 DNS rebinding 仍可越过 /state 上那道闸。
+    if (!sameOrigin(req, req.method)) { sendJson(res, 403, { ok: false, message: "cross-origin rejected" }); return; }
     const qs = url.searchParams.get("session");
     const key = qs === null || qs === "" ? undefined : "id:" + qs;
 

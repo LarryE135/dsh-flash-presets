@@ -42,25 +42,25 @@ jobs:
       - name: Commit when the number moved
         run: |
           set -euo pipefail
-          if git diff --quiet -- badges/downloads.json; then
-            echo "downloads unchanged — nothing to commit"
-            exit 0
+          # 比较基准是 badges 分支上的文件，不是 main（第二轮审计 P2-1）：main 已受分支保护、
+          # 不再被这个 job 写，它那份 JSON 会一直停在切换前，拿它比等于每次都「有变化」。
+          if git fetch -q --depth=1 origin badges 2>/dev/null; then
+            if git show origin/badges:badges/downloads.json 2>/dev/null | diff -q - badges/downloads.json >/dev/null; then
+              echo "downloads unchanged — nothing to commit"
+              exit 0
+            fi
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add badges/downloads.json
           git commit -m "chore(badge): npm downloads $(date -u +%F)"
-          # 守卫：本 job 与人工推送会撞车（2026-11-04 出现过 'remote rejected main -> main'，
-          # 因为 badge 运行期间 main 又被推了一次）。改成 rebase 重试：
-          # 冲突时只重建这一条提交，最多 5 次，仍失败才红。
-          # 推到 badges 分支（不是 main）：main 受分支保护，直推会被 GH013 拒绝。
+          # 只推 badges：main 开了必过状态检查且无绕过，直推会被 GH013 拒绝。
+          # 该分支只放这一个 JSON，允许强推，也就不需要 rebase 重试那套。
           for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:badges; then
+            if git push --force origin HEAD:badges; then
               echo "pushed to badges on attempt $attempt"
               exit 0
             fi
-            echo "push rejected (attempt $attempt) — rebasing onto origin/main"
-            git pull --rebase --autostash origin main
             sleep $((attempt * 5))
           done
           echo "::error::badge push rejected 5 times"

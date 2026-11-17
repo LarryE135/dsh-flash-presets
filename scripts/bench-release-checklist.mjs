@@ -12,6 +12,10 @@ const git = (args) => {
   catch { return ""; }
 };
 
+// 这份清单文档本身带着给人手抄的命令示例（grep base64,、grep 私有库链接），扫进去就会
+// 自己判自己失败。它只描述检查方法，不是被检查的交付物（第二轮审计 P2-6）。
+const SELF_DOC = "benchmarks/office/grading/发布前复核清单.md";
+
 const hard = [];
 const lines = [];
 const say = (s = "") => lines.push(s);
@@ -22,8 +26,11 @@ say("=".repeat(46));
 // ---- ① 候选：新增文本里"像数据行"的行 ----
 // 与守卫同一口径：tracked + untracked-not-ignored。只看 tracked 会漏掉"刚拷进来还没 add"的文件，
 // 而那恰恰是手滑搬真值最常见的时刻。
-const tracked = (git(["ls-files", "benchmarks/"]) + git(["ls-files", "-o", "--exclude-standard", "benchmarks/"]))
-  .split("\n").filter(Boolean);
+// 必须用 -z（第二轮审计 P2-6）：默认 core.quotepath=true 会把中文路径转义成八进制，
+// existsSync 判为不存在、被静默跳过（23 个文件）；而设了 quotepath=false 时又会把清单文档
+// 自己的 grep 示例扫进来、自己判自己失败。按 NUL 切分两种情况都对。
+const tracked = (git(["ls-files", "-z", "benchmarks/"]) + git(["ls-files", "-z", "-o", "--exclude-standard", "benchmarks/"]))
+  .split("\0").filter(Boolean);
 const textFiles = tracked.filter((p) => /\.(md|txt|json|csv)$/i.test(p));
 const suspicious = [];
 for (const rel of textFiles) {
@@ -76,6 +83,7 @@ const base64Hits = [];
 for (const rel of textFiles) {
   const p = join(REPO, rel);
   if (!existsSync(p)) continue;
+  if (rel === SELF_DOC) continue;
   if (/base64,|data:image\//.test(readFileSync(p, "utf8"))) base64Hits.push(rel);
 }
 say("[2] 二进制：" + binaries.length + " 个（inputs/ 内 " + insideInputs.length + "，之外 " + outsideInputs.length + "）；" +
@@ -93,6 +101,7 @@ say("");
 const hasSubmodule = existsSync(join(REPO, ".gitmodules"));
 const linkHits = [];
 for (const rel of tracked.filter((p) => /\.(md|txt|json|ya?ml)$/i.test(p))) {
+  if (rel === SELF_DOC) continue;
   const p = join(REPO, rel);
   if (!existsSync(p)) continue;
   const body = readFileSync(p, "utf8");

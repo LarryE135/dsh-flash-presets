@@ -13,7 +13,10 @@
  * 只删“已知退役”的 id，不碰其他预设（standard / 用户自己装的都不动）。
  */
 import fs from 'node:fs';
-import yaml from 'js-yaml';
+// js-yaml 不是本包的依赖（仓库内脚本，不随包发出）：新 clone 下没有它，这时退化成
+// 只看括号是否成对的粗校验，不让脚本直接 ERR_MODULE_NOT_FOUND（第二轮审计 P3）。
+let yaml = null;
+try { yaml = (await import('js-yaml')).default; } catch (error) { yaml = null; }
 import os from 'node:os';
 import path from 'node:path';
 
@@ -90,11 +93,21 @@ for (const dir of dirs) {
   const stripped = text.replace(/#[^\n]*/g, "").trim();
   if (stripped === "" || stripped === "[]") text = "[]\n";
   // 结构校验：解析不了就回滚，绝不写坏 profile 补丁。
-  try {
-    yaml.load(text);
-  } catch (error) {
-    console.error(path.basename(dir).padEnd(12) + "✖ 清理后 YAML 解析失败，已回滚：" + String(error && error.message));
-    continue;
+  if (yaml === null) {
+    // 没有 js-yaml：退化成「括号配平」粗校验，宁可少一层保险也不要直接崩（第二轮审计 P3）
+    const opens = (text.match(/[\[{]/g) || []).length;
+    const closes = (text.match(/[\]}]/g) || []).length;
+    if (opens !== closes) {
+      console.error(path.basename(dir).padEnd(12) + '✖ 清理后括号不配平，已回滚');
+      continue;
+    }
+  } else {
+    try {
+      yaml.load(text);
+    } catch (error) {
+      console.error(path.basename(dir).padEnd(12) + '✖ 清理后 YAML 解析失败，已回滚：' + String(error && error.message));
+      continue;
+    }
   }
   fs.writeFileSync(file, text);
   console.log(path.basename(dir).padEnd(12) + '→ 已清理（备份 ' + path.basename(file) + '.bak-prune-' + stamp + '）');
