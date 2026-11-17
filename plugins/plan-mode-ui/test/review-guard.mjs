@@ -94,6 +94,24 @@ console.log("review-guard");
     "字符串里的调用形态不再误拦");
   ok(f(runCode("const k = '" + NAME + "' + ''; tools[k]")) === undefined,
     "只取值不调用仍然放行");
+  // 第五轮审计 P3-1：逐字面识别调用形态永远漏（Reflect.apply / 先取值后调用 / 解构别名 /
+  // 模板串内嵌），改成「代码里出现工具名就要求 timeoutMs」，误报的代价只是多写一个字段。
+  ok(typeof f(runCode("await Reflect.apply(tools." + NAME + ", null, [{ plan }])")) === "string",
+    "Reflect.apply 形态被拦（词边界判定）");
+  ok(typeof f(runCode("const fn = tools." + NAME + "; await fn({ plan })")) === "string",
+    "先取值后调用的别名形态被拦");
+  ok(typeof f(runCode("const { " + NAME + ": grab } = tools; await grab({ plan })")) === "string",
+    "解构别名形态被拦");
+  ok(f(runCode("await tools.my_" + NAME + "_helper({ plan })")) === undefined,
+    "名字里含工具名的别的工具不误拦（词边界）");
+  // 第五轮审计 P3-2：以前 10 万字符输入要 1.8 s（\s* 嵌套在可选组里，Θ(k²)），量词改成有界后是毫秒级
+  {
+    const big = "await tools.read({ path: '" + "a".repeat(100000) + "' });";
+    const t0 = Date.now();
+    f(runCode(big));
+    const ms = Date.now() - t0;
+    ok(ms < 200, "10 万字符输入 < 200 ms（实测 " + ms + " ms）");
+  }
 }
 
 {

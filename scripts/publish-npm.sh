@@ -45,7 +45,9 @@ STALE="$(grep -oE 'dsh-flash-presets@[0-9]+\.[0-9]+\.[0-9]+' README.md | sort -u
 BADCMD="$(grep -hoE 'dsh-flash-presets[@#](v)?[0-9]+[.][0-9]+[.][0-9]+' scripts/install.sh scripts/install.ps1 marketplace/plugin.json | sort -u | grep -vE "^dsh-flash-presets[@#](v)?$VER$" || true)"
 [ -z "$BADCMD" ] || fail "安装器/市场清单里还留着旧版本引用：$BADCMD" "只允许 @$VER 与 #v$VER"
 
-# CI 守卫（第二轮审计 P2-1）：0.3.1 的 npm 发布早于 CI 结果，最后是绿的属于侥幸。
+# CI 守卫（第二轮审计 P2-1；第四轮审计 P1 补齐）：0.3.1 的 npm 发布早于 CI 结果，
+# 最后是绿的属于侥幸。以前这段只在「装了 gh」时才检查，没装就整段跳过、且不打印任何提示 ——
+# 与 publish.sh 的 fail-closed 语义相反，等于唯一的守卫在自己没装的机器上根本不存在。
 if command -v gh >/dev/null 2>&1; then
   RUNS="$(gh run list --commit "$(git rev-parse HEAD)" --limit 30 --json conclusion 2>/dev/null || true)"
   if [ -n "$RUNS" ]; then
@@ -53,7 +55,14 @@ if command -v gh >/dev/null 2>&1; then
       fail "本次提交的 CI 有失败/取消的 run" "等 CI 全绿再发"
     fi
     echo "CI 侧未见失败 run"
+  else
+    [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ] || fail "gh 拿不到本次提交的 run 列表" "先在 Actions 里确认，或 ALLOW_UNKNOWN_CI=1 自担风险跳过"
+    echo "⚠ gh 没有返回 run 列表：已按 ALLOW_UNKNOWN_CI=1 跳过"
   fi
+elif [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ]; then
+  echo "⚠ 没装 gh：已按 ALLOW_UNKNOWN_CI=1 跳过 CI 核对（发出去之前请自己在 Actions 里确认）"
+else
+  fail "没装 gh，无法核对本次提交的 CI 是否全绿" "装 gh（gh auth login）后重跑；或 ALLOW_UNKNOWN_CI=1 自担风险跳过（与 publish.sh 同一口径）"
 fi
 
 echo "发布 $PKG_VER 到 npm…"

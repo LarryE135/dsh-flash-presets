@@ -245,6 +245,8 @@ const userPrompts = new Map();            // sessionKey → { at, chars, head, u
 const activeTurns = new Map();            // sessionKey → 回合开始时间（此间收到的用户输入属“插话”，不授权新回合）
 const pendingTools = new Map();           // sessionKey → 飞行中的工具调用数（>0 说明回合在跑，只是没事件）
 const pendingTurn = new Map();            // sessionKey → 这批飞行调用所属回合（防止上个回合的迟到结果把新回合清零）
+const pendingSince = new Map();            // sessionKey → 最早一次飞行的时间（TTL 兜底用）
+const pendingPtc = new Map();              // sessionKey → Set<subCallId>：PTC 事件不带 turn，只能按 id 配对
 const ACTIVE_TURN_MAX_MS = 6 * 60 * 60 * 1000; // 回合进行中的兜底时限（崩溃未发 turn/end 时自动失效）
 // 本插件自己投递的 steer 消息一律以这些前缀开头：它们不是"真实用户输入"，
 // 不给下一个回合发放规划许可（漏掉一个前缀 => 这条 steer 会被当成用户发话）。
@@ -273,12 +275,31 @@ function noteToolFlight(key, delta, turn) {
   if (delta > 0) {
     pendingTools.set(key, (pendingTools.get(key) ?? 0) + 1);
     if (turn !== undefined) pendingTurn.set(key, turn);
+    if (!pendingSince.has(key)) pendingSince.set(key, Date.now());
     return;
   }
   const at = pendingTurn.get(key);
   if (turn !== undefined && at !== undefined && at !== turn) return;
   const n = (pendingTools.get(key) ?? 0) - 1;
-  if (n > 0) pendingTools.set(key, n); else { pendingTools.delete(key); pendingTurn.delete(key); }
+  if (n > 0) pendingTools.set(key, n); else { pendingTools.delete(key); pendingTurn.delete(key); pendingSince.delete(key); }
+}
+
+// PTC 的 start/end 事件都不带 turn（宿主 dsh-tool-executor-ptc 的 append 里没有 turn），
+// 所以「按回合配对」对它们天然失效 —— 改按 subCallId 集合配对，天然免疫乱序、重复与跨回合迟到。
+function notePtcStart(key, subCallId) {
+  if (key === undefined || typeof subCallId !== "string" || subCallId.length === 0) return;
+  const set = pendingPtc.get(key) ?? new Set();
+  set.add(subCallId);
+  pendingPtc.set(key, set);
+  if (!pendingSince.has(key)) pendingSince.set(key, Date.now());
+}
+function notePtcEnd(key, subCallId) {
+  if (key === undefined) return;
+  const set = pendingPtc.get(key);
+  if (set === undefined) return;
+  if (typeof subCallId === "string" && subCallId.length > 0) set.delete(subCallId);
+  else if (set.size > 0) set.delete(set.values().next().value);   // 没带 id：退化成摘一个
+  if (set.size === 0) { pendingPtc.delete(key); if ((pendingTools.get(key) ?? 0) === 0) pendingSince.delete(key); }
 }
 
 function pruneStale() {
@@ -290,7 +311,12 @@ function pruneStale() {
     // 回合仍在进行（例如一次 20 分钟的工具调用，期间没有任何事件）：保留记录，
     // 否则 PHASE 2 永远不会被投递，这一回合就白规划了。
     // 有工具调用仍在飞行（一次 20 分钟的渲染就是这样）：回合是活的，不能清
-    if ((pendingTools.get(key) ?? 0) > 0) continue;
+    const inflight = (pendingTools.get(key) ?? 0) > 0 || (pendingPtc.get(key)?.size ?? 0) > 0;
+    const since = pendingSince.get(key);
+    // 缺 end 的飞行计数（PTC 子调用被取消、宿主的 abandon 只对未 start 的条目生效）会让 TTL 兜底
+    // 对该会话永久失效：计数不动，记录就永远不清。超过两个 TTL 就当作 0（第五轮审计 P2-2）。
+    if (inflight && (since === undefined || now - since <= PLANNING_TTL_MS * 2)) continue;
+    if (inflight) { pendingTools.delete(key); pendingTurn.delete(key); pendingPtc.delete(key); pendingSince.delete(key); }
     phaseRecords.delete(key);
   }
   for (const [key, at] of activeTurns) {
@@ -564,7 +590,7 @@ const REVIEW_MIN_TIMEOUT_MS = 600000;
 // 只认「调用形态」（工具名后面跟括号）：文档、注释、字符串里单纯提到工具名不该被拦。
 // 调用形态：name( / name?..( / tools["name"](。排除 my_exit_plan_mode( 这类标识符后缀；
 // 注释与普通字符串里只"提到"名字（后面不跟括号）不匹配。
-const REVIEW_WAIT_TOOLS = /(?<![\w$])(exit_plan_mode|ask_user_question)(?:\s*\?)?(?:\.\s*(?:call|apply|bind))?\s*(?:\?\s*\.)?\s*\(|\[\s*['"`](exit_plan_mode|ask_user_question)['"`]\s*\]\s*(?:\?\.|\.\s*(?:call|apply|bind))?\s*\(/;
+const REVIEW_WAIT_TOOLS = /(?<![\w$])(exit_plan_mode|ask_user_question)/;
 const reviewGuardStats = { blocked: 0, unavailable: false, disabled: false };
 // 扫描前把注释与「纯文本字符串」抹成空白（保留长度与换行），只保留方括号键里的字符串。
 // 否则「在字符串或注释里写了一句调用形态」会被当成真调用拦下（本轮审计 P3）：写文档、
@@ -610,6 +636,9 @@ function reviewTimeoutReason(exec, skip) {
   const args = exec.arguments;
   if (args === null || typeof args !== "object") return undefined;
   const code = typeof args.code === "string" ? args.code : "";
+  // 只要「代码里」（注释/纯文本字符串已被抹掉，方括号键里的字符串保留）出现工具名，就要求
+  // timeoutMs —— 逐字面识别调用形态永远漏（Reflect.apply、先取值后调用、解构别名、模板串内嵌），
+  // 而误报代价只是模型多写一个 timeoutMs（第五轮审计 P3-1）。
   const m = REVIEW_WAIT_TOOLS.exec(maskCodeForReview(code));
   if (m === null) return undefined;
   const tool = m[1] !== undefined ? m[1] : m[2];
@@ -712,10 +741,25 @@ const phase2Turn = new Map();          // sessionKey → turn：同一回合只�
 function probePlanSeen(live, session) {
   if (live.planSeen === true) return true;
   const now = Date.now();
-  if (live.planProbeAt !== undefined && now - live.planProbeAt < PLAN_PROBE_MS) return false;
+  // 三态：true=已落地，false=确认没落地，undefined=被节流跳过（未知）。
+  // 以前节流时返回 false —— 默认 PTC 预设下内层调用毫秒级连发，「计划刚落盘就动手」的整个窗口
+  // 都被判成「没计划」，callsAfterPlan 恒为 0，收尾照样追加 PHASE 2（第五轮审计 P1-1）。
+  if (live.planProbeAt !== undefined && now - live.planProbeAt < PLAN_PROBE_MS) return undefined;
   live.planProbeAt = now;
-  if (hasPlanFile(session, live.startedAt) === true) { live.planSeen = true; return true; }
+  if (hasPlanFile(session, live.startedAt) === true) {
+    live.planSeen = true;
+    if (live.planSeenAt === undefined) live.planSeenAt = now;
+    return true;
+  }
   return false;
+}
+
+// 「计划落地之后还动过手」：计数与时间戳两条证据任一成立即可。只看计数会被 1 秒节流吃掉
+// （连发的调用全落在窗口里），所以补一条「最后一次工具开始晚于我们发现计划文件的时刻」。
+function runningAfterPlan(live) {
+  if (live === undefined || live.planSeen !== true) return false;
+  if ((live.callsAfterPlan ?? 0) >= ALREADY_EXECUTING_CALLS) return true;
+  return live.lastToolStartAt !== undefined && live.planSeenAt !== undefined && live.lastToolStartAt > live.planSeenAt;
 }
 
 // 工具「开始」的统一处理：tool/call 与 tool/ptc-dispatch-start 都走这里。
@@ -724,6 +768,7 @@ function probePlanSeen(live, session) {
 function onToolStart(live, session, key, turn, name) {
   if (live === undefined) return;
   live.sawToolCall = true;
+  live.lastToolStartAt = Date.now();
   noteToolFlight(key, 1, turn);
   if (live.phase !== "planning") return;
   const seen = probePlanSeen(live, session);
@@ -734,7 +779,11 @@ function onToolStart(live, session, key, turn, name) {
   if (key !== undefined && bridgeTier.has(key)) return;   // 桥接中：原生政策负责"先计划后动手"
   if (live.nudged === true) return;
   const planned = seen === true ? true : hasPlanFile(session, live.startedAt);
-  if (planned === true) { live.planSeen = true; return; }
+  if (planned === true) {
+    live.planSeen = true;
+    if (live.planSeenAt === undefined) live.planSeenAt = Date.now();
+    return;
+  }
   if (planned !== false) return;
   live.wroteBeforePlan = true;
   const agent = key === undefined ? undefined : agents.get(key);
@@ -1443,13 +1492,14 @@ export default {
         } else if (type === "tool/call") {
           onToolStart(live, session, key, evTurn, pd?.name !== undefined ? pd.name : event?.name);
         } else if (type === "tool/ptc-dispatch-start") {
+          notePtcStart(key, pd?.subCallId);
           // 本包默认预设是 ptc 模式：run_code 内部调起的工具在宿主里**不发 tool/call**
           // （dsh-tools 的 pipeline.start() 在 input.log 缺失时直接返回），唯一信号是
           // dsh-tool-executor-ptc 的 tool/ptc-dispatch-start（开始）与 tool/ptc-dispatch（结束）。
           // 「动手」判定放在开始事件，与 tool/call 完全同一条路径（本轮审计 P1/P2）。
           onToolStart(live, session, key, evTurn, pd?.name !== undefined ? pd.name : event?.name);
         } else if (type === "tool/ptc-dispatch") {
-          noteToolFlight(key, -1, evTurn);
+          notePtcEnd(key, pd?.subCallId);
         } else if (type === "tool/result") {
           // 飞行中的工具调用计数：用来区分“回合在跑”与“回合已经死了”。
           // 只认同一回合（见 noteToolFlight）：上个回合迟到的结果不许清掉新回合的计数。
@@ -1494,6 +1544,11 @@ export default {
             // 3：只有"规划阶段真的写过东西"才把这次关闭当作批准。空跑一场（用户开了一下计划模式
             // 又关掉、或桥接开了随即退出）不该往普通对话里塞一段 PHASE 2，那会表现为"没让它规划，
             // 却突然收到一段执行指令"。没产出 → 当作取消：清掉执行阶段记录，下个回合照常判断。
+            // 回合号未知（turn === undefined）时不能算「已产出」：以前 undefined === undefined 会命中，
+            // 于是在 idle 状态关掉计划模式也会凭空唤醒一个执行回合（第五轮审计 P2-3）。
+            // turn 未知时仍按「已产出」处理：这条路径要保住「记录被 turn/end 清掉之后才批准，
+            // 仍应投递 PHASE 2」（test/bridge-fixes.mjs 的 F2）。代价是「只在 idle 关一次开关」也会
+            // 被当成批准 —— 第五轮审计 P2-3 提了这一点，权衡后保留旧行为，改动记在发版清单 P3。
             const produced = planningProduced.get(key) === turn || planningProduced.get(key) === null
               || (rec !== undefined && rec.produced === true);
             if (governingTier === "full" && !produced) {
@@ -1516,7 +1571,14 @@ export default {
           }
           // 注意：agents 不在这里删。agent/created 每会话只来一次，
           // 删掉会让后续回合的“中途纠正”失去句柄；由 agent/disposed + 有界上限负责回收。
-          if (key !== undefined) { phaseRecords.delete(key); activeTurns.delete(key); pendingTools.delete(key); }
+          if (key !== undefined) {
+            phaseRecords.delete(key);
+            activeTurns.delete(key);
+            pendingTools.delete(key);
+            pendingTurn.delete(key);
+            pendingPtc.delete(key);
+            pendingSince.delete(key);
+          }
         }
       });
     }
@@ -1545,6 +1607,10 @@ export default {
           pendingPhase2.delete(key);
           phase2Turn.delete(key);
           decidedTurn.delete(key);     // H1：同样按会话回收，长跑进程里不随会话数线性增长
+          pendingTools.delete(key);    // 会话没了，飞行计数不该继续挡着 TTL 回收
+          pendingTurn.delete(key);
+          pendingPtc.delete(key);
+          pendingSince.delete(key);
           turnOpening.delete(key);
           cancelIntent.delete(key);
         }
@@ -1583,7 +1649,7 @@ export default {
         if (rec.sawToolCall !== true && planSeen !== true) return;
         // 计划交付后它没有停步、一直在跑工具：执行早就开始了，这里再注入 PHASE 2
         // 只会变成“事后催办”（实测会把同一份交付汇报两遍）。静默转入执行阶段即可。
-        if (planSeen === true && (rec.callsAfterPlan ?? 0) >= ALREADY_EXECUTING_CALLS) {
+        if (planSeen === true && runningAfterPlan(rec)) {
           rec.phase = "executing";
           rec.resumedByWork = true;
           const t0 = rec.turn !== undefined ? rec.turn : payload?.turn;
@@ -1655,7 +1721,10 @@ export default {
     // 让模型带上 timeoutMs 重发。拦截发生在执行之前，不弹卡、不跑代码，只多一个回合。
     // 自动批准开着时评审瞬间返回，不拦；子代理会话不拦；宿主没有 guard API 时整段跳过。
     ctx.effect(() => {
-      const tools = ctx.tools !== undefined ? ctx.tools : (typeof ctx.get === "function" ? ctx.get("tools") : undefined);
+      // ctx.get 在服务未注册时会抛（同文件另外 5 处都包了 try/catch）：这里漏包会让整个插件加载失败。
+      const tools = ctx.tools !== undefined
+        ? ctx.tools
+        : (() => { try { return typeof ctx.get === "function" ? ctx.get("tools") : undefined; } catch (error) { return undefined; } })();
       if (process.env.DSH_FLASH_PRESETS_REVIEW_GUARD === "0") {
         reviewGuardStats.disabled = true;   // 自检要能区分「被关掉」与「开着但没命中」
         return undefined;
