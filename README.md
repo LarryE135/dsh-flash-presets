@@ -104,6 +104,31 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 - 表里只有 token 消耗：逐题正确率没有留在本仓库（`docs/实测证据.md` 里另有一批 68.9167/100 的办公床记录，与上表不是同一批运行），所以不单列正确率。出题与评分使用同一个模型（`GPT-6.1-Sol`），答题与评分环节隔离以防止作弊。
 - 评分规则公开在 [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading)，真值与评分器放在私有仓库。
 
+### DSH-Bench 四臂对比（110 题 × 6 遍）
+
+同一套题、同一模型、同一题序下把四臂拉平比较（每臂 660 次作答，净耗时已扣除启动与排队）：**换 lean-v3 不掉正确率，token 与耗时都往下走**。
+
+![四臂正确率（总正确率 / 编程 / 知识 / 长任务 / 办公，轴从 60 起）](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-accuracy.webp)
+
+| 配置 | 总正确率 | Token | 相对标准 | 单答费用 | 净耗时 |
+|---|---:|---:|---:|---:|---:|
+| 标准 | 84.1% | 12,863 万 | — | ¥0.0805 | 12.2 h |
+| 原生 PTC | 85.0% | 9,800 万 | −23.8% | ¥0.0724 | 11.1 h |
+| lean-v3 · Windows | 84.1% | 8,377 万 | −34.9% | ¥0.0634 | 9.8 h |
+| lean-v3 · WSL | 84.8% | 6,308 万 | −51.0% | ¥0.0551 | 7.0 h |
+
+![四臂净作答耗时（均值 / 中位 / 每答对）](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-time.webp)
+
+![四臂 token 构成与费用（缓存读取 / 未缓存输入 / 输出）](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-token.webp)
+
+怎么读：
+
+- 正确率五个维度（总正确率 / 编程 / 知识 / 长任务 / 办公）差距都在 **±4 分内**；0.1 分级的差在噪声里，结论是「没有可测出的下降」，不是「变强了」。
+- 与 **原生 PTC** 比才是预设的净效果（和「标准」比会同时算进 PTC 工具面的收益）：token −14.5%（Windows）/ −35.6%（WSL）。
+- **Windows 与 WSL 不是两个预设**：同一份规则、同一台机器，差别在运行环境；对外引用一律用更保守的 Windows 一列。
+- **题目集和 [`dsh-bench`](https://github.com/LarryE135/dsh-bench) 仓库 v1 的 160 题不是同一套**（本文是 110 题 × 6 遍），也和上面的办公基准（8 + 5 题）、早期 `n = 3、7 项验收` 实验不同 —— **只能在同一套题内比臂间差，别跨集比绝对值**。
+- 耗时明细、三项折算与复现命令见 [基准：DSH-Bench 110 题 × 6 遍](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md)。
+
 ## 安装
 
 ### 用插件管理器（推荐）

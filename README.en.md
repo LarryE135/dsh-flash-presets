@@ -114,6 +114,31 @@ How to read it:
 - `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
 - Scoring rules are public in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading); ground truth and graders live in a private repository.
 
+### DSH-Bench, 110 tasks x 6 runs, four arms
+
+Same tasks, same model, same task order, four arms side by side (660 answered runs per arm; wall time excludes startup and queueing): **lean-v3 costs no measurable accuracy and cuts both tokens and time**.
+
+![Accuracy across the four arms (overall / coding / knowledge / long-horizon / office, axis starts at 60)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-accuracy.webp)
+
+| Setup | Accuracy | Tokens | vs standard | Cost per answer | Net time |
+|---|---:|---:|---:|---:|---:|
+| Standard | 84.1% | 128.63 M | — | ¥0.0805 | 12.2 h |
+| Native PTC | 85.0% | 98.00 M | −23.8% | ¥0.0724 | 11.1 h |
+| lean-v3 · Windows | 84.1% | 83.77 M | −34.9% | ¥0.0634 | 9.8 h |
+| lean-v3 · WSL | 84.8% | 63.08 M | −51.0% | ¥0.0551 | 7.0 h |
+
+![Net answering time across the four arms (mean / median / per correct answer)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-time.webp)
+
+![Token mix and cost across the four arms (cache reads / uncached input / output)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-dsh110-token.webp)
+
+How to read it:
+
+- All five dimensions (overall / coding / knowledge / long-horizon / office) sit **within ±4 points**. A 0.1-point spread is inside the noise: the honest claim is "no measurable drop", not "better".
+- Compare against **native PTC** to isolate the preset (comparing against standard also counts the PTC tool-surface gain): −14.5% tokens (Windows) / −35.6% (WSL).
+- **Windows and WSL are not two presets** — same rules, same machine, different runtime; quote the more conservative Windows column.
+- **This task set is not the 160-task DSH-Bench v1** in [`dsh-bench`](https://github.com/LarryE135/dsh-bench) (here it is 110 tasks x 6 runs), and it is not the office suites above (8 + 5 tasks) nor the older `n = 3, 7 checks` experiment — **only compare arms inside one task set**.
+- Per-metric tables, the arithmetic behind the percentages and how to reproduce: [benchmark note](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md).
+
 ## Install
 
 ### With the plugin manager (recommended)
