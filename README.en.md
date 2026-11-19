@@ -114,7 +114,7 @@ How to read it:
 - All five dimensions (overall / coding / knowledge / long-horizon / office) sit **within ±4 points**. A 0.1-point spread is inside the noise: the honest claim is "no measurable drop", not "better".
 - Compare against **native PTC** to isolate the preset (comparing against standard also counts the PTC tool-surface gain): −14.5% tokens (Windows) / −35.6% (WSL).
 - **Windows and WSL are not two presets** — same rules, same machine, different runtime; quote the more conservative Windows column.
-- **This task set is not the 160-task DSH-Bench v1** in [`dsh-bench`](https://github.com/LarryE135/dsh-bench) (here it is 110 tasks x 6 runs), and it is not the office suites above (8 + 5 tasks) nor the older `n = 3, 7 checks` experiment — **only compare arms inside one task set**.
+- **This task set is not the 160-task DSH-Bench v1** in [`dsh-bench`](https://github.com/LarryE135/dsh-bench) (here it is 110 tasks x 6 runs), and it is not the older `n = 3, 7 checks` experiment — **only compare arms inside one task set**.
 - `lean-v3` here is the **13-rule** tier (`flash-lean-ptc-v3`); from 0.3.2 on, rule 7 is worded slightly differently (a single-use call still goes through a one-line `run_code` program), the other 12 are unchanged.
 - Grading is fully objective (multiple choice / integer / file checks / hidden unit tests / multi-step items); tasks, graders and how to run them live in the [dsh-bench](https://github.com/LarryE135/dsh-bench) repository.
 - Per-metric tables, the arithmetic behind the percentages and how to reproduce: [benchmark note](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md).
@@ -258,13 +258,12 @@ The presets also declare `tool-subagent-codex`, `tool-subagent-claude-code`, `wo
 - The `glob` / `grep` concurrency marks only exist in a plugin-manager install (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them); the script install never has them. Legacy-id resolution comes from the plugin too (`DSH_FLASH_PRESETS_ALIAS=0`).
 - The plan-mode component also reads two environment variables: `DSH_PLAN_TODO_SYNC=off|remind|strict` (default `remind`) controls whether todo writes are reminded or required, and `DSH_PLAN_LAG_TURNS=<n>` (default 2) is how many turns behind the run may fall before a nudge; they mirror the `todoSync` / `lagTurns` plugin config keys.
 - The plan-mode tier is visible to other plugins that watch `planMode`. If you also run a plugin that injects reminders while plan mode is on (e.g. `chatgpt-subscription`), a pure Q&A turn — one that only talks and calls no tools — may be judged unfinished and **answered twice**. Mitigation: set the plan-mode tier to `off` in such sessions.
-- Development and testing centered on the public Luogu problem set and the office benchmark above. Other kinds of work have little data behind them.
+- Development and testing centered on the public Luogu problem set and the mixed DSH-Bench task set (coding / knowledge / long-horizon / office). Multimodal and very-long-document work still has little data behind it.
 
 ## Development and checks
 
 ```console
 npm run verify          # composition, YAML, preset structure, text lint, version consistency, benchmark leak guard, and more
-npm run bench:office    # structure and integrity checks for the office benchmark (repo only; the npm package excludes benchmarks/)
 bash scripts/selftest.sh
 node scripts/verify-session-compat.mjs   # whether old sessions still open after an upgrade (10 synthetic sessions, two negative controls)
 ```
