@@ -107,7 +107,7 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 - 正确率五个维度（总正确率 / 编程 / 知识 / 长任务 / 办公）差距都在 **±4 分内**；0.1 分级的差在噪声里，结论是「没有可测出的下降」，不是「变强了」。
 - 与 **原生 PTC** 比才是预设的净效果（和「标准」比会同时算进 PTC 工具面的收益）：token −14.5%（Windows）/ −35.6%（WSL）。
 - **Windows 与 WSL 不是两个预设**：同一份规则、同一台机器，差别在运行环境；对外引用一律用更保守的 Windows 一列。
-- **题目集和 [`dsh-bench`](https://github.com/LarryE135/dsh-bench) 仓库 v1 的 160 题不是同一套**（本文是 110 题 × 6 遍），也和上面的办公基准（8 + 5 题）、早期 `n = 3、7 项验收` 实验不同 —— **只能在同一套题内比臂间差，别跨集比绝对值**。
+- **题目集和 [`dsh-bench`](https://github.com/LarryE135/dsh-bench) 仓库 v1 的 160 题不是同一套**（本文是 110 题 × 6 遍），也不是早期 `n = 3、7 项验收` 那次小样本 —— **只能在同一套题内比臂间差，别跨集比绝对值**。
 - 这里的 lean-v3 指 **13 条规则**那一档（`flash-lean-ptc-v3`）；0.3.2 起规则 7 措辞调整（单调用也走一行 `run_code` 程序），其余 12 条不变。
 - 判分全客观（选择题 / 整数题 / 文件核对 / 隐藏单测 / 多步检查），题目、判分器与跑法都在 [dsh-bench](https://github.com/LarryE135/dsh-bench) 仓库。
 - 耗时明细、三项折算与复现命令见 [基准：DSH-Bench 110 题 × 6 遍](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md)。
@@ -252,13 +252,12 @@ node scripts/diag-preset-load.mjs --profile desktop   # GUI 里预设卡片显�
 - `glob` / `grep` 的只读并发标记只在插件管理器安装时才有（`DSH_FLASH_PRESETS_CONCURRENCY=0` 可关）；脚本安装路径本来就没有它。旧 id 解析同理由插件提供（`DSH_FLASH_PRESETS_ALIAS=0` 可关）。
 - 计划模式组件的两个开关也可以从环境变量给：`DSH_PLAN_TODO_SYNC=off|remind|strict`（默认 `remind`）控制是否提醒/强制写 todo，`DSH_PLAN_LAG_TURNS=<n>`（默认 2）是进度落后几回合才提示；等价于插件配置里的 `todoSync` / `lagTurns`。
 - 计划模式的档位状态对其他监听 `planMode` 的插件是可见的。若同时装了会在计划模式下注入提醒的插件（例如 `chatgpt-subscription`），纯问答（只说话、不调工具）的回合可能被判成「没做完」而**再答一遍**。缓解：这类会话把计划模式档位切到 `off`。
-- 开发与测试主要围绕洛谷公开题库和上面的办公基准，其他类型任务的表现缺少数据。
+- 开发与测试主要围绕洛谷公开题库与 DSH-Bench 的混合题集（编程 / 知识 / 长任务 / 办公）；多模态、超长文档等类型仍缺少数据。
 
 ## 开发与校验
 
 ```console
 npm run verify          # 合成一致性、YAML、预设结构、文本审计、版本一致性、基准防泄漏等
-npm run bench:office    # 办公基准的结构与完整性校验（只在仓库里可用，npm 包不含 benchmarks/）
 bash scripts/selftest.sh
 node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开（10 类合成会话，含两个反向控制）
 ```
