@@ -92,29 +92,7 @@ Does the number of rules matter? Across three task sets we tested up to four arm
 
 Every number below comes with its conditions and sample size. The experiments use different setups, so don't compare across tables.
 
-### Office benchmark
-
-Two synthetic suites of everyday office data-processing tasks: [Office benchmark v1](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/base-v1) (8 tasks) and [Office addendum v1](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/addendum-v1) (5 tasks). The table shows the mean tokens per configuration, including cache reads, in millions. OPS refers to [dsh-ops](https://github.com/T-Auto/dsh-ops).
-
-<!-- bench-table:begin（本块由 scripts/render-bench-table.mjs 生成，勿手改）-->
-| Setup | Office benchmark v1 | vs standard | Office addendum v1 | vs standard |
-|---|---:|---:|---:|---:|
-| Standard mode | 5.380 M(n=5) | — | 2.827 M(n=5) | — |
-| PTC mode | 3.553 M(n=5) | −34.0% | 1.560 M(n=5) | −44.8% |
-| lean-v3 | 1.437 M(n=5) | −73.3% | 0.481 M(n=5) | −83.0% |
-<!-- bench-table:end -->
-
-![Average token consumption on the office benchmark and addendum suites (including cache reads)](https://raw.githubusercontent.com/LarryE135/dsh-flash-presets/main/docs/images/bench-office-token.png)
-
-How to read it:
-
-- `lean-v3` is the 13-rule preset as it stood in 0.2.5; its rules match `flash-lean-ptc-v3` up to 0.3.1. From 0.3.2 on, rule 7 of v3 is worded slightly differently (a call that is single-use still goes through a one-line `run_code` program); the other 12 rules are unchanged.
-- "vs standard" also includes the gain from switching to PTC tools. To isolate the preset, compare against PTC mode instead: roughly −59.6% and −69.2% on the two suites (computed from the table).
-- Tokens only. Per-task accuracy is not kept in this repository (`docs/实测证据.md` has a separate office-bench batch scoring 68.9167/100, a different run set), so it isn't broken out. Tasks were written and graded by the same model (`GPT-6.1-Sol`), but the answering stage had no access to the ground truth or the grader.
-- `OPS + PTC` has only 4 valid runs on Office benchmark v1. The two suites contain different tasks and are not pooled into one ranking.
-- Scoring rules are public in [`benchmarks/office/grading/`](https://github.com/LarryE135/dsh-flash-presets/tree/main/benchmarks/office/grading); ground truth and graders live in a private repository.
-
-### DSH-Bench, 110 tasks x 6 runs, four arms
+### Benchmark: DSH-Bench, 110 tasks x 6 runs, four arms
 
 Same tasks, same model, same task order, four arms side by side (660 answered runs per arm; wall time excludes startup and queueing): **lean-v3 costs no measurable accuracy and cuts both tokens and time**.
 
@@ -137,6 +115,8 @@ How to read it:
 - Compare against **native PTC** to isolate the preset (comparing against standard also counts the PTC tool-surface gain): −14.5% tokens (Windows) / −35.6% (WSL).
 - **Windows and WSL are not two presets** — same rules, same machine, different runtime; quote the more conservative Windows column.
 - **This task set is not the 160-task DSH-Bench v1** in [`dsh-bench`](https://github.com/LarryE135/dsh-bench) (here it is 110 tasks x 6 runs), and it is not the office suites above (8 + 5 tasks) nor the older `n = 3, 7 checks` experiment — **only compare arms inside one task set**.
+- `lean-v3` here is the **13-rule** tier (`flash-lean-ptc-v3`); from 0.3.2 on, rule 7 is worded slightly differently (a single-use call still goes through a one-line `run_code` program), the other 12 are unchanged.
+- Grading is fully objective (multiple choice / integer / file checks / hidden unit tests / multi-step items); tasks, graders and how to run them live in the [dsh-bench](https://github.com/LarryE135/dsh-bench) repository.
 - Per-metric tables, the arithmetic behind the percentages and how to reproduce: [benchmark note](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md).
 
 ## Install

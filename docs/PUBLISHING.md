@@ -319,10 +319,10 @@ node scripts/sync-published-version.mjs      # publishedVersion 忘了跟进，l
 
 ```bash
 # c) npm 页面内容（README 只在 publish 时刷新，必须单独核对）
-curl -s https://registry.npmjs.org/dsh-flash-presets | python3 -c "import sys,json;r=json.load(sys.stdin)["readme"];print(len(r));print(\"含基准节:\" , \"办公基准测试\" in r);print(\"含 bench:office:\", \"bench:office\" in r)"
+curl -s https://registry.npmjs.org/dsh-flash-presets | python3 -c "import sys,json;r=json.load(sys.stdin)["readme"];print(len(r));print(\"含基准节:\" , \"DSH-Bench\" in r);print(\"含 bench:office:\", \"bench:office\" in r)"
 ```
 
-README 是**发布那一刻的快照**：仓库改完不重新发布，npm 页面上就是旧内容（0.2.5 发布后仓库加了整节基准测试，npm 页面直到 0.2.6 才会变）。所以每次发版都要跑上面这条，确认 `含基准节: True`、`含 bench:office: True`，否则说明发布的不是最新 README。
+README 是**发布那一刻的快照**：仓库改完不重新发布，npm 页面上就是旧内容（0.2.5 发布后仓库加了整节基准测试，npm 页面直到 0.2.6 才会变）。所以每次发版都要跑上面这条，确认 `含基准节: True`（README 有 `DSH-Bench` 那一节），否则说明发布的不是最新 README。
 
 ## 版本语义
 
