@@ -24,7 +24,7 @@
 | 10 | 修复（兼容层） | `legacy-preset-map.json` 的 `-lite` 改成 `rulesDiffer: true`：0.3.2 起 v3 的规则 7 措辞不同，旧说法「逐字相同」不再成立（首次命中会在启动日志提示）；同步 README / EN / 审计索引 / 别名测试 |
 | 11 | 修复（CI） | bundle-install 矩阵加入 `0.2.2-rc.3`（#29 报告者的版本，也是 npm `next`）：以前只覆盖 rc.5 与 rc.1 |
 | 12 | 修复（文档） | CHANGELOG 口径行「0.3.3 内容与 0.3.2 相同」纠正（该行随 npm 包发出）；审计文档日期 2026-12-01 → 20261117；写明 `v0.3.2` tag 被移动过、本地要 `git fetch --tags --force` |
-| 13 | 文档（基准） | 新增 **DSH-Bench 110 题 × 6 遍** 四臂截面：正确率雷达 / 净耗时 / token 与费用三张图，README（中英）各嵌两张 + 数字表，另建 [基准文档](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md) 写口径、三项折算与**题目集差异**（110 题 ≠ `dsh-bench` 仓库 v1 的 160 题 ≠ 办公基准 8+5 题 ≠ 早期 n=3 实验） |
+| 13 | 文档（基准） | 新增 **DSH-Bench 110 题 × 6 遍** 四臂截面：正确率雷达 / 净耗时 / token 与费用三张图，README（中英）各嵌三张 + 数字表，另建 [基准文档](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md) 写口径、三项折算与**题目集差异**（110 题 ≠ `dsh-bench` 仓库 v1 的 160 题 ≠ 办公基准 8+5 题 ≠ 早期 n=3 实验） |
 
 ## 0.3.2（2026-11-17，当前正式版：npm `latest` 指向它；`v0.3.3` 是误发版）
 

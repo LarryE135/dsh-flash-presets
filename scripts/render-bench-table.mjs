@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// README 的实测表格由 docs/bench-office-results.json 生成，避免手抄数字（0.461 vs 0.481 那种错）。
+// README 的实测表格曾由 docs/bench-office-results.json 生成，避免手抄数字（0.461 vs 0.481 那种错）。
+// 2026-11-17：README 的实测段改用 DSH-Bench 四臂截面，本生成器默认不启用；
+//   两份 README 都没有 bench-table 标记时按「已下线」跳过（退出 0）；要恢复就把标记加回去再 --write。
 //   node scripts/render-bench-table.mjs --check   只比对本，不一致退出 1
 //   node scripts/render-bench-table.mjs --write   写回两份 README
 import fs from "node:fs";
@@ -50,8 +52,7 @@ for (const t of targets) {
   const i = src.indexOf(BEGIN);
   const j = src.indexOf(END);
   if (i < 0 || j < i) {
-    console.log("  ✖ " + t.file + " 缺少 bench-table 标记（加一行 " + BEGIN + "）");
-    bad++;
+    console.log("  ok " + t.file + " 未启用基准表（README 已改用 DSH-Bench 截面；要恢复把标记加回去）");
     continue;
   }
   const current = src.slice(i + BEGIN.length, j).replace(/^\n+|\n+$/g, "");
