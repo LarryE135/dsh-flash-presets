@@ -267,7 +267,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 > `npm run verify`、`prepublishOnly`、`bench:*` 等 script 会因缺文件失败（仓库 `scripts/` 下有 44 个
 > 文件，发行包只带其中一部分）—— 那是发行包本来就不含开发面，不是坏了。要在装好的包旁边跑这些，请另克隆仓库。
 
-`cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 里的实测表由 `docs/bench-office-results.json` 生成。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
+`cordis.patch.yml` 由 `presets/*.patch.yml` 合成，请勿手改，CI 会断言两者一致。README 的实测段是手写的图表与数字，改动时请与[基准文档](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md) 对齐。贡献方式见 [CONTRIBUTING](https://github.com/LarryE135/dsh-flash-presets/blob/main/CONTRIBUTING.md)。
 
 ## 版本历史
 
