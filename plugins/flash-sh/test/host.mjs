@@ -49,6 +49,8 @@ process.env.DSH_FLASH_SH_ANY_PLATFORM = "1";
 
 const mod = await import(pathToFileURL(path.join(pluginDir, "lib", "index.js")).href);
 console.log("  · Config schema 来源：" + mod.CONFIG_SCHEMA_SOURCE);
+// 第 1–4 段只装独立包：相当于 presets 已表态「不提供」，独立行无需等待（等待逻辑在第 5 段单独测）
+mod.setPresetsIntent("none");
 
 // 捕获插件日志（插件优先走 ctx.logger，退回 console）
 const logs = [];
@@ -255,6 +257,10 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
   for (const order of ["presets-first", "standalone-first"]) {
     const host = await newHost();
     logs.length = 0;
+    // 真实启动顺序：flash-presets 行 apply 一开始就表态 pending（lib/bundle.js），子功能登记后变成 claimed
+    mod.presetsIntent().state = undefined;
+    if (order === "standalone-first") mod.setPresetsIntent("pending");
+    if (order === "presets-first") ok(mod.registryKey(host.tools) !== mod.SHARED_REGISTRY_KEY && mod.registryKey(host.tools) === mod.registryKey(host.tools), "真实 dsh-tools " + toolsVersion + "：ToolsService 有 layers 字段，经代理读出同一对象");
     let errors = 0;
     const fibers = {};
     const load = async (key, m, cfg) => {
@@ -272,6 +278,7 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
     const active = mod.claimsSnapshot(host.tools).filter((c) => c.active).map((c) => c.owner);
     ok(n === 1 && errors === 0 && active.length === 1 && active[0] === "dsh-flash-presets", "同时启用（" + order + "）：flash_sh 恰好 1 个、归 presets、无插件失败", "n=" + n + " errors=" + errors + " active=" + active + " " + logs.join(" | "));
     ok(sawLog(/skips registering it/), "（" + order + "）独立行记日志让位", logs.join(" | "));
+    ok(!sawLog(/handed over/) && !logs.some((l) => /\[flash-sh\] flash_sh registered/.test(l)), "（" + order + "）独立行从未注册过（没有「先注册再交出」的双注册窗口）", logs.join(" | "));
     await fibers.p.dispose();
     await tick(50);
     const res2 = await call(host, { command: "echo after-handover", workdir: tmp });
@@ -279,6 +286,36 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
     await fibers.s.dispose();
     await tick(20);
   }
+}
+
+// ── 5b. 什么都不知道（没有加载器配置树、presets 也没表态）：独立行短等；presets 在时限内到来 → 仍然没有双注册 ──
+{
+  mod._setDeferTimings({ short: 1500 });
+  const host = await newHost();
+  logs.length = 0;
+  mod.presetsIntent().state = undefined;
+  const s = host.plugin(mod, { enabled: true, binPath: bin, approval: "off" });
+  await s;
+  await tick(200);
+  ok(host.tools.get("flash_sh") === undefined && sawLog(/waiting up to 1500 ms/), "未知情况：独立行先等，不注册", logs.join(" | "));
+  const p = host.plugin(mod.createPlugin({ owner: "dsh-flash-presets" }), { enabled: true, binPath: bin, approval: "off" });
+  await p;
+  await tick();
+  ok(host.tools.schemas().filter((x) => x.name === "flash_sh").length === 1 && !sawLog(/handed over/) && mod.claimsSnapshot(host.tools).find((c) => c.active)?.owner === "dsh-flash-presets", "presets 在时限内到来：只注册它，独立行没注册过");
+  await p.dispose();
+  await tick(50);
+  ok(host.tools.get("flash_sh") !== undefined, "presets 卸载 → 独立行接管");
+  await s.dispose();
+  // 只有独立行：时限一过就注册
+  logs.length = 0;
+  mod.presetsIntent().state = undefined;
+  const s2 = host.plugin(mod, { enabled: true, binPath: bin, approval: "off" });
+  await s2;
+  await tick(1800);
+  ok(host.tools.get("flash_sh") !== undefined && sawLog(/did not report within 1500 ms/), "只有独立行：时限一过就注册", logs.join(" | "));
+  await s2.dispose();
+  mod._setDeferTimings({ short: 3000 });
+  mod.setPresetsIntent("none");
 }
 
 // ── 6. 缺二进制 / 非 Windows 无 ANY_PLATFORM ───────────────────────────────
