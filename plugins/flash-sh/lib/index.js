@@ -1308,6 +1308,35 @@ export const OWNERS = Object.freeze({
   "dsh-flash-sh": { priority: 1, label: "dsh-flash-sh（flash-sh-standalone 行）" },
 });
 const COORD_KEY = Symbol.for("dsh-flash-sh/coordinator@1");
+/**
+ * presets 一侧的意向（第二轮审计 T2：消除启动时的短暂双注册）。dsh-flash-presets 的 lib/bundle.js 按同一个 Symbol
+ * 直接写这个全局对象（它不能静态 import 本包——本包是它的可选依赖）：
+ *   pending  flash-presets 行开始 apply，还没决定要不要提供 flash_sh
+ *   loading  决定加载 dsh-flash-sh 并挂 flashSh 子功能，claim 稍后到
+ *   none     不提供（flashSh 关 / 平台不对 / 加载失败 / 子功能不注册 / 行被卸载）
+ *   claimed  presets 的 claim 已登记（由本文件的 createPlugin 写）
+ * 字段：{ state, at, listeners: Set<fn> }；改 state 后逐个调用 listeners。
+ */
+export const PRESETS_INTENT_KEY = Symbol.for("dsh-flash-sh/presets-intent@1");
+export function presetsIntent() {
+  let o = globalThis[PRESETS_INTENT_KEY];
+  if (!o || typeof o !== "object" || !(o.listeners instanceof Set)) {
+    o = { state: undefined, at: undefined, listeners: new Set() };
+    globalThis[PRESETS_INTENT_KEY] = o;
+  }
+  return o;
+}
+export function setPresetsIntent(state) {
+  const o = presetsIntent();
+  o.state = state;
+  o.at = Date.now();
+  for (const fn of [...o.listeners]) { try { fn(state); } catch (error) {} }
+}
+
+/** 独立行等 presets 表态的时限：知道 flash-presets 行存在 / 已表态 pending 时等得久一些；完全不知道时只等一小会儿。 */
+const DEFER = { long: 15000, short: 3000 };
+/** 仅测试用：改等待时限。 */
+export function _setDeferTimings(t = {}) { if (t.long !== undefined) DEFER.long = t.long; if (t.short !== undefined) DEFER.short = t.short; }
 
 export function coordinator() {
   let c = globalThis[COORD_KEY];
@@ -1315,19 +1344,26 @@ export function coordinator() {
     c = { claims: [], seq: 0, ours: new WeakSet() };
     globalThis[COORD_KEY] = c;
   }
+  if (!(c.watchers instanceof Set)) c.watchers = new Set(); // 旧版协调器对象（同进程里还有旧版 dsh-flash-sh）没有这个字段
   return c;
 }
 
+/** 没有 layers 字段时的共同身份：DSH 每个进程只有一个工具注册表（cordis 根上的 ToolsService），各插件拿到的代理指向它。 */
+export const SHARED_REGISTRY_KEY = Object.freeze({ toString: () => "[flash-sh shared tool registry]" });
+
 /**
  * 工具注册表的身份。cordis 的 ctx.get("tools") 给每个插件上下文返回一个绑定了调用方的代理，
- * 代理对象各不相同；底层 ToolsService 的实例字段（layers）经代理读出来是同一个对象，用它判同。
+ * 代理对象各不相同；底层 ToolsService 的实例字段 layers（DSH 0.2.1-rc.5 / 0.2.2-rc.1 / 0.2.2-rc.3 都是
+ * `layers = new ScopedLayers(...)`）经代理读出来是同一个对象，用它判同。
+ * 字段不在（DSH 改了内部结构）时退回进程内共同的 SHARED_REGISTRY_KEY——仍然只注册一个、presets 仍然优先；
+ * 绝不能退回代理对象本身（那样两边各算各的，第二个注册会撞名，谁先谁得）。
  */
 export function registryKey(registry) {
   try {
     const layers = registry && registry.layers;
-    if (layers !== null && (typeof layers === "object" || typeof layers === "function")) return layers;
+    if (layers !== null && layers !== undefined && (typeof layers === "object" || typeof layers === "function")) return layers;
   } catch (error) {}
-  return registry;
+  return SHARED_REGISTRY_KEY;
 }
 
 /** 在同一个工具注册表上的候选里选出应持有 flash_sh 的那个，并让其余的让位。 */
@@ -1348,18 +1384,57 @@ export function claimsSnapshot(registry) {
 }
 
 /**
+ * 从加载器的配置树里找 flash-presets 那一行（cordis-plugin-loader：ctx.fiber.entry.parent 是所在的 EntryGroup，
+ * .data 是同级各行的 options）。返回 present / disabled / absent / unknown（拿不到配置树）。只当提示用，不当真。
+ */
+export function presetsRowHint(ctx) {
+  try {
+    let group = ctx && ctx.fiber && ctx.fiber.entry ? ctx.fiber.entry.parent : undefined;
+    let seen = false;
+    for (let depth = 0; group && depth < 8; depth++) {
+      if (Array.isArray(group.data)) {
+        seen = true;
+        const row = group.data.find((o) => o && (o.id === "flash-presets" || o.name === "dsh-flash-presets" || /^dsh-flash-presets(\/|$)/.test(String(o.name))));
+        if (row) return row.disabled === true ? "disabled" : "present";
+      }
+      const up = group.ctx && group.ctx.fiber && group.ctx.fiber.entry;
+      group = up ? up.parent : undefined;
+    }
+    return seen ? "absent" : "unknown";
+  } catch (error) {
+    return "unknown";
+  }
+}
+
+const COMPARED_FIELDS = ["approval", "approvalMemory", "timeoutMs", "maxTimeoutMs", "maxOutputBytes", "binPath", "allowNonWindows"];
+/** 两边配置不同的字段（让位时写进 warn，告诉用户哪边生效）。 */
+export function configDiff(a, b) {
+  const out = [];
+  for (const k of COMPARED_FIELDS) {
+    const x = a ? a[k] : undefined;
+    const y = b ? b[k] : undefined;
+    if (JSON.stringify(x) !== JSON.stringify(y)) out.push(k + " (" + JSON.stringify(x) + " here vs " + JSON.stringify(y) + ")");
+  }
+  return out;
+}
+
+/**
  * 生成一个插件对象。owner 决定日志前缀与协调优先级：
  *   "dsh-flash-sh"（默认，独立包那一行） / "dsh-flash-presets"（presets 的 flashSh 子功能，优先）。
+ * 独立行不会立刻注册：先确认 presets 那边会不会提供（见 PRESETS_INTENT_KEY / presetsRowHint），
+ * 这样两包同开时启动阶段也不会出现「独立行先注册、presets 随后接管」的双注册窗口。
  */
 export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
   const meta = OWNERS[owner] ?? { priority: 0, label: owner };
   const prefix = owner === "dsh-flash-sh" ? "" : "(" + owner + ") ";
+  const isPresets = owner === "dsh-flash-presets";
   function applyPlugin(ctx, config) {
     const log = makeLog(ctx, prefix);
     const cfg = resolveConfig(config);
     const d = decide(cfg);
     if (!d.register) {
       log("info", "flash_sh not registered: " + d.reason);
+      if (isPresets) setPresetsIntent("none");
       return;
     }
     if (cfg.binSource === "env") log("info", "binPath taken from the environment variable DSH_FLASH_SH_BIN=" + cfg.binPath);
@@ -1375,11 +1450,14 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
     const registry = typeof ctx.get === "function" ? ctx.get("tools") : undefined;
     if (registry === undefined || typeof registry.register !== "function") {
       log("warn", "no tool registry; flash_sh not registered");
+      if (isPresets) setPresetsIntent("none");
       return;
     }
     if (cfg.approval === "off") log("warn", "approval is off: flash_sh runs every command without asking, outside the DSH sandbox");
     const definition = toolDefinition(ctx, cfg, d.bin, { log });
     const c = coordinator();
+    const key = registryKey(registry);
+    if (key === SHARED_REGISTRY_KEY) log("info", "tool registry has no 'layers' field (DSH internals changed?); coordinating on the process-wide registry instead");
     c.seq += 1;
     let dispose;
     let yieldedTo;
@@ -1388,7 +1466,8 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
       priority: meta.priority,
       seq: c.seq,
       registry,
-      key: registryKey(registry),
+      key,
+      cfg,
       active: false,
       waiting: false,
       activate() {
@@ -1422,20 +1501,54 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
       yieldTo(winner) {
         if (yieldedTo === winner) return;
         yieldedTo = winner;
-        log("info", "flash_sh is provided by " + winner.label + "; " + meta.label + " skips registering it");
+        const diff = configDiff(cfg, winner.cfg);
+        if (diff.length) log("warn", "flash_sh is provided by " + winner.label + "; " + meta.label + " skips registering it. Its settings differ and are NOT in effect: " + diff.join(", "));
+        else log("info", "flash_sh is provided by " + winner.label + "; " + meta.label + " skips registering it");
       },
       label: meta.label,
     };
-    c.claims.push(claim);
+    // ── 何时入场 ──
+    let joined = false;
+    let timer;
+    let released = false;
+    const intent = presetsIntent();
+    const onChange = () => { if (!joined && !released && readyToJoin()) join("presets " + (presetsClaimed() ? "claimed flash_sh" : "will not provide flash_sh")); };
+    const presetsClaimed = () => c.claims.some((x) => x.owner === "dsh-flash-presets" && x.key === key);
+    const readyToJoin = () => {
+      if (isPresets || presetsClaimed()) return true;
+      const st = intent.state;
+      if (st === "none") return true;
+      if (st === "pending" || st === "loading" || st === "claimed") return false;
+      const hint = presetsRowHint(ctx);
+      return hint === "absent" || hint === "disabled";
+    };
+    const unwatch = () => {
+      intent.listeners.delete(onChange);
+      c.watchers.delete(onChange);
+      if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+    };
+    const join = (why) => {
+      if (joined || released) return;
+      joined = true;
+      unwatch();
+      if (!isPresets && why) log("info", "standalone row joins after waiting: " + why);
+      c.claims.push(claim);
+      if (isPresets) setPresetsIntent("claimed");
+      for (const w of [...c.watchers]) { try { w(); } catch (error) {} }
+      elect(key);
+    };
     const release = () => {
+      released = true;
+      unwatch();
       const i = c.claims.indexOf(claim);
       if (i >= 0) c.claims.splice(i, 1);
       if (claim.active) {
         claim.active = false;
         try { if (typeof dispose === "function") dispose(); } catch (error) {}
       }
+      if (isPresets) setPresetsIntent("none");
       // 让剩下的候选接手（宿主自己也会因为注册随 ctx 释放而发 tools/change）
-      try { elect(claim.key); } catch (error) {}
+      if (joined) { try { elect(key); } catch (error) {} }
     };
     let bound = false;
     try {
@@ -1444,12 +1557,27 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
     if (!bound) {
       try { if (typeof ctx.on === "function") ctx.on("dispose", release); } catch (error) {}
     }
-    elect(claim.key);
+    if (readyToJoin()) join();
+    else {
+      const st = intent.state;
+      const hint = presetsRowHint(ctx);
+      const wait = st === "pending" || st === "loading" || st === "claimed" || hint === "present" ? DEFER.long : DEFER.short;
+      log("info", "waiting up to " + wait + " ms for dsh-flash-presets to report whether it provides flash_sh (intent=" + (st ?? "none-yet") + ", flash-presets row: " + hint + ")");
+      intent.listeners.add(onChange);
+      c.watchers.add(onChange);
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (joined || released) return;
+        log(hint === "present" || st !== undefined ? "warn" : "info", "dsh-flash-presets did not report within " + wait + " ms; the standalone row registers flash_sh (if presets claims it later, it takes over)");
+        join();
+      }, wait);
+      if (typeof timer.unref === "function") timer.unref();
+    }
     if (typeof ctx.on === "function") {
       // 第三方的 flash_sh 被注销后补上
       try {
         ctx.on("tools/change", () => {
-          if (c.claims.includes(claim) && claim.waiting && !claim.active && lookup(registry, TOOL_NAME) === undefined) elect(claim.key);
+          if (c.claims.includes(claim) && claim.waiting && !claim.active && lookup(registry, TOOL_NAME) === undefined) elect(key);
         });
       } catch (error) {}
     }

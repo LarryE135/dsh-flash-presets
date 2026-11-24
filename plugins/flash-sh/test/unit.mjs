@@ -57,6 +57,8 @@ if (inRepo) {
   const planPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "plugins", "plan-mode-ui", "package.json"), "utf8"));
   ok(JSON.stringify(pkg.engines) === JSON.stringify(planPkg.engines), "engines 与 plan-mode-ui 一致", JSON.stringify(pkg.engines));
   ok(!fs.existsSync(path.join(repoRoot, "lib", "flash-sh.js")), "dsh-flash-presets 的 lib/ 里没有 flash-sh.js 副本（单一来源）");
+  const bundleSrc = fs.readFileSync(path.join(repoRoot, "lib", "bundle.js"), "utf8");
+  ok(bundleSrc.includes("Symbol.for('dsh-flash-sh/presets-intent@1')") && src.includes('Symbol.for("dsh-flash-sh/presets-intent@1")'), "presets 的 bundle.js 与本包用同一个意向 Symbol（dsh-flash-sh/presets-intent@1）");
 }
 
 // ── vendor exe 与 sha256 ────────────────────────────────────────────────
@@ -452,17 +454,22 @@ if (process.platform !== "win32") {
   const mkRegistry = () => {
     const tools = new Map();
     const listeners = [];
-    return {
+    const reg = {
       tools,
       listeners,
+      calls: 0,
+      layers: {}, // 与 DSH rc.1/rc.3/rc.5 一致：ToolsService 有实例字段 layers
       get: (n) => tools.get(n),
       register(def) {
+        reg.calls += 1;
         if (tools.has(def.name)) throw new Error("duplicate " + def.name);
         tools.set(def.name, def);
         return () => { if (tools.get(def.name) === def) { tools.delete(def.name); for (const l of listeners) l(); } };
       },
     };
+    return reg;
   };
+  const resetIntent = () => { mod.presetsIntent().state = undefined; mod.presetsIntent().listeners.clear(); };
   const mkCtx = (registry, logs) => {
     const effects = [];
     return {
@@ -483,6 +490,7 @@ if (process.platform !== "win32") {
   delete process.env.DSH_FLASH_SH;
   delete process.env.DSH_FLASH_SH_BIN;
   for (const order of ["standalone-first", "presets-first"]) {
+    resetIntent();
     const reg = mkRegistry();
     const logs = [];
     const cS = mkCtx(reg, logs);
@@ -492,13 +500,109 @@ if (process.platform !== "win32") {
     const snap = mod.claimsSnapshot().filter((x) => x.active);
     ok(reg.tools.size === 1 && snap.length === 1 && snap[0].owner === "dsh-flash-presets", order + "：只注册一个 flash_sh，归 presets 子功能", JSON.stringify(mod.claimsSnapshot()) + " " + logs.join(" | "));
     ok(logs.some((l) => /provided by dsh-flash-presets.*dsh-flash-sh（flash-sh-standalone 行） skips registering it/.test(l)), order + "：独立行写日志说明让位", logs.join(" | "));
-    if (order === "standalone-first") ok(logs.some((l) => /handed over to dsh-flash-presets/.test(l)), "独立行先注册的，presets 到来时交出并记日志", logs.join(" | "));
+    ok(reg.calls === 1 && !logs.some((l) => /handed over/.test(l)), order + "：启动期间 register 只被调用 1 次（独立行不先注册再交出，没有双注册窗口）", "calls=" + reg.calls + " " + logs.join(" | "));
     cP.dispose();
     const after = mod.claimsSnapshot();
     ok(reg.tools.size === 1 && after.length === 1 && after[0].owner === "dsh-flash-sh" && after[0].active, order + "：presets 那边卸载后独立行接管", JSON.stringify(after));
     cS.dispose();
     ok(reg.tools.size === 0 && mod.claimsSnapshot().length === 0, order + "：都卸载后注册表干净");
   }
+  // ── 第二轮审计 T2/T3：入场时机、layers 缺失时的退化、配置矛盾 ──
+  {
+    // 独立行先到、presets 表态 pending → 独立行一直不注册；presets 子功能到来后只注册它
+    resetIntent();
+    mod._setDeferTimings({ long: 400, short: 150 });
+    const reg = mkRegistry();
+    const logs = [];
+    mod.setPresetsIntent("pending");
+    const cS = mkCtx(reg, logs);
+    standalonePlugin.apply(cS, base);
+    await new Promise((r) => setTimeout(r, 200));
+    ok(reg.calls === 0 && reg.tools.size === 0 && logs.some((l) => /waiting up to 400 ms/.test(l)), "presets 表态 pending：独立行等待（200 ms 内不注册）", logs.join(" | "));
+    mod.setPresetsIntent("loading");
+    const cP = mkCtx(reg, logs);
+    presetsPlugin.apply(cP, { ...base, approval: "off" });
+    ok(reg.calls === 1 && mod.claimsSnapshot().find((x) => x.active)?.owner === "dsh-flash-presets", "presets 子功能到来：只注册它一次");
+    ok(logs.some((l) => /Its settings differ and are NOT in effect: approval \("sandboxed" here vs "off"\)/.test(l)), "两边配置矛盾：独立行让位时 warn 写明哪些字段不生效", logs.filter((l) => /differ/.test(l)).join(" | "));
+    cP.dispose();
+    ok(reg.tools.size === 1 && mod.claimsSnapshot().find((x) => x.active)?.owner === "dsh-flash-sh", "presets 卸载后独立行接管");
+    cS.dispose();
+  }
+  {
+    // presets 表态 none → 独立行立刻注册
+    resetIntent();
+    const reg = mkRegistry();
+    const logs = [];
+    const cS = mkCtx(reg, logs);
+    mod.setPresetsIntent("pending");
+    standalonePlugin.apply(cS, base);
+    ok(reg.calls === 0, "pending 时先不注册");
+    mod.setPresetsIntent("none");
+    ok(reg.calls === 1 && reg.tools.size === 1, "presets 表态 none → 独立行随即注册");
+    cS.dispose();
+  }
+  {
+    // 配置树里看得到同级行、没有 flash-presets → 不等
+    resetIntent();
+    const reg = mkRegistry();
+    const logs = [];
+    const cS = mkCtx(reg, logs);
+    cS.fiber = { entry: { parent: { data: [{ id: "flash-sh-standalone", name: "dsh-flash-sh" }, { id: "other", name: "x" }] } } };
+    standalonePlugin.apply(cS, base);
+    ok(reg.calls === 1 && !logs.some((l) => /waiting/.test(l)), "加载器配置里没有 flash-presets 行 → 独立行立即注册");
+    cS.dispose();
+    const cS2 = mkCtx(reg, logs);
+    cS2.fiber = { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets", disabled: true }] } } };
+    standalonePlugin.apply(cS2, base);
+    ok(reg.tools.size === 1, "flash-presets 行被整行关掉（disabled: true）→ 独立行立即注册");
+    cS2.dispose();
+    ok(mod.presetsRowHint({ fiber: { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets" }] } } } }) === "present" && mod.presetsRowHint({}) === "unknown", "presetsRowHint：present / unknown");
+  }
+  {
+    // 什么都不知道：短等后注册；知道 flash-presets 行存在但它一直不表态：长等后注册（warn）
+    resetIntent();
+    const reg = mkRegistry();
+    const logs = [];
+    const cS = mkCtx(reg, logs);
+    standalonePlugin.apply(cS, base);
+    ok(reg.calls === 0, "不知道 presets 在不在：先不注册");
+    await new Promise((r) => setTimeout(r, 250));
+    ok(reg.calls === 1 && logs.some((l) => /did not report within 150 ms/.test(l)), "短等（150 ms）后独立行注册", logs.join(" | "));
+    cS.dispose();
+    const cS2 = mkCtx(reg, logs);
+    cS2.fiber = { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets" }] } } };
+    standalonePlugin.apply(cS2, base);
+    await new Promise((r) => setTimeout(r, 250));
+    ok(reg.tools.size === 0, "flash-presets 行存在：短时限过了仍在等");
+    await new Promise((r) => setTimeout(r, 250));
+    ok(reg.tools.size === 1, "长时限（400 ms）过了 presets 仍不表态 → 独立行注册");
+    cS2.dispose();
+    // 等待中被卸载：不注册、定时器清掉
+    const cS3 = mkCtx(reg, logs);
+    standalonePlugin.apply(cS3, base);
+    cS3.dispose();
+    await new Promise((r) => setTimeout(r, 250));
+    ok(reg.tools.size === 0 && mod.claimsSnapshot().length === 0, "等待中被卸载 → 不注册");
+  }
+  {
+    // ToolsService 没有 layers（DSH 改了内部结构）：两个插件拿到的是不同代理 → 退回进程内共同身份，仍只注册一个、presets 优先
+    resetIntent();
+    const under = mkRegistry();
+    const proxy = () => ({ get: (n) => under.get(n), register: (d) => under.register(d), listeners: under.listeners });
+    ok(mod.registryKey(proxy()) === mod.SHARED_REGISTRY_KEY && mod.registryKey(under) === under.layers, "registryKey：有 layers 用 layers；没有就用进程内共同身份（不退回代理本身）");
+    const logs = [];
+    const cS = mkCtx(proxy(), logs);
+    const cP = mkCtx(proxy(), logs);
+    mod.setPresetsIntent("none");
+    standalonePlugin.apply(cS, base);
+    presetsPlugin.apply(cP, base);
+    ok(under.tools.size === 1 && mod.claimsSnapshot().filter((x) => x.active).map((x) => x.owner).join() === "dsh-flash-presets" && logs.some((l) => /no 'layers' field/.test(l)), "没有 layers：仍只注册一个，presets 优先，并记日志", JSON.stringify(mod.claimsSnapshot()));
+    cP.dispose();
+    ok(under.tools.size === 1 && mod.claimsSnapshot()[0]?.owner === "dsh-flash-sh", "没有 layers：presets 卸载后独立行接管");
+    cS.dispose();
+  }
+  mod._setDeferTimings({ long: 15000, short: 3000 });
+  resetIntent();
   // 第三方已注册 flash_sh：不抢，等它消失
   {
     const reg = mkRegistry();
@@ -516,6 +620,7 @@ if (process.platform !== "win32") {
     const reg = mkRegistry();
     const logs = [];
     process.env.DSH_FLASH_SH_BIN = bin;
+    mod.setPresetsIntent("none");
     const c1 = mkCtx(reg, logs);
     standalonePlugin.apply(c1, { enabled: true, allowNonWindows: true });
     ok(logs.some((l) => /binPath taken from the environment variable DSH_FLASH_SH_BIN/.test(l)), "环境变量换 exe：日志提示");

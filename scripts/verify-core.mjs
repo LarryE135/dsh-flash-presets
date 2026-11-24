@@ -202,12 +202,16 @@ check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expect
   const stub = async () => { loads += 1; return { createPlugin: ({ owner }) => { owners.push(owner); return { name: "dsh-flash-sh", inject: ["tools"], apply() {} }; } }; };
   let r = await run({ enabled: false }, stub);
   check(loads === 0 && r.st.features.flashSh === "off" && !r.mounted.some((m) => m.p.name === "dsh-flash-sh"), "默认关：不 import dsh-flash-sh");
+  const intentOf = () => globalThis[Symbol.for("dsh-flash-sh/presets-intent@1")]?.state;
+  check(intentOf() === "none" && bundle.FLASH_SH_INTENT_KEY === Symbol.for("dsh-flash-sh/presets-intent@1"), "flashSh 关：向 dsh-flash-sh 独立行表态 none（独立行不必再等）", String(intentOf()));
   r = await run({ enabled: true, allowNonWindows: true, approval: "read-only" }, stub);
   const fm = r.mounted.find((m) => m.p.name === "dsh-flash-sh");
   check(loads === 1 && owners[0] === "dsh-flash-presets" && fm && fm.conf.approval === "read-only" && r.st.features.flashSh === "mounted", "启用（开发模式）：动态 import，createPlugin({owner:'dsh-flash-presets'}) 挂载，配置原样透传", JSON.stringify(r.st.features));
   check(r.logs.some((l) => /flashSh=mounted/.test(l)), "汇总日志带 flashSh 状态");
+  check(intentOf() === "loading", "flashSh 挂上：表态 loading（claim 由子功能自己登记，独立行继续等）", String(intentOf()));
   r = await run({ enabled: true, allowNonWindows: true }, async () => { throw new Error("Cannot find package 'dsh-flash-sh'"); });
   check(r.st.features.flashSh.startsWith("unavailable") && r.st.features.alias === "mounted" && r.st.features.core === "mounted" && r.logs.filter((l) => /加载不到 dsh-flash-sh/.test(l)).length === 1 && !r.logs.some((l) => /flashSh.*(error|失败)/i.test(l) && !/加载不到/.test(l)), "依赖没装上：一行 info、其它功能照常", JSON.stringify(r.st.features));
+  check(intentOf() === "none", "依赖没装上：表态 none", String(intentOf()));
   if (process.platform !== "win32" || process.arch !== "x64") {
     loads = 0;
     r = await run({ enabled: true }, stub);
