@@ -54,6 +54,9 @@
   },
   "files": [
     "lib/",
+    "locale/",
+    "docs/plugin-detail.zh.md",
+    "docs/plugin-detail.en.md",
     "cordis.patch.yml",
     "presets/flash-lean-ptc-v3.patch.yml",
     "presets/flash-lean-ptc-v3-balance.patch.yml",
@@ -86,9 +89,12 @@
     "README.en.md",
     "LICENSE"
   ],
-  "main": "./lib/index.js",
+  "main": "./lib/bundle.js",
   "exports": {
     ".": {
+      "default": "./lib/bundle.js"
+    },
+    "./plan-mode": {
       "default": "./lib/index.js"
     },
     "./client": {
@@ -103,7 +109,8 @@
     "./package.json": "./package.json",
     "./delivery-gate": {
       "default": "./lib/delivery-gate.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.2.3-0 || >=0.2.2-0 <0.2.3-0",

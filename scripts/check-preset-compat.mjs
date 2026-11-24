@@ -101,9 +101,17 @@ for (const id of idsInText(fs.readdirSync(path.join(repo, 'presets'))
   .map((f) => fs.readFileSync(path.join(repo, 'presets', f), 'utf8')).join('\n'))) sourceIds.add(id);
 const bundle = path.join(repo, 'cordis.patch.yml');
 // 别名层丢掉 = 旧会话在插件卡形态下也解析不了，这是 0.2.8 → 0.2.9 想消灭的事故本身（第六轮 U2-3）。
-const aliasRowRe = /name:\s*['"]dsh-flash-presets\/alias['"]/;
-if (fs.existsSync(bundle) && !aliasRowRe.test(fs.readFileSync(bundle, 'utf8'))) {
-  failures.push('cordis.patch.yml 缺少 flash-presets-alias 行（旧 id 将无法解析）');
+// 0.3.4 起别名层是 flash-presets 行（包根 → lib/bundle.js）下的子功能：行在、指向包根、alias 没被默认关掉、
+// 入口真的会挂别名插件，四条都要成立。
+{
+  const text = fs.existsSync(bundle) ? fs.readFileSync(bundle, 'utf8') : '';
+  const row = (text.split(/\n(?=- insert:)/).find((b) => /^\s*- id: flash-presets$/m.test(b)) || '');
+  if (!/name:\s*['"]dsh-flash-presets['"]/.test(row)) failures.push('cordis.patch.yml 缺少 flash-presets 行（或 name 不是包根）——旧 id 将无法解析');
+  if (!/\n {8}alias:\n {10}enabled: true/.test(row)) failures.push('flash-presets 行里 alias.enabled 不是 true（旧 id 将无法解析）');
+  const main = pkg && pkg.exports && pkg.exports['.'] && pkg.exports['.'].default;
+  if (main !== './lib/bundle.js') failures.push('package.json exports["."] 应指向 ./lib/bundle.js（实际 ' + main + '）');
+  const entry = path.join(repo, 'lib', 'bundle.js');
+  if (!fs.existsSync(entry) || !/load\('\.\/alias-plugin\.js'\)/.test(fs.readFileSync(entry, 'utf8'))) failures.push('lib/bundle.js 没有加载别名插件');
 }
 const exportsMap = (pkg && pkg.exports) || {};
 if (!(exportsMap['./alias'] && exportsMap['./alias'].default)) failures.push('package.json 缺少 exports["./alias"]');

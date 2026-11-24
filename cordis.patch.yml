@@ -376,28 +376,24 @@
 - id: ptc-runtime
   config:
     executionMode: persistent-in-memory
-# run_code 优化 A（glob/grep 只读并发安全）：独立成行，装包即生效，与计划模式开不开无关。
-# 关闭（优先级从高到低）：DSH_FLASH_PRESETS_CONCURRENCY=0 ＞ 本行 config.toolConcurrency.enabled=false ＞ 默认开启。
+# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门，都挂在这一行下面，
+# 各自按需要的宿主服务启动，缺哪个服务只影响对应功能。0.3.2 及以前它们是 4 行
+# （flash-presets-core / plan-mode-ui / flash-presets-alias / delivery-gate），按旧 id 写的覆盖仍会被读回生效。
+# 环境变量优先于这里：DSH_FLASH_PRESETS_CONCURRENCY=0、DSH_FLASH_PRESETS_ALIAS=0、DSH_DELIVERY_GATE=0/1。
+# 交付门默认关闭（deliveryGate.enabled: false）—— 它会执行工作区里的验收脚本，要用户显式打开。
 - insert:
-    - id: flash-presets-core
-      name: 'dsh-flash-presets/core'
-# 计划模式组件（plan-mode v1）：宿主半边与浏览器半边都来自本包。
-- insert:
-    - id: plan-mode-ui
+    - id: flash-presets
       name: 'dsh-flash-presets'
-# 历史 preset id 解析兜底（旧会话能否打开靠这一行）：纯内存映射，不写任何会话文件。
-- insert:
-    - id: flash-presets-alias
-      name: 'dsh-flash-presets/alias'
-# 交付门（delivery-gate）：工作区里有验收脚本时，回合收尾自动跑一次；不通过就把失败清单回灌。
-# 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。
-# 脚本默认按平台取（Windows 先 verify.ps1，其余先 verify.sh）；要指定自己的脚本再加 scripts: [..]。
-- insert:
-    - id: delivery-gate
-      name: 'dsh-flash-presets/delivery-gate'
       config:
-        enabled: false
-        maxRounds: 2
+        toolConcurrency:
+          enabled: true
+        alias:
+          enabled: true
+        planMode:
+          enabled: true
+        deliveryGate:
+          enabled: false
+          maxRounds: 2
 # 技能目录里每条描述的截断长度（默认整段；60 足够表达用途）。
 - id: tool-skill
   config:

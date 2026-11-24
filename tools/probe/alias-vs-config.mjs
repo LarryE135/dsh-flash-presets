@@ -48,9 +48,11 @@ for (const [from, entry] of Object.entries(map.aliases)) {
   }
 }
 
-// 别名层那一行本身也必须在（0.2.9 起它是独立插件行，桌面端靠它）。
-if (!/flash-presets-alias/.test(text)) {
-  problems.push('配置里没有 flash-presets-alias 行 —— 旧会话会以「预设不存在」失败');
+// 别名层那一行本身也必须在：0.2.9–0.3.2 是独立行 flash-presets-alias，0.3.4 起是 flash-presets 行下的子功能。
+if (!/flash-presets-alias/.test(text) && !/- id: flash-presets\n\s+name: '?dsh-flash-presets'?\n/.test(text)) {
+  problems.push('配置里既没有 flash-presets 行也没有 flash-presets-alias 行 —— 旧会话会以「预设不存在」失败');
+} else if (/- id: flash-presets\n/.test(text) && /\n\s+alias:\n\s+enabled: false/.test(text)) {
+  problems.push('flash-presets 行把 alias.enabled 设成了 false —— 旧会话会以「预设不存在」失败');
 }
 
 if (problems.length) {

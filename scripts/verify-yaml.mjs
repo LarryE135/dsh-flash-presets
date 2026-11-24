@@ -247,12 +247,16 @@ if (args.length) {
               '合成产物含 ' + EXPECT_IDS.join('/') + '（实际: ' + (ids.join(', ') || '无') + '）');
         check(ids.length === EXPECT_IDS.length,
               '合成产物只含 ' + EXPECT_IDS.join('/') + '，不含对照版本（实际: ' + (ids.join(', ') || '无') + '）');
-        // 计划模式是第三个组件：必须恰好一行 plan-mode-ui，且 name 指向本包（模块入口在 lib/index.js）。
-        const pluginRows = (cdoc || []).flatMap(e => (e && e.insert) || []).filter(r => r && r.id === 'plan-mode-ui');
+        // 0.3.4 起运行时功能（计划模式 / 优化 A / 别名层 / 交付门）只占一行 flash-presets，name 指向包根（lib/bundle.js）。
+        const insertRows = (cdoc || []).flatMap(e => (e && e.insert) || []);
+        const pluginRows = insertRows.filter(r => r && r.id === 'flash-presets');
         check(pluginRows.length === 1,
-              '合成产物恰好一行 plan-mode-ui（实际 ' + pluginRows.length + ' 行）');
+              '合成产物恰好一行 flash-presets（实际 ' + pluginRows.length + ' 行）');
         check(pluginRows[0] && pluginRows[0].name === 'dsh-flash-presets',
-              'plan-mode-ui 行指向本包 dsh-flash-presets');
+              'flash-presets 行指向本包 dsh-flash-presets');
+        const oldRows = insertRows.filter(r => r && ['plan-mode-ui', 'flash-presets-core', 'flash-presets-alias', 'delivery-gate'].includes(r.id));
+        check(oldRows.length === 0, '合成产物不再插入 0.3.2 的 4 个旧行（实际 ' + oldRows.map(r => r.id).join(', ') + '）');
+        check(insertRows.filter(r => r && !/^preset-/.test(r.id)).length === 1, '除两个预设外只插入一行（插件页组件数 = 3）');
         check(!String(JSON.stringify(pluginRows)).includes('dsh-plan-mode-ui'),
               '合成产物不再引用独立包 dsh-plan-mode-ui');
         // 客户端 bundle 的注册 id 必须等于包名：DSH 的 boot graph 用包名做行 id，

@@ -329,24 +329,18 @@ jobs:
       - name: 断言合成结果里的取值
         run: node scripts/verify-runtime.mjs "$RUNNER_TEMP/dump.txt"
 
-      # 交付门是后加的组件：装完必须能在组合配置里看到，且默认关闭（它会在用户会话里跑工作区脚本）
-      - name: 断言交付门行（默认关闭）
+      # 0.3.4 起 4 个运行时功能（优化 A / 计划模式 / 别名层 / 交付门）只占一行 flash-presets：
+      # 插件页上本包 = 2 个预设 + 1 行。旧的 4 个行 id 不能再进组合配置；交付门默认关闭（它会在用户会话里跑工作区脚本）。
+      - name: 断言运行时功能是单行 flash-presets（交付门默认关闭）
         run: |
-          n=$(grep -c "id: delivery-gate" "$RUNNER_TEMP/dump.txt" || true)
-          echo "delivery-gate: $n"
-          [ "$n" -ge 1 ] || { echo "::error::delivery-gate 未进入组合配置"; exit 1; }
-          grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
-          grep -A8 "id: delivery-gate" "$RUNNER_TEMP/dump.txt" | grep -q "enabled: false" || { echo "::error::delivery-gate 默认应为 enabled: false"; exit 1; }
-
-      # run_code 优化 A 从 0.4 起是独立行：0.3.x 它搭的是 plan-mode-ui 的车，关掉计划模式就静默消失。
-      # 这条只守「独立成行 + name 正确」，真正的生效由单元守卫 scripts/verify-core.mjs 覆盖。
-      - name: 断言 run_code 优化 A 是独立行（flash-presets-core）
-        run: |
-          n=$(grep -c "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" || true)
-          echo "flash-presets-core: $n"
-          [ "$n" -ge 1 ] || { echo "::error::flash-presets-core 未进入组合配置（优化 A 又搭到别的行上了）"; exit 1; }
-          grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
-          grep -A3 "id: flash-presets-core" "$RUNNER_TEMP/dump.txt" | grep -q "dsh-flash-presets/core" || { echo "::error::flash-presets-core 的 name 应为 dsh-flash-presets/core"; exit 1; }
+          grep -A3 -E "^- id: flash-presets$" "$RUNNER_TEMP/dump.txt" | sed 's/^/    /'
+          grep -A1 -E "^- id: flash-presets$" "$RUNNER_TEMP/dump.txt" | grep -q "name: '\?dsh-flash-presets'\?$" || { echo "::error::flash-presets 行缺失或 name 不是包根 dsh-flash-presets"; exit 1; }
+          for old in flash-presets-core plan-mode-ui flash-presets-alias delivery-gate; do
+            n=$(grep -cE -- "^- id: $old$" "$RUNNER_TEMP/dump.txt" || true)
+            echo "$old: $n（期望 0）"
+            [ "$n" -eq 0 ] || { echo "::error::旧行 $old 不应再进组合配置（插件页会变回多个组件，且与 flash-presets 重复启动）"; exit 1; }
+          done
+          grep -A16 -E "^- id: flash-presets$" "$RUNNER_TEMP/dump.txt" | grep -A1 "deliveryGate:" | grep -q "enabled: false" || { echo "::error::deliveryGate 默认应为 enabled: false"; exit 1; }
 
       # 升级回归守卫（第七轮审计 A5）：造 10 类会话（5 个历史 id + 现役 + 内建 + 无 id + 事件覆盖 header），
       # 交给真正的解析器判「能不能打开」；另带两个反向控制（去掉别名层、塞孤儿 id 必须判红）。

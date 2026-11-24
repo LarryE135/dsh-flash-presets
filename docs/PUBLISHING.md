@@ -307,7 +307,7 @@ curl -s https://registry.npmjs.org/dsh-flash-presets/latest | python3 -c "import
 # b) 真装一遍（临时 home，用完删）
 dsh plugin --profile web add dsh-flash-presets@X.Y.Z
 dsh --profile web --dump-config | grep -c 'id: preset-'        # 干净 profile = 6（两张卡 + 4 个内置）
-dsh --profile web --dump-config | grep -c 'flash-presets-alias' # 必须是 1，否则旧会话打不开
+dsh --profile web --dump-config | grep -c '^- id: flash-presets$' # 必须是 1（0.3.4 起别名层在这一行下面），否则旧会话打不开
 rm -rf ~/.dsh/profiles/web
 
 # b2) 与试发布时记下的数字对齐（0.2.9 的 dry-run：39 个文件；体积与 shasum 以当次输出为准）
@@ -315,7 +315,7 @@ npm view dsh-flash-presets dist.fileCount dist.unpackedSize dist.shasum
 node scripts/sync-published-version.mjs      # publishedVersion 忘了跟进，lint 就拦不住旧版本号
 ```
 
-预期：6 行预设、1 行 `flash-presets-alias`。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块，不是 npm bundle 形态，别拿它去校验临时 profile。
+预期：6 行预设、1 行 `flash-presets`（0.3.2 及以前是 `flash-presets-alias`）。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块，不是 npm bundle 形态，别拿它去校验临时 profile。
 
 ```bash
 # c) npm 页面内容（README 只在 publish 时刷新，必须单独核对）

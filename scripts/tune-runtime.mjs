@@ -158,7 +158,7 @@ function revertB(dir, st) {
   return left.indexOf(MARK) >= 0 ? 'failed (残块未删净，备份 ' + path.basename(bak) + ')' : 'reverted';
 }
 
-// A 已改由插件提供（0.2.6 起）：glob/grep 的定义对象由 plan-mode-ui 的
+// A 已改由插件提供（0.2.6 起）：glob/grep 的定义对象由插件（0.3.4 起是 flash-presets 行）的
 // lib/tool-concurrency.js 在运行期补 isConcurrencySafe。以前的实现是改 profile 里的
 // node_modules/@deepseek-ai/dsh-tool-fs-search/lib/index.js，但 0.2.2-rc.1 起该包不再
 // 是 profile 依赖（从全局 dsh 安装解析），那条路径不存在，补丁静默失效。

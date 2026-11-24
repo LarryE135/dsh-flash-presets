@@ -50,56 +50,32 @@ const RUNTIME = [
   '    executionMode: persistent-in-memory',
 ].join('\n');
 
-// run_code 优化 A（glob/grep 只读并发安全）**单独成行**：0.3.x 它搭的是 plan-mode-ui 的车——
-// 关掉计划模式、或用只挂部分行的精简组合，优化就静默消失；而且 plan-mode-ui 的 inject 含
-// webServer / systemPrompt，宿主缺任一个就停在 pending，连带 A 也不跑（headless、部分桌面端）。
-// 这一行只 inject tools / agents，装包即生效。实现见 lib/core.js + lib/tool-concurrency.js。
-const CORE_ROW = [
+// 0.3.4 起本包的运行时功能只占**一行**（插件页上原来是 4 个组件：flash-presets-core / plan-mode-ui /
+// flash-presets-alias / delivery-gate，标题全是裸模块名）。入口 lib/bundle.js 自己 inject 为空，
+// 4 个功能作为子插件各按自己的 inject 启动、互不牵连 —— 桌面端缺 webServer 时只有计划模式宿主等待，
+// 别名层 / 优化 A 照常（当初拆行要解决的 T1-1 仍然成立）。
+// 用户按旧行 id 写的覆盖由 lib/row-overrides.js 在运行时读回并换算，不改写用户文件。
+// 默认值必须与 lib/row-overrides.js 的 BUNDLE_DEFAULTS 一致（verify-core.mjs 断言）。
+const BUNDLE_ROW = [
   '',
-  '# run_code 优化 A（glob/grep 只读并发安全）：独立成行，装包即生效，与计划模式开不开无关。',
-  '# 关闭（优先级从高到低）：DSH_FLASH_PRESETS_CONCURRENCY=0 ＞ 本行 config.toolConcurrency.enabled=false ＞ 默认开启。',
+  '# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门，都挂在这一行下面，',
+  '# 各自按需要的宿主服务启动，缺哪个服务只影响对应功能。0.3.2 及以前它们是 4 行',
+  '# （flash-presets-core / plan-mode-ui / flash-presets-alias / delivery-gate），按旧 id 写的覆盖仍会被读回生效。',
+  '# 环境变量优先于这里：DSH_FLASH_PRESETS_CONCURRENCY=0、DSH_FLASH_PRESETS_ALIAS=0、DSH_DELIVERY_GATE=0/1。',
+  '# 交付门默认关闭（deliveryGate.enabled: false）—— 它会执行工作区里的验收脚本，要用户显式打开。',
   '- insert:',
-  '    - id: flash-presets-core',
-  "      name: 'dsh-flash-presets/core'",
-].join('\n');
-
-// 计划模式（plan-mode v1）是本包的第三个组件：宿主半边由包根的 main（lib/index.js）提供，
-// 浏览器半边由 dsh.client 声明。这一行把组件挂到 profile，插件列表里显示在 dsh-flash-presets 卡下。
-// 注意 name 必须是本包名：解析器按 name 去找模块入口。
-const PLUGIN_ROW = [
-  '',
-  '# 计划模式组件（plan-mode v1）：宿主半边与浏览器半边都来自本包。',
-  '- insert:',
-  '    - id: plan-mode-ui',
+  '    - id: flash-presets',
   "      name: 'dsh-flash-presets'",
-].join('\n');
-
-// 历史 preset id 的解析兜底**单独成行**：只 inject agentPresets，任何宿主（web / 桌面端 / tui）都能加载。
-// 挂在 plan-mode-ui 上的话，桌面端会因为 inject 里有 webServer 而停在 pending，旧会话照样打不开
-// （第五轮审计 T1-1）。实现见 lib/alias-plugin.js + lib/preset-alias.js。
-const ALIAS_ROW = [
-  '',
-  '# 历史 preset id 解析兜底（旧会话能否打开靠这一行）：纯内存映射，不写任何会话文件。',
-  '- insert:',
-  '    - id: flash-presets-alias',
-  "      name: 'dsh-flash-presets/alias'",
-].join('\n');
-
-
-// 交付门（delivery-gate）：工作区里有 verify.sh 时，回合收尾自动跑一次；不通过就把失败清单回灌
-// （最多 maxRounds 次），而不是让模型「如实地」交付部分分。默认 enabled: false —— 它会在用户
-// 会话里跑工作区的脚本，属于要用户显式打开的开关。实测见 docs/实测证据.md。
-const GATE_ROW = [
-  '',
-  '# 交付门（delivery-gate）：工作区里有验收脚本时，回合收尾自动跑一次；不通过就把失败清单回灌。',
-  '# 默认关闭（enabled: false）—— 它会执行工作区里的脚本，要用户显式打开。',
-  '# 脚本默认按平台取（Windows 先 verify.ps1，其余先 verify.sh）；要指定自己的脚本再加 scripts: [..]。',
-  '- insert:',
-  '    - id: delivery-gate',
-  "      name: 'dsh-flash-presets/delivery-gate'",
   '      config:',
-  '        enabled: false',
-  '        maxRounds: 2',
+  '        toolConcurrency:',
+  '          enabled: true',
+  '        alias:',
+  '          enabled: true',
+  '        planMode:',
+  '          enabled: true',
+  '        deliveryGate:',
+  '          enabled: false',
+  '          maxRounds: 2',
 ].join('\n');
 // 0.3.2 上下文瘦身（第二轮研究实测，见 docs/研究-DSH-0.2.2-rc.3-上下文注入.md）：
 //   · tool-skill 默认把整段技能描述塞进目录；技能一多就是上千字符。压到 60 字符，语义保留。
@@ -127,7 +103,7 @@ function compose() {
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + CORE_ROW + PLUGIN_ROW + ALIAS_ROW + GATE_ROW + LEAN_ROWS + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + BUNDLE_ROW + LEAN_ROWS + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

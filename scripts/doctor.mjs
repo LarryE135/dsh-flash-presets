@@ -244,7 +244,10 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
   const bundlePatch = path.join(pluginDir, 'cordis.patch.yml');
   if (fs.existsSync(bundlePatch)) {
     const text = fs.readFileSync(bundlePatch, 'utf8');
+    // 0.2.9–0.3.2：独立行 flash-presets-alias；0.3.4 起：flash-presets 行下的子功能（alias.enabled）。
+    const singleRow = /\n\s*- id: flash-presets\n/.test(text);
     if (/id:\s*flash-presets-alias/.test(text)) ok('旧 id 兼容行存在（flash-presets-alias，旧会话可解析）');
+    else if (singleRow && /\n\s+alias:\n\s+enabled: true/.test(text)) ok('旧 id 兼容层在（flash-presets 行的 alias 子功能，旧会话可解析）');
     else {
       warn('组合包里没有 flash-presets-alias 行 —— 旧会话（-lite / v1 / v2 / flash-lean）会 not-found');
       info('这是 0.2.9 之前的插件卡：升级 dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
@@ -275,6 +278,30 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
     } else {
       warn('本包未安装：dsh plugin --profile ' + profile + ' add ' + pinnedSpec());
     }
+  }
+}
+// 0.3.4 把 4 个运行时行合成 flash-presets 一行。按旧行 id 写在用户补丁里的覆盖，DSH 只在 stderr 打一句
+// 「entry not found」就丢弃；插件会在运行时读回并换算（lib/row-overrides.js），这里静态地再报一遍，
+// 让人知道它们还在起作用、该怎么改写。旧插件卡（仍有 4 行）不报。
+{
+  const OLD = { 'flash-presets-core': 'toolConcurrency', 'plan-mode-ui': 'planMode', 'flash-presets-alias': 'alias', 'delivery-gate': 'deliveryGate' };
+  let installedSingle = false;
+  try { installedSingle = /\n\s*- id: flash-presets\n/.test(fs.readFileSync(path.join(pluginDir, 'cordis.patch.yml'), 'utf8')); } catch {}
+  const hits = [];
+  let doc = null;
+  if (yaml) { try { doc = yaml.load(resolvePlatformTags(raw)); } catch {} }
+  if (Array.isArray(doc)) {
+    for (const e of doc) if (e && typeof e === 'object' && !e.insert && OLD[e.id]) hits.push(e.id + '（' + Object.keys(e).filter((k) => k !== 'id' && k !== 'name').join('/') + '）');
+  } else {
+    for (const id of Object.keys(OLD)) if (new RegExp('^- id: ' + id + '\\s*$', 'm').test(raw)) hits.push(id);
+  }
+  if (hits.length === 0) ok('用户补丁里没有按 0.3.2 旧行 id 写的覆盖');
+  else if (!installedSingle) info('用户补丁里有旧行覆盖：' + hits.join('、') + '（当前插件卡仍是 4 行结构，照常生效）');
+  else {
+    warn('用户补丁里有按 0.3.2 旧行 id 写的覆盖：' + hits.join('、'));
+    info('它们仍然生效（插件启动时读回并换算，启动日志有 [flash-presets] 沿用旧行… 一行），DSH 会对每条打一句 entry not found。');
+    info('建议改写到 id: flash-presets 的 config 下：' + Object.entries(OLD).map(([k, v]) => k + ' → ' + v).join('，') +
+      '；disabled: true 改成对应段的 enabled: false（flash-presets-core 的 config.toolConcurrency 原样搬到 toolConcurrency）。');
   }
 }
 const stateFile = path.join(home, 'plan-mode-ui', 'state.json');

@@ -165,7 +165,7 @@ Presets and runtime settings are read once, at process start.
 ```bash
 dsh --profile web --dump-config | grep -c 'id: preset-'             # 6 (4 built-in + 2 from this package, with no other preset packages)
 dsh --profile web --dump-config | grep -c 'persistent-in-memory'    # 1
-dsh --profile web --dump-config | grep -c 'plan-mode-ui'            # 1
+dsh --profile web --dump-config | grep -c '^- id: flash-presets$'   # 1 (from 0.3.4 the runtime features use this one row; up to 0.3.2 grep plan-mode-ui)
 node scripts/doctor.mjs --profile web                                # version, duplicate rows, !!js, YAML parsing in one pass
 ```
 
@@ -189,8 +189,9 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 - **Preset ids no longer change.** The 13-rule preset is `flash-lean-ptc-v3`; the 3-rule preset is `flash-lean-ptc-v3-balance`. 0.2.7–0.2.8 renamed the first one to `flash-lean-ptc-v3-lite`; 0.2.9 reverts that and will not rename ids again — DSH persists the preset id inside the session log, so renaming it is what makes old sessions fail to open. Rule text may evolve; identifiers stay put.
 - Old sessions still open, and none of them get rewritten: `flash-lean-ptc-v3-lite` (0.2.6–0.2.8) has identical rules and is aliased to `flash-lean-ptc-v3`; older `flash-lean` / `flash-lean-ptc` are aliased too, and `flash-lean-ptc-v1` / `-v2` are aliased as well (0.2.8 already aliased them and 0.2.9 keeps that promise); their rules differ from v3, so the first hit logs a warning — add a row to your profile patch if you want the old rules, which is what this machine does for `v2`. Ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. The layer steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
 - **The install never touches sessions**: `install.sh` / `install.ps1` and plugin startup do not scan or rewrite `sessions/`. As of 0.2.9 **no code in this package writes a session file at all** (the start-up self-heal `lib/compat-heal.js` is gone: it rewrote the header without invalidating DSH's projection cache, so it barely worked and left a stale lock behind). CI asserts that a session directory is byte-identical after an install and an uninstall.
-- **Desktop app / plugin card**: whether old sessions open depends on the bundle carrying a `flash-presets-alias` row (a standalone plugin that injects only `agentPresets`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
+- **Desktop app / plugin card**: whether old sessions open depends on the alias layer -- the `flash-presets-alias` row in 0.2.9–0.3.2, a sub-feature of the `flash-presets` row from 0.3.4 (it still injects only `agentPresets`, so it runs on the desktop app without `webServer`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
 - **Script install (`install.sh` / `install.ps1`)**: this path has no alias layer. If the patch mentioned `flash-lean-ptc-v3-lite` before the upgrade, `merge-presets` keeps one extra compatibility row (`order: 99`, labelled "do not pick"), otherwise those sessions would be not-found. A profile that already carries the plugin card is refused (`exit 4`) — pass `--force` to stack them anyway.
+- **0.3.2 → 0.3.4: the plugin page shows 3 components instead of 6** (two presets + one "Flash lean presets" row). The `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` rows were merged into one `flash-presets` row; features and defaults are unchanged. Overrides you wrote against the old row ids (turning the delivery gate on, turning concurrency off, switching a row off on the plugin page) **still apply** after the upgrade: the plugin reads them back at startup and logs `[flash-presets] 沿用旧行 …`; DSH itself prints a harmless `entry "…" not found` for each. Rewrite them as in [Runtime switches](#runtime-switches) to silence it; `doctor` section 6 lists them.
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
 - If the profile's `selectedDefault` points at `flash-lean-ptc-v3-lite`, set it to `flash-lean-ptc-v3` (the old value still resolves through the compatibility layer).
 
@@ -200,18 +201,36 @@ The same plugin card carries a plan-mode component, plan-mode v1 (1.0.0). Within
 
 - The control sits to the left of the input box, with off / light / full levels independent of the preset.
 - Light is the recommended default. In a comparison with n = 3 and 7 acceptance checks, both levels passed 3/3; full used about 17% more tokens (median 40.2k vs 34.3k) and about 33% more time (196 s vs 147 s) ([changelog](docs/CHANGELOG.md), Chinese).
-- If you don't want it, switch the component off on the card. The presets behave exactly the same without it.
+- If you don't want it, set `planMode: { enabled: false }` in the profile patch (see [Runtime switches](#runtime-switches)). The presets behave exactly the same without it. **Don't switch off the whole "Flash lean presets" row on the plugin page**: from 0.3.4 that also turns off legacy-session support and the run_code speed-up.
 - **The panel only talks to loopback**: `/api/plan-mode/*` accepts requests whose `Host` is `127.0.0.1` / `localhost` / `[::1]` (DNS-rebinding guard). If you reach the Web GUI through a LAN IP or a custom hostname, the panel answers 403 and the UI tells you to set `DSH_FLASH_PRESETS_TRUST_HOST=1` and restart.
 
 ## Delivery gate (optional component, off by default)
 
-The same card also ships a delivery gate, `delivery-gate`. It needs no rule text: at the end of a turn it runs your acceptance script for you. If the workspace contains `verify.sh` it runs once, and the turn only finishes when it passes; a failure is fed back to the model, which keeps working.
+The same card also ships a delivery gate (the `delivery-gate` row up to 0.3.2, the `deliveryGate` section of the `flash-presets` row from 0.3.4). It needs no rule text: at the end of a turn it runs your acceptance script for you. If the workspace contains `verify.sh` it runs once, and the turn only finishes when it passes; a failure is fed back to the model, which keeps working.
 
 - Why: in the P15654 runs all three implementations *honestly* wrote "17-19 timed out / not covered" in their closing message and shipped anyway. What was missing was not self-reporting but a "you may not finish while it fails" mechanism.
-- Turning it on: set `enabled: true` on that row (the `delivery-gate` row near the end of `cordis.patch.yml`), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
+- Turning it on: add `- id: flash-presets` with `config.deliveryGate.enabled: true` to the profile patch (up to 0.3.2 it was the `delivery-gate` row; that form keeps working after the upgrade), or set `DSH_DELIVERY_GATE=1` for one run. Turn it off with `enabled: false` or `DSH_DELIVERY_GATE=0`.
 - Script contract: the default candidates are platform-dependent (Windows tries `verify.ps1` first, everything else `verify.sh`; pin them via the `scripts` config); a timeout counts as a failure; it reads only the exit code and the tail of the output and never edits your files.
 - Note: the shipped row sets `enabled: false`, and the schema default is also `false` (0.3.1 shipped `true`, which chased ordinary chats with an acceptance gate; 0.3.2 flipped it back). 0.3.1 only honoured `DSH_DELIVERY_GATE=0`; `=1` starts working in 0.3.2.
 - **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row — `enabled: false` / `maxRounds: 2`, with the acceptance script picked per platform: `verify.ps1` first on Windows, `verify.sh` elsewhere). On 0.3.0 the only route is git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`. npm 0.3.1, 0.3.2 (official) and the mis-published 0.3.3 all carry it, so there is **no need to wait for a future release**.
+
+
+## Runtime switches
+
+From 0.3.4 the run_code speed-up, plan mode, legacy-session support and the delivery gate all hang off the bundle's single `flash-presets` row, so the plugin page shows one component for them. Each feature starts once the host services it needs are present; a missing service only holds back its own feature (on the desktop app without `webServer`, only plan mode waits). Switch them in the profile patch (`~/.dsh/profiles/<name>/cordis.patch.yml`):
+
+```yaml
+- id: flash-presets
+  config:
+    toolConcurrency: { enabled: true }   # run_code optimisation A (read-only glob/grep concurrency)
+    alias:           { enabled: true }   # legacy preset ids (old sessions may not open when off)
+    planMode:        { enabled: true }   # plan-mode host; todoSync / lagTurns / compositionCheck go here too
+    deliveryGate:    { enabled: true }   # delivery gate (default false); maxRounds / scripts / timeoutMs go here too
+```
+
+Write only the sections you change; the rest keep the bundle defaults. Environment variables win over this: `DSH_FLASH_PRESETS_CONCURRENCY=0`, `DSH_FLASH_PRESETS_ALIAS=0`, `DSH_DELIVERY_GATE=0/1`.
+
+Old form (up to 0.3.2) → new form: `flash-presets-core`'s `config.toolConcurrency` → `toolConcurrency`; `plan-mode-ui`'s `config` → `planMode`; `delivery-gate`'s `config` → `deliveryGate`; `disabled: true` on any old row → `enabled: false` in its section. The old form keeps working (when both are written, the new one wins).
 
 ## Getting the most out of it
 

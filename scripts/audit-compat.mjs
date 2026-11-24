@@ -123,7 +123,7 @@ const roster = rosterIds();
 const defined = roster.ids;
 const map = aliasMap();
 
-// 别名层只在插件卡形态里存在（组合包自带那一行 flash-presets-alias）。脚本安装（install.sh 写的托管块）没有这一行，
+// 别名层只在插件卡形态里存在（0.2.9–0.3.2 是组合包里的 flash-presets-alias 行，0.3.4 起是 flash-presets 行的 alias 子功能，文件都是 lib/alias-plugin.js）。脚本安装（install.sh 写的托管块）没有这一行，
 // 所以「在 alias 表里」不等于「这台机器上打得开」（第六轮 U1-3）。
 function aliasLayerInstalled() {
   if (argv.includes('--no-alias')) return false;
@@ -243,7 +243,7 @@ if (AS_JSON) {
   if (Object.keys(result.aliasedBy).length) console.log('经 alias 层可解析：' + JSON.stringify(result.aliasedBy));
   if (Object.keys(result.unresolvedBy).length) {
     console.log('✖ 本形态没有别名层（没装插件卡，或用了 --no-alias），这些历史 id 此时解析不到：' + JSON.stringify(result.unresolvedBy));
-    console.log('   修法：改装插件卡（自带 flash-presets-alias 行），或在 profile 补丁里加回原预设行；本包不改写任何会话文件。');
+    console.log('   修法：改装插件卡（自带别名层），或在 profile 补丁里加回原预设行；本包不改写任何会话文件。');
   }
   if (buckets.orphan.length) {
     console.log('');

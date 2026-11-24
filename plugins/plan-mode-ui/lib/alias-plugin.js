@@ -4,9 +4,8 @@
 // webServer；桌面端（Electron）与无 web 的组合里那一行会停在 pending，别名层跟着不存在，于是
 // 「0.2.6–0.2.8 建的 -lite 会话」在桌面端照样打不开。这里只 inject agentPresets，任何宿主都能加载。
 //
-// 对应 cordis.patch.yml 里的一行：
-//     - id: flash-presets-alias
-//       name: 'dsh-flash-presets/alias'
+// 0.2.9–0.3.2 对应 cordis.patch.yml 里单独一行（id: flash-presets-alias，name: 'dsh-flash-presets/alias'）；
+// 0.3.4 起由 lib/bundle.js（flash-presets 行）作为子插件挂上，inject 不变，所以桌面端照样能加载。
 import { schedulePresetAliases } from './preset-alias.js';
 
 export default {

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Flash 精简预设",
+    "description": "为 DeepSeek V4.1 Flash 调校的两个预设（lean-v3 / balance），附计划模式、run_code 优化、旧会话兼容与交付门（默认关）。",
+    "detail": "docs/plugin-detail.zh.md"
+  }
+}

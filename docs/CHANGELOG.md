@@ -26,6 +26,7 @@
 | 12 | 修复（文档） | CHANGELOG 口径行「0.3.3 内容与 0.3.2 相同」纠正（该行随 npm 包发出）；审计文档日期 2026-12-01 → 20261117；写明 `v0.3.2` tag 被移动过、本地要 `git fetch --tags --force` |
 | 13 | 文档（基准） | 新增 **DSH-Bench 110 题 × 6 遍** 四臂截面：正确率雷达 / 净耗时 / token 与费用三张图，README（中英）各嵌三张 + 数字表，另建 [基准文档](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/%E5%9F%BA%E5%87%86-DSH-Bench%E5%9B%9B%E8%87%82%E5%AF%B9%E6%AF%94-20261117.md) 写口径、三项折算与**题目集差异**（110 题 ≠ `dsh-bench` 仓库 v1 的 160 题 ≠ 办公基准 8+5 题 ≠ 早期 n=3 实验） |
 | 14 | 文档（基准） | README 实测段改用 DSH-Bench 截面：办公基准表与图从展示面下线（`benchmarks/office/` 与 `docs/bench-office-results.json` 保留；`render-bench-table.mjs` 在两份 README 都缺标记时按「已下线」跳过）；PUBLISHING 的 npm 页面核对标记 `办公基准测试` -> `DSH-Bench`；技术文档-lean-v3 的「端到端预设对照」行改为本次截面（正确率持平 / token −34.9% / 每答对 79→63 s） |
+| 15 | 结构（插件页） | **插件页上本包从 6 个组件简并为 3 个**：`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` 四行合成一行 `flash-presets`（包根入口改为 `lib/bundle.js`，自身 inject 为空；四个功能作为子插件各按自己的 inject 启动，桌面端缺 `webServer` 时只有计划模式宿主等待，别名层 / 优化 A 照常 —— 第五轮 T1-1 的约束保持不变）。两个预设行与 id 不动。新增 `locale/{zh,en}.json` 展示元信息（卡片标题「Flash 精简预设」+ 一句话简介）和 `meta.detail` 短介绍（`docs/plugin-detail.*.md`），组合包页不再整篇渲染 README（rc.1 实测详情页高度 11527 px → 1426 px）。旧行 id 的用户覆盖（含插件页开关写下的 `disabled: true`）由 `lib/row-overrides.js` 在启动时读回并换算、日志点名；`doctor` 第 6 节静态列出。`exports` 保留 `./core` `./alias` `./delivery-gate`，新增 `./plan-mode`（原包根）。CI bundle-install 断言改为单行；`verify-core` / `verify-yaml` / `check-preset-compat` / `alias-vs-config` 同步 |
 
 ## 0.3.2（2026-11-17，当前正式版：npm `latest` 指向它；`v0.3.3` 是误发版）
 
