@@ -147,6 +147,10 @@ Windows 程序（`git`、`node`、`python`…）按 PATH 调用，不在此列�
 `-p`（显示函数名）、`-N` / `--new-file`、`-s`、`-x` / `--exclude`、`-I` / `--ignore-matching-lines`、`-t`、`--color`、`--suppress-common-lines`；
 二进制文件不会报 `Binary files … differ`，而是按文本逐行比较。
 
+### jq（内置最小子集）
+
+PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使用内置版。支持 `.`、`.a.b`、`.[n]`、`.[]`、后缀 `?`、`|`、`,`、`[...]`、`{k: v}`、`$var`、比较与 `and/or//`、算术，以及 keys、keys_unsorted、length、select、map、not、empty、type、add、has；选项支持 `-r -c -e -n -s --arg --argjson`。输出格式与退出码对齐 jq 1.7。不支持的语法报 `jq: error: unsupported` 并返回 3。
+
 ## 验证
 
 1. 运行随包的 `check-flash-sh.ps1`（只读自检）。
