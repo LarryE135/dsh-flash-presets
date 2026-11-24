@@ -100,18 +100,32 @@ DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升�
   所以本插件自己记：同一个会话里，同一类命令批准一次后不再问。「同一类」= 命令里出现的**全部命令名**（排序去重）加上特征
   （`|` 管道、`>` 写文件、`&` 后台）。例如批准过 `ls -la`，之后 `ls src` 不再问；但 `ls | head`、`ls > a.txt`、`ls && rm x` 都是新的一类，要再问。
   审批框里会写明「批准后同类命令本会话不再问」的范围。记忆只在内存里，重启 DSH 或换会话就清空。
-- **危险命令每次都问**（不进记忆）：`rm` / `rmdir` 带 `-r` / `-f`；写到工作区外（重定向、`tee`、`cp` / `mv` 的目标、`sed -i`、`mkdir` / `touch` 等，
-  临时目录与 `/dev/null` 除外；含 `$变量` 或 `~` 的写目标按外部算）；工作目录在工作区外；`$(...)` / 反引号 / `<(...)` / here-document；
-  套另一个 shell（`bash -c`、`pwsh`、`cmd` 等）、`eval` / `source`、`xargs` / `env` / `sudo` 之类的包装命令；`python -c` / `node -e` 等内联代码；
-  `git push` / `git clean` / `git reset --hard`；`find -delete` / `-exec`；函数定义；`curl` / `wget` / `ssh` / `dd` / `kill` / `reg` / `setx` 等。
-  这是一套保守的启发式规则：看不懂的写法一律按「每次都问」处理。
-- **子进程环境脱敏**：名字里含 `KEY` / `PASSWORD` / `PASSWD` / `SECRET` / `TOKEN` / `CREDENTIAL`（不分大小写，`db_password` 也算）的环境变量，
-  以及全部 `DSH_*`，都不传给 flash-sh；`PATH`、`HOME`、`USERPROFILE`、`TEMP` 等照常保留。需要凭据的命令请让它自己读配置文件。
-- **大输出**：内存里只留头尾；完整输出流式写到临时目录下 `dsh-flash-sh-spill-*`（`mkdtemp` 新建，文件权限 0600），单个 DSH 进程累计上限 64 MB，
-  超过就停写并在结果里注明。启动时删除 24 小时以前的残留目录。
+- **危险命令每次都问**（不进记忆）：`rm` / `rmdir` 带 `-r` / `-f`；写到工作区外（重定向含 `>|` `>>` `1>` `&>` `>&`、`tee`、`cp` / `mv` 的目标
+  与 `mv` 的源、`sed -i`、`sort -o`、`uniq` 的输出、`tar -C` / `unzip -d`、`mkdir` / `touch` 等；临时目录与 `/dev/null` 除外；含 `$变量`、`~`、
+  花括号展开、可能匹配 `..` 的 glob 的写目标按外部算；**按真实路径判断**，经符号链接 / 联接点写到外面也算；先 `cd` 出工作区再写相对路径也算；
+  `/c/…`、`C:\…`、别的盘、UNC `\\host\share`、`CON` / `COM1` 等设备名按 Windows 规则判断）；工作目录在工作区外；`$(...)` / 反引号 / `<(...)` / here-document；
+  命令名来自变量、带 glob / 花括号展开；给 `PATH` / `LD_PRELOAD` / `BASH_ENV` / `IFS` / `GIT_*` / `NODE_OPTIONS` 等赋值（前置、单独、`export` / `declare` / `read` / `printf -v`）；
+  套另一个 shell（`bash -c`、`pwsh`、`cmd /c`，含 `C:\…\cmd.exe`、`RM.exe` 这类带路径 / 大小写 / 扩展名的写法——比对前先归一化）、`eval` / `source` / `alias` / `hash` / `trap`、
+  `command` / `builtin` / `exec` / `env` / `xargs` / `sudo` / `coproc` / `npx` 之类的包装命令；解释器的内联代码（`python -c`、`node -e` / `-pe`、`perl -e` / `-pe` / `-M…`、`ruby -e`、`php -r`）、
+  把代码从管道喂给解释器（`… | python3`）、`awk` 里的 `system()` / 管道 / 写文件、`sed` 的 `e` / `w`；`git push` / `clean` / `reset --hard` / `checkout .` / `restore` / `config`（写）/ `-c …` /
+  `-C <工作区外>` 等；`find -delete` / `-exec` / `-fprint`；`chmod` / `chown` / `ln`；函数定义；`curl` / `wget` / `ssh` / `dd` / `kill` / `reg` / `setx` / `patch` / 包管理器等；参数里有 UNC 路径。
+  这是一套保守的启发式规则，原则是**看不懂的写法一律每次都问**；规则键用原样的命令名，`/usr/bin/rm`、`RM.exe` 与 `rm` 互不借用批准。
+  对抗用例见 `test/adversarial.mjs`（77 条 + 15 条良性写法）。仍然要知道：同一类里的命令参数不同也算同一类（批准过 `rm a.o` 后，工作区内的 `rm b.c` 不再问；
+  批准过 `python3 x.py` 后，`python3 y.py` 不再问——脚本内容本身不受审查）。
+- **子进程环境脱敏**：名字里含 `KEY` / `PASSWORD` / `PASSWD` / `SECRET` / `TOKEN` / `CREDENTIAL` / `COOKIE` / `JWT`（不分大小写，`db_password` 也算）、
+  以 `_PAT` / `_AUTH` 为词（`GITHUB_PAT`、`NPM_CONFIG__AUTH`、`SSH_AUTH_SOCK`；不误伤 `NODE_PATH` 这类 `*_PATH` 与 `GIT_AUTHOR_*`）、
+  前缀为 `DSH_` / `AWS_` / `GITHUB_` / `GH_` / `NPM_CONFIG_` / `YARN_NPM_` / `AZURE_DEVOPS_` 的变量，以及**值**是带账号密码的 URL（`postgres://u:p@h`、
+  `http://user:pw@proxy`）的变量，都不传给 flash-sh；`PATH`、`HOME`、`USERPROFILE`、`TEMP`、不带账号密码的代理等照常保留。
+  影响：flash_sh 里的 `npm` 读不到 `NPM_CONFIG_*`（改读 `.npmrc`），`git` 走 ssh-agent 会失败（`SSH_AUTH_SOCK` 被去掉）。需要凭据的命令请让它自己读配置文件。
+- **大输出**：内存里只留头尾；完整输出流式写到临时目录下 `dsh-flash-sh-spill-*`（`mkdtemp` 新建、0700；文件名是 128 位随机数，`O_EXCL` 0600 新建），
+  单个 DSH 进程累计上限 64 MB，超过就停写并在结果里注明。启动时清理 24 小时以前的残留目录：只删名字对、是真目录（不跟符号链接 / 联接点）、
+  POSIX 上属主是自己、且里面只有 spill 日志文件的目录，逐个删文件再删空目录，不做递归删除。
 - **超时**：exe 的 `--timeout` 到点会杀掉整棵进程树、以 124 退出并在 stderr 写 `flash-sh: timed out after Ns, process tree killed`；
-  插件在此之上再留 5 秒，exe 没退就硬杀（Windows 上 `taskkill /T /F`）。`timedOut` 只在看到这个标记（或插件硬杀）时为 true，
-  脚本自己 `exit 124` 不算超时。
+  插件在此之上再留 5 秒，exe 没退就硬杀（Windows 上 `%SystemRoot%\System32\taskkill.exe /PID <pid> /T /F`，绝对路径、不走 PATH；
+  taskkill 失败时退回直接杀进程；开发验证用的 POSIX 模式下杀整个进程组）。杀掉后最多再等 3 秒，孙进程仍攥着输出管道不放就由插件断开管道收尾，
+  调用一定会返回。`timedOut` 只在看到这个标记（或插件硬杀）时为 true，脚本自己 `exit 124` 不算超时。
+- **workdir**：相对路径按会话工作区解析；Windows 上 `/d/x` 按 `D:\x` 理解；`\\host\share`、`//host/share`、`\\.\设备` 这类路径在工作区之外时
+  **连 stat 都不做就拒绝**（在 Windows 上访问网络共享本身就会向对方发 SMB 认证）。
 
 **`approval: off` 的风险**：模型生成的每条命令都会直接在你的电脑上、以你的用户权限执行，不经过 DSH 沙箱，也没有任何确认 ——
 包括删除文件、改写工作区外的文件、联网上传、读取你能读到的任何文件。只建议在一次性的虚拟机 / 容器里，或你完全信任当前任务时使用；
@@ -166,11 +180,15 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 dsh-flash-presets 0.3.4 起把本包当作可选依赖，在 `flash-presets` 一行下作为 `flashSh` 子功能挂上（默认关）。两种装法可以并存：
 
 - 插件页上，presets 那边**不新增组件**，仍然只有「Flash 精简预设」一行；单独装的本包是另一行 `flash-sh-standalone`；
-- 工具名都叫 `flash_sh`，由进程内的协调器保证**任何时候只注册一个**：两边都启用时 **presets 的 flashSh 优先**，本包这一行跳过并写日志
+- 工具名都叫 `flash_sh`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
+  （presets 的 `flash-presets` 行一开始 apply 就会表态；DSH 的加载器配置里看不到 `flash-presets` 行、或它被整行关掉时不等；
+  看得到它但它一直不表态时最多等 15 秒，什么都判断不了时等 3 秒），所以不会出现「本行先注册、presets 随后接管」的双注册窗口。
+  两边都启用时 **presets 的 flashSh 优先**，本包这一行跳过并写日志
   `flash_sh is provided by dsh-flash-presets（…flashSh 子功能）; dsh-flash-sh（flash-sh-standalone 行） skips registering it`；
   presets 那边被关掉或卸载后，本行自动接管。若是别的插件（第三方）先注册了 `flash_sh`，两边都不抢，等它注销后再补上。
 - 注意环境变量 `DSH_FLASH_SH=1` 会同时打开两边（两者用同一个开关）；建议只保留一处启用。
-- 两边的配置各管各的：生效的是 presets 那边 `config.flashSh` 的设置。
+- 两边的配置各管各的：生效的是 presets 那边 `config.flashSh` 的设置；两边的 `approval` / `approvalMemory` / 超时 / 输出上限 / `binPath` 不一致时，
+  本包这一行让位时会打一条 warn，列出哪些设置**没有生效**。
 - 0.3.4 的 presets 不会把 profile 补丁里 `- id: flash-sh-standalone` 的覆盖换算过去（那是本包自己的一行，只要本包还装着就仍然有效）；
   卸载本包、改用 presets 时，请把它改写到 `- id: flash-presets` 的 `config.flashSh` 下（presets 启动日志会提示）。
 

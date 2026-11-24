@@ -212,6 +212,24 @@ check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expect
   r = await run({ enabled: true, allowNonWindows: true }, async () => { throw new Error("Cannot find package 'dsh-flash-sh'"); });
   check(r.st.features.flashSh.startsWith("unavailable") && r.st.features.alias === "mounted" && r.st.features.core === "mounted" && r.logs.filter((l) => /加载不到 dsh-flash-sh/.test(l)).length === 1 && !r.logs.some((l) => /flashSh.*(error|失败)/i.test(l) && !/加载不到/.test(l)), "依赖没装上：一行 info、其它功能照常", JSON.stringify(r.st.features));
   check(intentOf() === "none", "依赖没装上：表态 none", String(intentOf()));
+  {
+    // 非法 flashSh 配置：用 dsh-flash-sh 的 Config 先校验，不合法就不挂（cordis 对非法配置只记日志、不调 apply）
+    const realMod = await import("../plugins/flash-sh/lib/index.js");
+    loads = 0;
+    r = await run({ enabled: true, allowNonWindows: true, timeoutMs: 0 }, async () => realMod);
+    check(r.st.features.flashSh.startsWith("config-invalid") && !r.mounted.some((m) => m.p.name === "dsh-flash-sh") && intentOf() === "none" && r.logs.some((l) => /flashSh 配置不合法/.test(l)), "flashSh.timeoutMs:0：校验不过 → 不挂、warn、表态 none（不再谎报 mounted）", JSON.stringify(r.st.features));
+    r = await run({ enabled: true, allowNonWindows: true, approval: "always" }, async () => realMod);
+    check(r.st.features.flashSh.startsWith("config-invalid"), "flashSh.approval 非法值 → config-invalid", JSON.stringify(r.st.features));
+    for (const [label, v] of [["字符串", "yes"], ["null", null], ["数组", [true]], ["enabled:\"true\"", { enabled: "true" }], ["enabled:1", { enabled: 1 }]]) {
+      const e2 = ro.effectiveConfig({ flashSh: v }, ro.collectRowOverrides([]));
+      const fc = e2.flashSh !== null && typeof e2.flashSh === "object" && !Array.isArray(e2.flashSh) ? e2.flashSh : {};
+      check(bundle.planFlashSh(fc, {}, "win32", "x64").state === "off", "flashSh 为 " + label + " → 关（只认字面量 enabled: true）");
+    }
+    const odd = ro.collectRowOverrides([{ id: "flash-sh", disabled: "yes", config: { enabled: true } }]);
+    check(ro.effectiveConfig({}, odd).flashSh.enabled === false && /按关闭处理/.test(odd.found[0].note), "旧行 flash-sh 的 disabled 不是字面量布尔 → flash_sh 按关闭处理（失败即关闭）", JSON.stringify(odd));
+    const both = ro.collectRowOverrides([{ id: "flash-sh", config: { enabled: true } }, { id: "flash-presets", config: { flashSh: { enabled: false } } }]);
+    check(ro.effectiveConfig({}, both).flashSh.enabled === false, "旧行开、新行（用户写）关 → 新行优先");
+  }
   if (process.platform !== "win32" || process.arch !== "x64") {
     loads = 0;
     r = await run({ enabled: true }, stub);

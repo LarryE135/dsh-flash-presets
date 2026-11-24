@@ -19,6 +19,6 @@ Five features hang off this single row. Each starts as soon as the host services
 - **Delivery gate** (off by default): when the workspace has `verify.sh` / `verify.ps1`, it runs at the end of a turn and hands failures back to the model.
 - **flash_sh** (off by default, Windows x64 only): a Bash-compatible shell tool from the optional dependency `dsh-flash-sh`, not installed on other platforms. It is not sandboxed: outside full-access sessions it asks you, once per kind of command per session, and every time for dangerous commands.
 
-To switch one feature, set `enabled` under `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` / `flashSh` of `id: flash-presets` in the profile patch. Overrides written against the old row ids (`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`, up to 0.3.2) still apply. Turning the whole row off also turns off legacy-session support.
+To switch one feature, set `enabled` under `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` / `flashSh` of `id: flash-presets` in the profile patch. Overrides written against the old row ids (`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`, up to 0.3.2) still apply. Turning the whole row off also turns off legacy-session support and flashSh (a separately installed dsh-flash-sh row is not affected and takes over flash_sh).
 
 Switch examples, measurements and the compatibility table: [GitHub](https://github.com/LarryE135/dsh-flash-presets).

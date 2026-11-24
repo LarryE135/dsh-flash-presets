@@ -19,6 +19,6 @@
 - **交付门**（默认关）：工作区里有 `verify.sh` / `verify.ps1` 时，回合收尾自动验收，不通过就把失败清单交回模型。
 - **flash_sh**（默认关，仅 Windows x64）：Bash 兼容的 shell 工具，由可选依赖 `dsh-flash-sh` 提供，其他平台不安装。它不受沙箱约束：非「完全访问」会话里要你审批，同类命令一个会话只问一次，危险命令每次都问。
 
-单独开关某个功能：在 profile 补丁里给 `id: flash-presets` 写 `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` / `flashSh` 的 `enabled`。0.3.2 及以前按旧组件 id（`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`）写的覆盖升级后仍然生效。关掉整行会连旧会话兼容一起关掉。
+单独开关某个功能：在 profile 补丁里给 `id: flash-presets` 写 `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` / `flashSh` 的 `enabled`。0.3.2 及以前按旧组件 id（`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`）写的覆盖升级后仍然生效。关掉整行会连旧会话兼容和 flashSh 一起关掉（单独安装的 dsh-flash-sh 那一行不受影响，会接管 flash_sh）。
 
 开关示例、实测数据与版本兼容表见 [GitHub](https://github.com/LarryE135/dsh-flash-presets)。

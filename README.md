@@ -218,8 +218,9 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **打开**：profile 补丁里写 `- id: flash-presets` / `config.flashSh.enabled: true`，或设用户环境变量 `DSH_FLASH_SH=1`（不能写进 `.env`）。
   其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在 `flashSh` 段里，含义见 dsh-flash-sh 的 README。
 - **安全**：`flash_sh` 不受 DSH 文件沙箱约束。默认 `approval: sandboxed` —— 会话不是「完全访问」时要你审批（读不到会话模式也要审批，审批出错就不执行）；
-  同一会话里同一类命令批准一次后不再问，`rm -rf`、写到工作区外、`bash -c` / `eval` / 内联代码等危险命令每次都问。子进程拿不到名字含
-  `KEY` / `PASSWORD` / `SECRET` / `TOKEN` 的环境变量和 `DSH_*`。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
+  同一会话里同一类命令批准一次后不再问，`rm -rf`、写到工作区外（按真实路径判断）、`bash -c` / `eval` / 内联代码、改 `PATH` 等危险命令每次都问，
+  看不懂的写法也每次都问。子进程拿不到名字含 `KEY` / `PASSWORD` / `SECRET` / `TOKEN` 等字样或 `_PAT` / `_AUTH` 的环境变量、`DSH_*` / `AWS_*` / `GITHUB_*` /
+  `NPM_CONFIG_*`，以及值里带账号密码的 URL（完整规则见 dsh-flash-sh 的 README）。`flashSh` 的配置不合法（如 `timeoutMs: 0`）时不启用，日志写明原因。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
 - **启动日志**：非 Windows x64 上启用时只写一行 `[flash-presets] flashSh 已启用，但 flash_sh 只在 Windows x64 上可用…`；可选依赖没装上时写一行
   `…加载不到 dsh-flash-sh…`，其余功能都不受影响。
 - **和单独安装的 dsh-flash-sh 并存**：两边都启用时只注册一个 `flash_sh`，本行优先，独立包那一行写日志跳过；本行关掉后它自动接管。

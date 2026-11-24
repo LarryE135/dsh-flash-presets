@@ -228,7 +228,9 @@ From 0.3.4 the same row also has a `flashSh` section: on **Windows x64** it give
 - **Safety**: `flash_sh` is not confined by the DSH file sandbox. The default `approval: sandboxed` asks you unless the session has full access (it also asks
   when the session mode cannot be read, and refuses to run when the approval call fails). Within one session a kind of command is asked once; dangerous
   commands (`rm -rf`, writes outside the workspace, `bash -c` / `eval` / inline code, …) are asked every time. The child process does not see environment
-  variables whose names contain `KEY` / `PASSWORD` / `SECRET` / `TOKEN`, nor any `DSH_*`. `approval: off` lets the model run anything on your machine
+  variables whose names contain `KEY` / `PASSWORD` / `SECRET` / `TOKEN` (and the like) or the words `_PAT` / `_AUTH`, nor any `DSH_*` / `AWS_*` / `GITHUB_*` /
+  `NPM_CONFIG_*`, nor variables whose value is a URL with a username and password (full rules in the dsh-flash-sh README). Writes are judged by their real path
+  (through symlinks), and anything the classifier cannot read is asked every time. An invalid `flashSh` config (e.g. `timeoutMs: 0`) leaves it off, with the reason logged. `approval: off` lets the model run anything on your machine
   without confirmation; use it only in a throwaway environment.
 - **Startup log**: enabled on a non-Windows-x64 host it writes one line, `[flash-presets] flashSh 已启用，但 flash_sh 只在 Windows x64 上可用…`; when the
   optional dependency is missing, one line `…加载不到 dsh-flash-sh…`. Nothing else is affected.
