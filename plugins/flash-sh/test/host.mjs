@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -30,16 +31,21 @@ if (!bin || !fs.existsSync(bin)) {
   process.exit(process.env.FLASH_SH_REQUIRE_BIN === "1" ? 1 : 0);
 }
 
-let cordis, Tools, SystemPrompt;
+// DSH_HOST_NM=/path/to/node_modules：换一套宿主包（例如某个 DSH 安装的 node_modules）来跑，用来覆盖 engines.dsh 声明的整个范围。
+// 不设时按正常的模块解析（仓库根目录的 node_modules）。
+const hostNm = process.env.DSH_HOST_NM ? path.resolve(process.env.DSH_HOST_NM) : "";
+const hostRequire = createRequire(hostNm ? path.join(hostNm, "__host__.js") : import.meta.url);
+const importHost = (name) => import(pathToFileURL(hostRequire.resolve(name)).href);
+let cordis, Tools, SystemPrompt, toolsVersion;
 try {
-  cordis = await import("@deepseek-ai/cordis");
-  Tools = (await import("@deepseek-ai/dsh-tools")).ToolRuntime;
-  SystemPrompt = (await import("@deepseek-ai/dsh-system-prompt")).SystemPrompt;
+  cordis = await importHost("@deepseek-ai/cordis");
+  Tools = (await importHost("@deepseek-ai/dsh-tools")).ToolRuntime;
+  SystemPrompt = (await importHost("@deepseek-ai/dsh-system-prompt")).SystemPrompt;
+  toolsVersion = JSON.parse(fs.readFileSync(hostRequire.resolve("@deepseek-ai/dsh-tools/package.json"), "utf8")).version;
 } catch (error) {
   console.log("host 自测：跳过（找不到 @deepseek-ai/cordis / dsh-tools / dsh-system-prompt：" + error.message + "）");
   process.exit(0);
 }
-const toolsVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "node_modules/@deepseek-ai/dsh-tools/package.json"), "utf8")).version;
 console.log("host 自测（cordis + dsh-tools " + toolsVersion + "，flash-sh = " + bin + "）");
 
 const savedEnv = { ...process.env };
@@ -76,13 +82,51 @@ async function newHost() {
   ctx.plugin(SystemPrompt);
   ctx.plugin(Tools, {});
   await tick();
+  // DSH 0.2.2 起 dsh-tools 只做登记与分派，执行交给单独挂载的 executor（不挂就抛 TOOL_EXECUTOR_UNAVAILABLE）。
+  // 有 setExecutor 就挂一个 native executor：优先用宿主自带的 @deepseek-ai/dsh-tool-executor-native，找不到就用
+  // dsh-tools/pipeline 现场装一个等价的（与 native executor 源码相同：executeToolBatch + ToolExecutionPipeline）。
+  if (typeof ctx.tools.setExecutor === "function") {
+    ctx.plugin(await nativeExecutorPlugin());
+    await tick();
+  }
   return ctx;
 }
+let executorPlugin;
+async function nativeExecutorPlugin() {
+  if (executorPlugin) return executorPlugin;
+  try {
+    if (process.env.DSH_HOST_INLINE_EXECUTOR === "1") throw new Error("forced inline executor");
+    executorPlugin = await importHost("@deepseek-ai/dsh-tool-executor-native");
+    executorSource = "@deepseek-ai/dsh-tool-executor-native";
+  } catch {
+    const { projectToolSchema } = await importHost("@deepseek-ai/dsh-tools");
+    const { ToolExecutionPipeline, executeToolBatch } = await importHost("@deepseek-ai/dsh-tools/pipeline");
+    executorPlugin = {
+      name: "test-native-tool-executor",
+      inject: ["tools"],
+      apply(ctx) {
+        const pipeline = new ToolExecutionPipeline(ctx);
+        ctx.tools.setExecutor({
+          describe: (tools) => ({ schemas: tools.map((d) => projectToolSchema(d, false)) }),
+          execute: (input) => executeToolBatch(input, pipeline, () => 10),
+        });
+      },
+    };
+    executorSource = "测试内置（dsh-tools/pipeline）";
+  }
+  return executorPlugin;
+}
+let executorSource = "";
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-host-"));
 let callN = 0;
+// 两代调用接口：≤0.2.1 的 tools.execute(单次调用) 直接返回结果；0.2.2 起 tools.execute({ calls }) 交给 executor 跑一批，
+// 返回 { results: [{ callId, result }] }，参数是模型给的 JSON 字符串。
 async function call(ctx, args, signal) {
-  const res = await ctx.tools.execute({ callId: "c" + ++callN, name: "flash_sh", arguments: args, signal: signal ?? new AbortController().signal });
-  return res;
+  const callId = "c" + ++callN;
+  signal ??= new AbortController().signal;
+  if (typeof ctx.tools.setExecutor !== "function") return ctx.tools.execute({ callId, name: "flash_sh", arguments: args, signal });
+  const batch = await ctx.tools.execute({ calls: [{ id: callId, name: "flash_sh", arguments: JSON.stringify(args) }], signal });
+  return batch.results.find((r) => r.callId === callId)?.result;
 }
 const valueOf = (res) => res && (res.value ?? res.structured ?? res.output ?? res.result);
 
@@ -119,11 +163,21 @@ ok(sawLog(/\[flash-sh\] flash_sh registered \(/), "日志含 \"[flash-sh] flash_
 const schemas = ctx.tools.schemas();
 ok(schemas.some((s) => s.name === "flash_sh"), "出现在模型可见 schema（native 模式）");
 // PTC：SDK 投影里也有它（run_code 程序内可调）
-try {
-  const sdk = ctx.tools.sdkSchemas();
-  ok(sdk.some((s) => s.name === "flash_sh" && s.output && s.output.type === "object"), "出现在 PTC SDK 投影（sdkSchemas），带输出 schema");
-} catch (error) {
-  ok(false, "sdkSchemas()", error.message);
+// ≤0.2.1 有 tools.sdkSchemas()；0.2.2 起 SDK 由 PTC executor 从定义生成，没有这个方法 → 改查定义本身带对象型输出 schema
+// （PTC executor 生成返回类型所需的就是它）。
+if (typeof ctx.tools.sdkSchemas === "function") {
+  try {
+    const sdk = ctx.tools.sdkSchemas();
+    ok(sdk.some((s) => s.name === "flash_sh" && s.output && s.output.type === "object"), "出现在 PTC SDK 投影（sdkSchemas），带输出 schema");
+  } catch (error) {
+    ok(false, "sdkSchemas()", error.message);
+  }
+} else {
+  const defs = typeof ctx.tools.definitions === "function" ? ctx.tools.definitions() : [ctx.tools.get("flash_sh")];
+  const def = defs.find((d) => d && d.name === "flash_sh");
+  const out = def && def.output && (def.output.schema ?? def.output);
+  ok(out && out.type === "object", "定义带对象型输出 schema（本宿主没有 sdkSchemas，PTC SDK 由 executor 生成）", JSON.stringify(def && def.output));
+  console.log("  · executor：" + executorSource);
 }
 
 let res = await call(ctx, { command: 'x=$((6*7)); echo "v=$x"; printf "b\\na\\n" | sort | tr a-z A-Z; pwd', workdir: tmp });

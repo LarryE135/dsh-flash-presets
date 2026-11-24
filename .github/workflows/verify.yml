@@ -55,6 +55,29 @@ jobs:
         timeout-minutes: 12
         run: npm run verify
 
+      # dsh-flash-sh 0.1.0 的 P1 回归只在真 Windows 上出现（管道 / here-string / heredoc 里 read 只读到第一行）：
+      # 直接跑 vendor 里随包发出的 flash-sh.exe，断言每条用例的输出完整（脚本文件与 -c 两种方式各跑一遍）。
+      - name: flash-sh.exe 直接跑 read 回归用例（Windows）
+        if: runner.os == 'Windows' && !cancelled()   # 前面的闸门红了也照跑：这一步单独回答「发出去的 exe 在真 Windows 上读得全不全」
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower() + "  flash-sh.exe"
+          Get-Content plugins/flash-sh/vendor/win32-x64/flash-sh.exe.sha256
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/read-regress.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 的 read 回归用例失败"; exit 1 }
+          # 报告里的原始最小复现，直接打印输出（供人工核对；期望 <a> <b> / x y / 123）
+          $repro = Join-Path $env:RUNNER_TEMP 'read-repro.sh'
+          Set-Content -Path $repro -Encoding utf8NoBOM -Value @'
+          printf 'a\nb\n' | while read -r l; do echo "<$l>"; done
+          while read -r l; do echo "$l"; done <<< $'x\ny'
+          printf '1\n2\n3\n' | { read -r a; read -r b; read -r c; echo "$a$b$c"; }
+          '@
+          & $exe $repro
+          exit $LASTEXITCODE
+
       # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
       - name: 别名表 × 合成配置
         shell: bash

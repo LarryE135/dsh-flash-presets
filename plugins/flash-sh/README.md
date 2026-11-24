@@ -7,15 +7,17 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 两种装法，二选一即可（都装也没关系，见「与 dsh-flash-presets 同时安装」）：
 
-- **随 dsh-flash-presets（0.3.4 起）**：presets 把本包声明为可选依赖，Windows x64 上自动装上，在插件页「Flash 精简预设」那一行下面
-  作为 `flashSh` 子功能出现（默认关）。非 Windows x64 的机器上 npm / pnpm 按本包的 `os` / `cpu` 直接跳过，不会下载 7.9 MB 的 exe。
+- **随 dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）**：presets 把本包声明为可选依赖，Windows x64 上随 presets 一起装上，在插件页
+  「Flash 精简预设」那一行下面作为 `flashSh` 子功能出现（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
 - **单独安装**：本包自己是一个组合包（一行 `flash-sh-standalone`），见下面「安装」。
 
 - 工具名 `flash_sh`，**不占用** `bash` / `pwsh` / `run_code`。
 - **默认关闭**：它会在你的电脑上执行命令，必须你显式打开。
-- **只在 Windows x64 上注册**：`package.json` 声明 `os: ["win32"]`、`cpu: ["x64"]`（其他平台上 npm / pnpm 不安装；直接
-  `dsh plugin add dsh-flash-sh` 会被 pnpm 以 unsupported platform 拒绝），组合包再声明 `dsh.bundle.platforms: ["win32"]`，
+- **只在 Windows x64 上激活**：`package.json` 声明 `os: ["win32"]`、`cpu: ["x64"]`，组合包声明 `dsh.bundle.platforms: ["win32"]`，
   运行时还要求 `process.arch === 'x64'`（桌面端插件跑在 Electron 进程里，arch 是该 Electron 构建的架构）。
+  实测（Linux 宿主、pnpm 11.22.0）：`dsh plugin add dsh-flash-sh` 时 **pnpm 仍会把包装进 profile**（并不按 `os` / `cpu` 跳过或拒绝），
+  随后 DSH 在组合包激活阶段以 `Bundle supports Host platforms win32` 拒绝激活，最终不会激活、不注册任何工具；
+  装错了平台用 `dsh plugin --profile <p> remove dsh-flash-sh` 清理即可。
 - 包内无运行时依赖、无安装脚本（不会触发 pnpm 的 `allowBuilds` 拦截）。
 
 版本要求：DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines.dsh`，与 dsh-flash-presets 相同）。
@@ -24,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.0.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.0.tgz`。
+1. 把 `dsh-flash-sh-0.1.1.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.1.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.0.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.0.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.1.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.1.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.0.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.1.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -163,7 +165,32 @@ Windows 程序（`git`、`node`、`python`…）按 PATH 调用，不在此列�
 
 ### jq（内置最小子集）
 
-PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使用内置版。支持 `.`、`.a.b`、`.[n]`、`.[]`、后缀 `?`、`|`、`,`、`[...]`、`{k: v}`、`$var`、比较与 `and/or//`、算术，以及 keys、keys_unsorted、length、select、map、not、empty、type、add、has；选项支持 `-r -c -e -n -s --arg --argjson`。输出格式与退出码对齐 jq 1.7。不支持的语法报 `jq: error: unsupported` 并返回 3。
+PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使用内置版。输出格式与退出码对齐 jq 1.7（对照用例逐条和真 jq 1.7 比过）。
+
+- **支持**：`.`、`.a.b`、`."a"`、`.["k"]`、`.[n]`（含负下标）、`.[]`、后缀 `?`、`|`、`,`、`( )`、`[...]`、`{k: v}` / `{k}`、`$var`、
+  比较 `== != < <= > >=`、`and` / `or` / `//`、`not`、算术 `+ - * / %`；函数 `keys`、`keys_unsorted`、`length`、`select(f)`、`map(f)`、
+  `empty`、`type`、`add`、`has(k)`、`to_entries`、`from_entries`、`with_entries(f)`（0.1.1 新增后三个；`from_entries` 按 jq 1.7
+  的规则取键 `key` / `name` / `Name` / `Key`、取值 `value`，键不是字符串时报错）。
+- **选项**：`-r` / `--raw-output`、`-j` / `--join-output`（0.1.1 新增：同 `-r`，且每个结果后不加换行）、`-c`、`-e`、`-n`、`-s`、
+  `--arg`、`--argjson`，短选项可合写（`-rc`、`-jc`）。
+- **不支持**（报 `jq: error: unsupported` 并返回 3；不认识的选项返回 2）：`reduce` / `foreach`、`if … then … else … end`、`as $x` 绑定、
+  `def` 自定义函数、字符串插值 `"\(.a)"`、切片 `.[1:2]`、递归 `..`、赋值 / 更新 `=` `|=` `+=`、`@csv` / `@tsv` / `@base64` 等格式化、
+  `tostring` / `tonumber` / `split` / `join` / `test` / `sort_by` / `group_by` / `unique` / `paths` 等其余内建函数、`--tab` / `--indent` /
+  `--slurpfile` / `--rawfile` 等选项。需要这些时装一个真 jq 放进 PATH（内置版只在找不到 jq 时才用）。
+
+### read 与逐行读取
+
+0.1.1 修复了 0.1.0 的回归：在 Windows 上，`read` 从**管道、here-string（`<<<`）、here-document（`<<EOF`）**读时只读到第一行
+（`cmd | while read -r l`、`while read …; done <<< "$x"` 只处理第一条，且退出码为 0）。原因是只有常规文件才该一次读一整块，
+而判断「是不是常规文件」用的方法在 Windows 上把匿名管道也当成了文件。现在只有确认可以 seek 的磁盘文件才按块读、读完把文件位置
+退回本行末尾（与 bash 一致），管道 / FIFO / 控制台一律逐字节读，多读的字节不会在两次 `read` 之间丢失。
+
+实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe）：
+
+- `cmd | while read -r l`、`find … | while read -r f`、`while read …; done <<< "$x"`、`while read …; done <<EOF`、
+  `{ read a; read b; read c; }` 连续读、`read` 之后接 `cat` 读剩下的内容（管道 / heredoc / 文件 / `exec 3<file` 都对）；
+- `read -n N`、`read -d 分隔符`、`read -t 秒数`（含 `-t 0` 只探测）都正常；最后一行没有换行时 `read` 返回 1 且变量里是这行内容，与 bash 相同；
+- `readarray` / `mapfile` 从管道读（`cmd | { readarray -t a; …; }`、`readarray -t a < <(cmd)`）正常，需要整段读进数组时可以用它。
 
 ## 验证
 
@@ -177,7 +204,7 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ## 与 dsh-flash-presets 同时安装
 
-dsh-flash-presets 0.3.4 起把本包当作可选依赖，在 `flash-presets` 一行下作为 `flashSh` 子功能挂上（默认关）。两种装法可以并存：
+dsh-flash-presets 0.3.4 起（需要 presets ≥ 0.3.4，尚未发布）把本包当作可选依赖，在 `flash-presets` 一行下作为 `flashSh` 子功能挂上（默认关）。两种装法可以并存：
 
 - 插件页上，presets 那边**不新增组件**，仍然只有「Flash 精简预设」一行；单独装的本包是另一行 `flash-sh-standalone`；
 - 工具名都叫 `flash_sh`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
@@ -205,6 +232,9 @@ dsh-flash-presets 0.3.4 起把本包当作可选依赖，在 `flash-presets` 一
 ```bash
 npm test                                   # unit（必跑，不需要 DSH 与二进制；包内与仓库内都能跑）
 FLASH_SH_TEST_BIN=/path/to/flash-sh npm test   # + host：真实 cordis + dsh-tools 宿主（需要能解析到 @deepseek-ai/*，否则自动跳过）
+                                           #   + read 回归：直接跑该可执行文件（管道 / here-string / heredoc 逐行读取，test/read-regress.mjs）
+DSH_HOST_NM=/path/to/node_modules FLASH_SH_TEST_BIN=... node test/host.mjs   # host 换一套宿主包跑；实测 DSH 0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.5 都通过
+                                           #   （0.2.2 起没有 tools.sdkSchemas、执行要挂 tool executor：测试会自动检测并挂上 native executor）
 DSH_REAL_NM=/path/to/dsh-install/node_modules FLASH_SH_TEST_BIN=... npm test   # 再加真实 DSH 安装的 plugin add / dump-config / 启动（需要 bash）
 ```
 
