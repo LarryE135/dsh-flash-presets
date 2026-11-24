@@ -1453,7 +1453,6 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
       if (isPresets) setPresetsIntent("none");
       return;
     }
-    if (cfg.approval === "off") log("warn", "approval is off: flash_sh runs every command without asking, outside the DSH sandbox");
     const definition = toolDefinition(ctx, cfg, d.bin, { log });
     const c = coordinator();
     const key = registryKey(registry);
@@ -1484,6 +1483,8 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
           c.ours.add(definition);
           claim.active = true;
           log("info", "flash_sh registered (" + d.bin + ")" + (claim.waiting ? " (took over after the other flash_sh went away)" : ""));
+          // 只在真正生效时提醒（让位的那一行配置不生效，提醒它反而误导）
+          if (cfg.approval === "off") log("warn", "approval is off: flash_sh runs every command without asking, outside the DSH sandbox");
           claim.waiting = false;
         } catch (error) {
           claim.waiting = true;
