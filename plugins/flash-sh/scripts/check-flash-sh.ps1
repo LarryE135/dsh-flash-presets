@@ -40,7 +40,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$ExpectedSha256 = 'b9493d31c0eed516f5d890c7e098cd5b8d0071f83b6f80beeee3b6bf1cd46379'
+$ExpectedSha256 = 'e4951f47fe731acc0eef457f018e801778a05b960a5a6ad52f6e5377432476bb'
 $RowId = 'flash-sh-standalone'
 $PackageName = 'dsh-flash-sh'
 
