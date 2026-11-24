@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Flash lean presets",
-    "description": "Two agent presets tuned for DeepSeek V4.1 Flash (lean-v3 / balance), plus plan mode, a run_code speed-up, legacy-session compatibility and an opt-in delivery gate.",
+    "description": "Two agent presets tuned for DeepSeek V4.1 Flash (lean-v3 / balance), plus plan mode, a run_code speed-up, legacy-session compatibility, and an opt-in delivery gate and Windows Bash tool (flash_sh).",
     "detail": "docs/plugin-detail.en.md"
   }
 }

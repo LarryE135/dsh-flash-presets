@@ -12,6 +12,9 @@ import { coreStatus } from "../lib/core.js";
 import core from "../lib/core.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const problems = [];
 const check = (ok, label, detail) => {
@@ -105,6 +108,7 @@ for (const old of ["flash-presets-core", "flash-presets-alias", "plan-mode-ui", 
   check(!new RegExp("^\\s*- id: " + old + "$", "m").test(composed), "组合配置里不再有旧行 " + old);
 }
 const ro = await import("../lib/row-overrides.js");
+const BUNDLE_DEFAULTS_HAS_FLASH = (m) => m.BUNDLE_DEFAULTS.flashSh && m.BUNDLE_DEFAULTS.flashSh.enabled === false;
 const flashRow = rowOf("flash-presets") || "";
 const expectBlock = ["      config:", ...Object.entries(ro.BUNDLE_DEFAULTS).flatMap(([k, v]) => ["        " + k + ":", ...Object.entries(v).map(([k2, v2]) => "          " + k2 + ": " + v2)])].join("\n");
 check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expectBlock), "flash-presets 行指向包根且默认值 = BUNDLE_DEFAULTS", flashRow.slice(0, 400));
@@ -149,6 +153,73 @@ check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expect
   for (const [k, v] of Object.entries(st.features)) {
     if (k === "planMode" || k === "deliveryGate") check(v === "mounted" || /^load-failed/.test(v), k + " 已挂载或明确记为 load-failed", v);
   }
+}
+
+// ⑦ flashSh 子功能（0.3.4）：实现只在可选依赖 dsh-flash-sh 里；默认关；非 Windows x64 不加载；加载失败只写 info；
+//   与单独安装的 dsh-flash-sh 同时启用时只注册一个（由 dsh-flash-sh 的协调器保证，这里验证本行用 owner=dsh-flash-presets 挂载）。
+{
+  check(!fs.existsSync(path.join(root, "lib", "flash-sh.js")), "presets 的 lib/ 里没有 flash-sh.js 副本（单一来源：plugins/flash-sh）");
+  const pkgJ = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  check(typeof pkgJ.optionalDependencies?.["dsh-flash-sh"] === "string" && !pkgJ.dependencies?.["dsh-flash-sh"], "dsh-flash-sh 只作为 optionalDependencies 声明", JSON.stringify(pkgJ.optionalDependencies));
+  check(!pkgJ.files.some((f) => /^plugins|vendor/.test(f)), "presets 的 files 不带 plugins/ 与 vendor/（exe 不进 presets 包）", JSON.stringify(pkgJ.files));
+  const flashPkg = JSON.parse(fs.readFileSync(path.join(root, "plugins", "flash-sh", "package.json"), "utf8"));
+  check(JSON.stringify(flashPkg.os) === '["win32"]' && JSON.stringify(flashPkg.cpu) === '["x64"]', "dsh-flash-sh 声明 os:[win32] cpu:[x64]（非 Windows x64 上 npm/pnpm 跳过可选依赖）");
+  const { satisfies } = await (async () => { try { return await import("semver"); } catch { return { satisfies: null }; } })();
+  if (satisfies) check(satisfies(flashPkg.version, pkgJ.optionalDependencies["dsh-flash-sh"]), "optionalDependencies 的范围覆盖仓库里 dsh-flash-sh 的版本（" + flashPkg.version + "）");
+  check(BUNDLE_DEFAULTS_HAS_FLASH(ro), "BUNDLE_DEFAULTS.flashSh.enabled === false（默认关）");
+  const bundle = await import("../lib/bundle.js");
+  const P = bundle.planFlashSh;
+  check(P({}, {}, "win32", "x64").state === "off" && P({ enabled: true }, { DSH_FLASH_SH: "0" }, "win32", "x64").state === "off", "flashSh 默认关；DSH_FLASH_SH=0 压过 enabled");
+  check(P({}, { DSH_FLASH_SH: "1" }, "win32", "x64").load === true, "DSH_FLASH_SH=1 打开（与 dsh-flash-sh 自己的开关语义一致）");
+  const lin = P({ enabled: true }, {}, "linux", "x64");
+  check(lin.load === false && /^skipped: linux-x64$/.test(lin.state) && /只在 Windows x64/.test(lin.log), "Linux 上启用：跳过，不加载，一行 info");
+  check(P({ enabled: true }, {}, "win32", "arm64").load === false, "Windows arm64：跳过");
+  check(P({ enabled: true, allowNonWindows: true }, {}, "linux", "x64").load === true && P({ enabled: true }, { DSH_FLASH_SH_ANY_PLATFORM: "1" }, "darwin", "arm64").load === true, "allowNonWindows / DSH_FLASH_SH_ANY_PLATFORM=1：开发模式照样加载");
+  // 旧行 flash-sh（feat/flash-sh 预览版）换算；flash-sh-standalone 不换算、只提示
+  const c = ro.collectRowOverrides([
+    { id: "flash-sh", config: { enabled: true, timeoutMs: 5000 } },
+    { id: "flash-sh-standalone", config: { enabled: true } },
+  ]);
+  const e = ro.effectiveConfig({ flashSh: { enabled: false } }, c);
+  check(c.found.length === 1 && c.found[0].id === "flash-sh" && e.flashSh.enabled === true && e.flashSh.timeoutMs === 5000, "旧行 flash-sh 的覆盖换算到 flashSh", JSON.stringify(e.flashSh));
+  check(Array.isArray(c.standalone) && c.standalone.includes("config.enabled") && ro.effectiveConfig({}, ro.collectRowOverrides([{ id: "flash-sh-standalone", config: { enabled: true } }])).flashSh.enabled === false, "flash-sh-standalone 的覆盖不换算（只记下来提示）");
+  // 挂载：用替身模块验证 owner、配置透传、失败只写 info
+  const run = async (cfg, loader) => {
+    bundle._setFlashShLoader(loader);
+    const mounted = [];
+    const logs = [];
+    const fakeCtx = { get: () => undefined, plugin: (p, conf) => { mounted.push({ p, conf }); } };
+    const saved = { info: console.info, warn: console.warn, error: console.error };
+    console.info = console.warn = console.error = (...a) => logs.push(a.join(" "));
+    try { await bundle.apply(fakeCtx, { ...ro.BUNDLE_DEFAULTS, flashSh: cfg }); } finally { Object.assign(console, saved); bundle._setFlashShLoader(undefined); }
+    return { mounted, logs, st: bundle.bundleState() };
+  };
+  const savedEnv = { DSH_FLASH_SH: process.env.DSH_FLASH_SH, ANY: process.env.DSH_FLASH_SH_ANY_PLATFORM };
+  delete process.env.DSH_FLASH_SH;
+  delete process.env.DSH_FLASH_SH_ANY_PLATFORM;
+  let loads = 0;
+  const owners = [];
+  const stub = async () => { loads += 1; return { createPlugin: ({ owner }) => { owners.push(owner); return { name: "dsh-flash-sh", inject: ["tools"], apply() {} }; } }; };
+  let r = await run({ enabled: false }, stub);
+  check(loads === 0 && r.st.features.flashSh === "off" && !r.mounted.some((m) => m.p.name === "dsh-flash-sh"), "默认关：不 import dsh-flash-sh");
+  r = await run({ enabled: true, allowNonWindows: true, approval: "read-only" }, stub);
+  const fm = r.mounted.find((m) => m.p.name === "dsh-flash-sh");
+  check(loads === 1 && owners[0] === "dsh-flash-presets" && fm && fm.conf.approval === "read-only" && r.st.features.flashSh === "mounted", "启用（开发模式）：动态 import，createPlugin({owner:'dsh-flash-presets'}) 挂载，配置原样透传", JSON.stringify(r.st.features));
+  check(r.logs.some((l) => /flashSh=mounted/.test(l)), "汇总日志带 flashSh 状态");
+  r = await run({ enabled: true, allowNonWindows: true }, async () => { throw new Error("Cannot find package 'dsh-flash-sh'"); });
+  check(r.st.features.flashSh.startsWith("unavailable") && r.st.features.alias === "mounted" && r.st.features.core === "mounted" && r.logs.filter((l) => /加载不到 dsh-flash-sh/.test(l)).length === 1 && !r.logs.some((l) => /flashSh.*(error|失败)/i.test(l) && !/加载不到/.test(l)), "依赖没装上：一行 info、其它功能照常", JSON.stringify(r.st.features));
+  if (process.platform !== "win32" || process.arch !== "x64") {
+    loads = 0;
+    r = await run({ enabled: true }, stub);
+    check(loads === 0 && r.st.features.flashSh.startsWith("skipped:") && r.logs.filter((l) => /只在 Windows x64 上可用/.test(l)).length === 1, "本机（非 Windows x64）启用：不 import，一行 info", JSON.stringify(r.st.features));
+  }
+  r = await run({ enabled: true, allowNonWindows: true }, async () => ({ default: { name: "dsh-flash-sh", apply() {} } }));
+  check(/版本过旧/.test(r.st.features.flashSh), "装的是没有 createPlugin 的旧版：跳过并说明");
+  if (savedEnv.DSH_FLASH_SH !== undefined) process.env.DSH_FLASH_SH = savedEnv.DSH_FLASH_SH;
+  if (savedEnv.ANY !== undefined) process.env.DSH_FLASH_SH_ANY_PLATFORM = savedEnv.ANY;
+  // 真实模块（仓库里的 plugins/flash-sh）：createPlugin 存在、owner 优先级 presets > standalone
+  const real = await import("../plugins/flash-sh/lib/index.js");
+  check(typeof real.createPlugin === "function" && real.OWNERS["dsh-flash-presets"].priority > real.OWNERS["dsh-flash-sh"].priority, "dsh-flash-sh 导出 createPlugin，presets 的 flashSh 优先于独立行");
 }
 
 if (problems.length > 0) {

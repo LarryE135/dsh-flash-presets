@@ -122,6 +122,9 @@
       "optional": true
     }
   },
+  "optionalDependencies": {
+    "dsh-flash-sh": "^0.1.0"
+  },
   "dsh": {
     "bundle": {
       "patch": "cordis.patch.yml"

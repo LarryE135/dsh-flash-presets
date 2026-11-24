@@ -13,6 +13,8 @@
 *.bat   text eol=crlf
 *.png   binary
 *.zip   binary
+# flash-sh.exe（plugins/flash-sh/vendor）：按字节保存，sha256 在 .sha256 与 check-flash-sh.ps1 里各记一份
+*.exe   binary
 # plugins/ 只在仓库里做版本管理，不随 git archive 进 Release 包（预设包本身不需要它们）
 plugins/ export-ignore
 # 办公基准测试：inputs 必须按字节保留（含 UTF-8 BOM 与 CRLF），否则 input_manifest 的 sha256 全部失效。

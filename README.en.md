@@ -215,9 +215,29 @@ The same card also ships a delivery gate (the `delivery-gate` row up to 0.3.2, t
 - **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row — `enabled: false` / `maxRounds: 2`, with the acceptance script picked per platform: `verify.ps1` first on Windows, `verify.sh` elsewhere). On 0.3.0 the only route is git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`. npm 0.3.1, 0.3.2 (official) and the mis-published 0.3.3 all carry it, so there is **no need to wait for a future release**.
 
 
+## flash_sh, a Bash tool for Windows (optional component, off by default)
+
+From 0.3.4 the same row also has a `flashSh` section: on **Windows x64** it gives the model a Bash-compatible shell tool, `flash_sh`
+(a single-file Rust interpreter, `flash-sh.exe`; no Git Bash / WSL needed; it does not take the `bash` / `pwsh` / `run_code` names).
+
+- **Where it comes from**: the implementation lives only in the separate package [`dsh-flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md). This package lists it under
+  `optionalDependencies`, and its `package.json` declares `os: ["win32"]`, `cpu: ["x64"]`: the plugin manager (pnpm) installs it on Windows x64 and
+  **skips it on macOS / Linux / Windows ARM64 without downloading the 7.9 MB exe and without an error**. The plugin page gains no extra component.
+- **Turning it on**: `- id: flash-presets` with `config.flashSh.enabled: true` in the profile patch, or the user environment variable `DSH_FLASH_SH=1`
+  (not in `.env`). The other fields (`approval`, `approvalMemory`, `timeoutMs`, `maxOutputBytes`, `binPath`, …) go in the same section; see the dsh-flash-sh README.
+- **Safety**: `flash_sh` is not confined by the DSH file sandbox. The default `approval: sandboxed` asks you unless the session has full access (it also asks
+  when the session mode cannot be read, and refuses to run when the approval call fails). Within one session a kind of command is asked once; dangerous
+  commands (`rm -rf`, writes outside the workspace, `bash -c` / `eval` / inline code, …) are asked every time. The child process does not see environment
+  variables whose names contain `KEY` / `PASSWORD` / `SECRET` / `TOKEN`, nor any `DSH_*`. `approval: off` lets the model run anything on your machine
+  without confirmation; use it only in a throwaway environment.
+- **Startup log**: enabled on a non-Windows-x64 host it writes one line, `[flash-presets] flashSh 已启用，但 flash_sh 只在 Windows x64 上可用…`; when the
+  optional dependency is missing, one line `…加载不到 dsh-flash-sh…`. Nothing else is affected.
+- **Alongside a separately installed dsh-flash-sh**: with both enabled only one `flash_sh` is registered; this row wins and the standalone row logs that it
+  steps aside. Turn this one off and the standalone row takes over.
+
 ## Runtime switches
 
-From 0.3.4 the run_code speed-up, plan mode, legacy-session support and the delivery gate all hang off the bundle's single `flash-presets` row, so the plugin page shows one component for them. Each feature starts once the host services it needs are present; a missing service only holds back its own feature (on the desktop app without `webServer`, only plan mode waits). Switch them in the profile patch (`~/.dsh/profiles/<name>/cordis.patch.yml`):
+From 0.3.4 the run_code speed-up, plan mode, legacy-session support, the delivery gate and flash_sh all hang off the bundle's single `flash-presets` row, so the plugin page shows one component for them. Each feature starts once the host services it needs are present; a missing service only holds back its own feature (on the desktop app without `webServer`, only plan mode waits). Switch them in the profile patch (`~/.dsh/profiles/<name>/cordis.patch.yml`):
 
 ```yaml
 - id: flash-presets
@@ -226,11 +246,12 @@ From 0.3.4 the run_code speed-up, plan mode, legacy-session support and the deli
     alias:           { enabled: true }   # legacy preset ids (old sessions may not open when off)
     planMode:        { enabled: true }   # plan-mode host; todoSync / lagTurns / compositionCheck go here too
     deliveryGate:    { enabled: true }   # delivery gate (default false); maxRounds / scripts / timeoutMs go here too
+    flashSh:         { enabled: true }   # Bash tool flash_sh on Windows x64 (default false); approval / timeoutMs etc. go here too
 ```
 
-Write only the sections you change; the rest keep the bundle defaults. Environment variables win over this: `DSH_FLASH_PRESETS_CONCURRENCY=0`, `DSH_FLASH_PRESETS_ALIAS=0`, `DSH_DELIVERY_GATE=0/1`.
+Write only the sections you change; the rest keep the bundle defaults. Environment variables win over this: `DSH_FLASH_PRESETS_CONCURRENCY=0`, `DSH_FLASH_PRESETS_ALIAS=0`, `DSH_DELIVERY_GATE=0/1`, `DSH_FLASH_SH=0/1`.
 
-Old form (up to 0.3.2) → new form: `flash-presets-core`'s `config.toolConcurrency` → `toolConcurrency`; `plan-mode-ui`'s `config` → `planMode`; `delivery-gate`'s `config` → `deliveryGate`; `disabled: true` on any old row → `enabled: false` in its section. The old form keeps working (when both are written, the new one wins).
+Old form (up to 0.3.2) → new form: `flash-presets-core`'s `config.toolConcurrency` → `toolConcurrency`; `plan-mode-ui`'s `config` → `planMode`; `delivery-gate`'s `config` → `deliveryGate`; `disabled: true` on any old row → `enabled: false` in its section. The old form keeps working (when both are written, the new one wins). The `flash-sh` row of the feat/flash-sh preview installer → `flashSh` (also translated); the standalone dsh-flash-sh row `flash-sh-standalone` is not translated (it is still a component of its own).
 
 ## Getting the most out of it
 
