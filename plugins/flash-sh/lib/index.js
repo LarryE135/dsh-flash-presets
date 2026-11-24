@@ -218,16 +218,26 @@ export function commandPreview(command, max = PREVIEW_MAX_CHARS) {
 }
 
 // ── 命令分类：会话级审批记忆的规则键 ＋ 危险判定 ─────────────────────────────────────────────
+//
+// 原则（2026-11-24 第二轮审计）：看不懂的写法一律每次都问。分类器只为「这一类是否已经批准过」服务，
+// 不是沙箱：它只在「可记忆」与「每次都问」之间选，判不准时一律选后者。
+// 命令名先归一化再比对名单：去掉路径（/usr/bin/rm、C:\…\cmd.exe）、盘符、结尾的点和空格、
+// 扩展名（.exe/.com/.bat/.cmd/.ps1…），并转小写（Windows 上 RM.exe = rm）。规则键仍用原样的命令名，
+// 所以 /usr/bin/rm、RM.exe 与 rm 是不同的类，彼此不能借用批准。
 const OPERATORS = ["&&", "||", ";;", "|&", "|", ";", "&", "(", ")", "\n"];
-const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "flash-sh", "flash-sh.exe", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe", "wsl", "wsl.exe", "busybox"]);
-const WRAPPERS = new Set(["sudo", "doas", "runas", "env", "nohup", "xargs", "timeout", "command", "builtin", "exec", "nice", "time", "stdbuf", "watch", "start", "parallel"]);
-const EVALS = new Set(["eval", "source", ".", "trap", "alias"]);
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "mksh", "fish", "csh", "tcsh", "ash", "yash", "flash-sh", "cmd", "powershell", "powershell_ise", "pwsh", "wsl", "busybox", "git-bash", "conhost", "wt"]);
+const WRAPPERS = new Set(["sudo", "doas", "runas", "su", "runuser", "gosu", "env", "nohup", "xargs", "timeout", "command", "builtin", "exec", "nice", "renice", "time", "stdbuf", "watch", "start", "parallel", "coproc", "setsid", "chroot", "flock", "ionice", "taskset", "chrt", "numactl", "cpulimit", "strace", "ltrace", "gdb", "lldb", "valgrind", "script", "unbuffer", "faketime", "fakeroot", "firejail", "proot", "catchsegv", "entr", "vim", "vi", "nvim", "view", "ex", "ed", "emacs", "call", "npx", "bunx", "pnpx", "uvx", "pipx", "dotnet-script", "cmdkey", "psexec", "wmic", "forfiles", "at"]);
+const EVALS = new Set(["eval", "source", ".", "trap", "alias", "enable", "hash", "fc", "bind", "complete", "compgen"]);
 const KEYWORDS = new Set(["if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "{", "}", "[[", "]]"]);
-const INTERPRETERS = new Set(["node", "node.exe", "python", "python3", "python.exe", "py", "ruby", "perl", "php", "deno", "bun", "lua", "Rscript"]);
-const INLINE_CODE_FLAGS = new Set(["-c", "-e", "--eval", "-p", "--print", "-r", "-command", "-Command", "-EncodedCommand", "/c", "/C", "/k", "/K"]);
-const WRITE_ALL_ARGS = new Set(["touch", "mkdir", "rm", "rmdir", "tee", "truncate", "chmod", "chown", "chgrp", "unlink", "shred", "del", "rd"]);
-const WRITE_LAST_ARG = new Set(["cp", "mv", "ln", "install", "rsync", "scp"]);
-const ALWAYS_DANGEROUS = new Set(["dd", "mkfs", "format", "diskpart", "reg", "regedit", "shutdown", "reboot", "halt", "poweroff", "kill", "killall", "pkill", "taskkill", "setx", "schtasks", "sc", "net", "netsh", "icacls", "takeown", "bcdedit", "chsh", "crontab", "systemctl", "launchctl", "curl", "wget", "ssh", "scp", "rsync", "nc", "ncat", "telnet", "ftp"]);
+const INTERPRETER_RE = /^(python[\d.]*|pythonw[\d.]*|py|pypy[\d.]*|node|nodejs|deno|bun|ts-node|tsx|ruby[\d.]*|irb|jruby|perl[\d.]*|php[\d.]*|lua[\d.]*|luajit|tclsh[\d.]*|wish[\d.]*|rscript|r|julia|osascript|jshell|groovy|scala|kotlin|kotlinc|swift|csi|jrunscript|cscript|wscript|mshta|awk|gawk|mawk|nawk)$/;
+const AWKS = new Set(["awk", "gawk", "mawk", "nawk"]);
+// 改变权限 / 链接 / 系统状态 / 网络 / 进程 / 补丁：每次都问
+const ALWAYS_DANGEROUS = new Set(["dd", "mkfs", "format", "diskpart", "fdisk", "parted", "mount", "umount", "reg", "regedit", "regsvr32", "rundll32", "msiexec", "certutil", "bitsadmin", "shutdown", "reboot", "halt", "poweroff", "kill", "killall", "pkill", "taskkill", "tskill", "setx", "schtasks", "sc", "net", "netsh", "icacls", "cacls", "takeown", "attrib", "bcdedit", "chsh", "crontab", "systemctl", "service", "launchctl", "curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "netcat", "socat", "telnet", "ftp", "tftp", "chmod", "chown", "chgrp", "chattr", "setfacl", "xattr", "ln", "mklink", "junction", "patch", "mshta", "wscript", "cscript", "explorer", "invoke-expression", "iex", "useradd", "userdel", "usermod", "passwd", "visudo", "apt", "apt-get", "yum", "dnf", "pacman", "brew", "choco", "winget", "scoop", "robocopy", "xcopy"]);
+const WRITE_ALL_ARGS = new Set(["touch", "mkdir", "rm", "rmdir", "tee", "truncate", "unlink", "shred", "del", "erase", "rd", "mv", "move", "ren", "rename"]);
+const WRITE_LAST_ARG = new Set(["cp", "copy", "install"]);
+// 按名字给变量赋值的内建命令：给下面这些变量赋值会改变之后命令的查找 / 执行方式
+const ASSIGNING_BUILTINS = new Set(["export", "declare", "typeset", "local", "readonly", "read", "printf", "mapfile", "readarray", "let", "getopts", "unset"]);
+const DANGER_VAR = /^(PATH|PATHEXT|COMSPEC|IFS|ENV|BASH_ENV|BASH_LOADABLES_PATH|SHELLOPTS|BASHOPTS|PS4|PROMPT_COMMAND|CDPATH|GLOBIGNORE|HOME|USERPROFILE|TMPDIR|TEMP|TMP|EDITOR|VISUAL|PAGER|MANPAGER|BROWSER|LESSOPEN|LESSCLOSE|LD_\w*|DYLD_\w*|NODE_OPTIONS|NODE_PATH|NODE_REPL_EXTERNAL_MODULE|PYTHON\w*|PERL\w*|RUBY\w*|GEM_\w*|GIT_\w*|NPM_CONFIG_\w*|SSH_\w*|BASH_FUNC_\w*)$/i;
 
 /** 把命令切成词与运算符（理解引号与反斜杠；只为分类，不做展开）。 */
 function lex(command) {
@@ -235,26 +245,34 @@ function lex(command) {
   const flags = { substitution: false, heredoc: false, unbalanced: false, background: false };
   let i = 0;
   const s = command;
-  let word = null; // { text, quoted, dollar }
-  const flush = () => { if (word !== null) { tokens.push({ type: "word", ...word }); word = null; } };
-  const ensure = () => { if (word === null) word = { text: "", quoted: false, dollar: false }; return word; };
+  // text：去掉引号/转义后的字面；bare：未加引号、未转义的字符（判断 glob / 花括号 / ~ 展开用）；raw：原文
+  let word = null;
+  const flush = () => {
+    if (word !== null) { tokens.push({ type: "word", ...word, raw: s.slice(word.start, i) }); word = null; }
+  };
+  const ensure = () => { if (word === null) word = { text: "", bare: "", quoted: false, dollar: false, start: i }; return word; };
   while (i < s.length) {
     const c = s[i];
     if (c === "\\") {
       if (s[i + 1] === "\n") { i += 2; continue; }
-      ensure().text += s[i + 1] ?? "";
+      const w = ensure();
+      w.text += s[i + 1] ?? "";
+      w.bare += "\u0000"; // 占位：转义过的字符不参与展开
       i += 2;
       continue;
     }
     if (c === "'") {
       const end = s.indexOf("'", i + 1);
-      if (end < 0) { flags.unbalanced = true; ensure().text += s.slice(i + 1); i = s.length; continue; }
-      const w = ensure(); w.text += s.slice(i + 1, end); w.quoted = true;
+      const w = ensure();
+      w.quoted = true;
+      if (end < 0) { flags.unbalanced = true; w.text += s.slice(i + 1); i = s.length; continue; }
+      w.text += s.slice(i + 1, end);
+      w.bare += "\u0000";
       i = end + 1;
       continue;
     }
     if (c === '"') {
-      const w = ensure(); w.quoted = true;
+      const w = ensure(); w.quoted = true; w.bare += "\u0000";
       i += 1;
       let closed = false;
       while (i < s.length) {
@@ -269,10 +287,10 @@ function lex(command) {
       if (!closed) flags.unbalanced = true;
       continue;
     }
-    if (c === "`") { flags.substitution = true; ensure().text += c; i += 1; continue; }
+    if (c === "`") { flags.substitution = true; const w = ensure(); w.text += c; w.bare += c; i += 1; continue; }
     if (c === "$") {
-      if (s[i + 1] === "(" ) flags.substitution = true;
-      const w = ensure(); w.dollar = true; w.text += c; i += 1;
+      if (s[i + 1] === "(") flags.substitution = true;
+      const w = ensure(); w.dollar = true; w.text += c; w.bare += c; i += 1;
       continue;
     }
     if (c === "#" && word === null) {
@@ -304,76 +322,174 @@ function lex(command) {
       i += op.length;
       continue;
     }
-    ensure().text += c;
+    const w = ensure();
+    w.text += c;
+    w.bare += c;
     i += 1;
   }
   flush();
   return { tokens, flags };
 }
 
-const isMsysDrive = (p) => /^\/[a-zA-Z](\/|$)/.test(p);
+/** 词里有没有会展开的东西（未加引号的 glob / 花括号 / 开头的 ~ / $）。 */
+function expansionOf(word) {
+  const b = word.bare ?? "";
+  const kinds = [];
+  if (word.dollar) kinds.push("$");
+  if (/[*?[]/.test(b) || /[@!+*?]\(/.test(b)) kinds.push("glob");
+  if (/\{[^}]*(,|\.\.)[^}]*\}/.test(b)) kinds.push("brace");
+  if (b.startsWith("~")) kinds.push("~");
+  return kinds;
+}
 
-/** 写目标是否落在工作区外（或无法判定）。/dev/null 等与临时目录（/tmp、os.tmpdir()）不算外部。 */
-export function isOutsideWorkspace(target, { cwd, workspace, platform = process.platform, tmpdir = os.tmpdir() } = {}) {
+/** 命令名归一化（只用于比对名单）：两种读法（反斜杠被 shell 吃掉 / 当作 Windows 路径分隔符）都算。 */
+export function commandNames(text, raw = text) {
+  const out = new Set();
+  for (const candidate of [text, raw]) {
+    if (typeof candidate !== "string") continue;
+    let n = candidate.replace(/["']/g, "").replace(/\\/g, "/");
+    n = n.slice(n.lastIndexOf("/") + 1);
+    n = n.replace(/^[a-zA-Z]:/, "").replace(/[.\s]+$/, "").toLowerCase();
+    out.add(n);
+    out.add(n.replace(/\.(exe|com|bat|cmd|ps1|vbs|vbe|js|wsf|msc|cpl|scr)$/, ""));
+  }
+  out.delete("");
+  return [...out];
+}
+
+const isMsysDrive = (p) => /^\/[a-zA-Z](\/|$)/.test(p);
+const isUncLike = (p) => /^[\\/]{2}/.test(p);
+const WIN_DEVICE = /^(con|prn|aux|com\d|lpt\d|conin\$|conout\$)(\.[^\\/]*)?$/i;
+
+/** 最深的已存在祖先做 realpath，再接上剩下的部分；任何异常返回 undefined（调用方按外部算）。 */
+function realpathLoose(abs, P) {
+  let cur = abs;
+  const rest = [];
+  for (let guard = 0; guard < 256; guard++) {
+    try {
+      const real = (fs.realpathSync.native ?? fs.realpathSync)(cur);
+      return rest.length ? P.join(real, ...rest.reverse()) : real;
+    } catch (error) {
+      if (error && error.code !== "ENOENT" && error.code !== "ENOTDIR") return undefined;
+      const parent = P.dirname(cur);
+      if (parent === cur) return undefined;
+      rest.push(P.basename(cur));
+      cur = parent;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 写目标是否落在工作区外（或无法判定）。/dev/null、NUL 与临时目录（/tmp、os.tmpdir()）不算外部。
+ * UNC（\\server\share、//server/share、\\.\设备）与 CON/COM1 等设备名一律算外部。
+ * followLinks（默认：platform 与本机一致时开）：目标在字面上位于工作区内时，再按真实路径（解开符号链接 / 联接点）复核；
+ * UNC 路径不做 realpath（避免为了判定而去连网络共享）。
+ */
+export function isOutsideWorkspace(target, { cwd, workspace, platform = process.platform, tmpdir = os.tmpdir(), followLinks } = {}) {
   if (typeof target !== "string" || target === "") return true;
   if (/^\/dev\/(null|stdout|stderr|tty)$/.test(target) || /^nul$/i.test(target)) return false;
   if (/[$`]/.test(target) || target.startsWith("~")) return true; // 展开后才知道 → 按外部算
   if (workspace === undefined || cwd === undefined) return true;
-  const P = platform === "win32" ? path.win32 : path.posix;
+  const win = platform === "win32";
+  const P = win ? path.win32 : path.posix;
   let t = target;
-  if (platform === "win32" && isMsysDrive(t)) t = t[1] + ":" + (t.slice(2) || "\\");
+  if (win && isMsysDrive(t)) t = t[1] + ":" + (t.slice(2) || "\\");
+  if (win && (isUncLike(t) || WIN_DEVICE.test(P.basename(t)))) return true;
   if (t === "/tmp" || t.startsWith("/tmp/")) return false;
-  const abs = P.resolve(cwd, t.replace(/[*?[].*$/, "") || ".");
-  const inside = (root) => {
-    const rel = P.relative(P.resolve(root), abs);
+  if (win && isUncLike(cwd) && !isUncLike(workspace)) return true;
+  const abs = P.resolve(cwd, t);
+  const inside = (root, p = abs) => {
+    const rel = P.relative(P.resolve(root), p);
     return rel === "" || (!rel.startsWith("..") && !P.isAbsolute(rel));
   };
   if (inside(tmpdir)) return false;
-  return !inside(workspace);
+  if (!inside(workspace)) return true;
+  const follow = followLinks ?? (platform === process.platform);
+  if (!follow || isUncLike(abs)) return false;
+  const realAbs = realpathLoose(abs, P);
+  const realWs = realpathLoose(P.resolve(workspace), P);
+  if (realAbs === undefined || realWs === undefined) return true;
+  return !inside(realWs, realAbs);
 }
+
+/** 带展开的写目标取「确定的前缀」：花括号 / $ / ~、或 glob 所在的那一段以 . 或 [ 开头（可能匹配 ..）→ undefined（无法判定）。 */
+function globTargetPrefix(word) {
+  const kinds = expansionOf(word);
+  if (kinds.includes("brace") || kinds.includes("$") || kinds.includes("~")) return undefined;
+  if (!kinds.includes("glob")) return word.text;
+  const parts = word.text.split(/[\\/]/);
+  const bareParts = (word.bare ?? "").split(/[\\/]/);
+  const out = [];
+  for (let k = 0; k < parts.length; k++) {
+    const b = bareParts[k] ?? "";
+    if (/[*?[]/.test(b) || /[@!+*?]\(/.test(b)) {
+      if (/^[.[]/.test(parts[k]) || parts[k] === "") return undefined;
+      return out.length ? out.join("/") : ".";
+    }
+    out.push(parts[k]);
+  }
+  return word.text;
+}
+
+// 以 - 开头（含 '-rf' 这种整体加引号的：bash 去引号后照样当选项传给命令）才算选项
+const isFlag = (w) => w.text.startsWith("-") && w.text !== "-" && /^["']?-/.test(w.raw ?? w.text);
 
 /**
  * 给一条命令归类：
- *   key        会话级记忆的规则键：命令名集合（排序去重）＋特征（| 管道，> 写文件，& 后台）
+ *   key        会话级记忆的规则键：命令名集合（排序去重，原样）＋特征（| 管道，> 写文件，& 后台）
  *   cacheable  可否「批准一次、本会话不再问」
  *   reasons    不可记忆的原因（危险 / 无法可靠分析）
  */
 export function classifyCommand(command, ctx = {}) {
   const reasons = [];
+  const why = (r) => { if (!reasons.includes(r)) reasons.push(r); };
   const { tokens, flags } = lex(String(command));
-  if (flags.substitution) reasons.push("command substitution $(...) / `...` / <(...)");
-  if (flags.heredoc) reasons.push("here-document");
-  if (flags.unbalanced) reasons.push("unbalanced quotes");
+  if (flags.substitution) why("command substitution $(...) / `...` / <(...)");
+  if (flags.heredoc) why("here-document");
+  if (flags.unbalanced) why("unbalanced quotes");
   const heads = new Set();
   const features = new Set();
   if (flags.background) features.add("&");
+  const plat = ctx.platform ?? process.platform;
+  const PP = plat === "win32" ? path.win32 : path.posix;
   // 切段
   const segments = [];
   let cur = [];
   for (const t of tokens) {
     if (t.type === "op") {
       if (t.text === "|" || t.text === "|&") features.add("|");
-      if (t.text === "(" || t.text === ")" || t.text === ";;") { if (t.text === ";;") reasons.push("case statement"); }
+      if (t.text === ";;") why("case statement");
       segments.push(cur);
       cur = [];
     } else cur.push(t);
   }
   segments.push(cur);
+  // 写目标：{ w, cwds }；cwds 是这一段可能所在的目录（cd 之后会变；undefined = 不知道）
   const writeTargets = [];
-  let funcDef = /(^|[\s;&|({])function\s+[A-Za-z_]/.test(command) || /(^|[\s;&|({])[A-Za-z_][\w.:-]*\s*\(\s*\)/.test(command);
+  let cwds = [ctx.cwd];
+  const addTarget = (w) => writeTargets.push({ w, cwds: cwds.slice() });
+  const addTargetText = (text) => writeTargets.push({ w: { text, bare: text, dollar: /\$/.test(text), quoted: false }, cwds: cwds.slice() });
+  const outsideFor = (text, dirs) => dirs.some((d) => isOutsideWorkspace(text, { ...ctx, cwd: d }));
+  const valueWord = (text) => ({ text, bare: text, dollar: /\$/.test(text), quoted: false });
+  let funcDef = /(^|[\s;&|({])function\s+[A-Za-z_]/.test(command) || /(^|[\s;&|({])[^\s;&|(){}<>'"`$]+\s*\(\s*\)/.test(command);
   for (const seg of segments) {
     // 先收重定向目标
     const words = [];
     for (let k = 0; k < seg.length; k++) {
       const t = seg[k];
       if (t.type === "redir") {
-        const target = seg[k + 1];
-        if (target && target.type === "word") k += 1;
-        if (t.op === ">&" || t.op === "<&") { if (target && !/^\d+$|^-$/.test(target.text)) writeTargets.push(target.text); continue; }
+        const target = seg[k + 1] && seg[k + 1].type === "word" ? seg[k + 1] : undefined;
+        if (target) k += 1;
+        if (t.op === ">&" || t.op === "<&") {
+          if (target && !/^\d+-?$|^-$/.test(target.text)) { if (t.op === ">&") features.add(">"); addTarget(target); }
+          continue;
+        }
         if (t.op.startsWith(">") || t.op === "<>") {
-          if (target) {
-            if (!/^\/dev\/null$|^nul$/i.test(target.text)) features.add(">");
-            writeTargets.push(target.dollar ? "$" + target.text : target.text);
+          if (!target) { features.add(">"); why("redirection without a target"); }
+          else {
+            if (!(target.text === "/dev/null" || /^nul$/i.test(target.text))) features.add(">");
+            addTarget(target);
           }
         }
         continue;
@@ -381,59 +497,239 @@ export function classifyCommand(command, ctx = {}) {
       words.push(t);
     }
     let w = 0;
-    while (w < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[w].text) && !words[w].quoted) w += 1; // 前置赋值
+    // 前置赋值：给会改变命令查找 / 执行方式的变量赋值（PATH、LD_PRELOAD、BASH_ENV、IFS、GIT_*、NODE_OPTIONS…）→ 每次都问
+    while (w < words.length && /^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=/.test(words[w].text) && !/^["']/.test(words[w].raw ?? "")) {
+      const nm = words[w].text.replace(/(\[.*)?\+?=.*$/s, "");
+      if (DANGER_VAR.test(nm)) why("sets " + nm + " (changes how commands are found or run)");
+      w += 1;
+    }
     while (w < words.length && KEYWORDS.has(words[w].text) && !words[w].quoted) w += 1;
     if (w >= words.length) continue;
-    const head0 = words[w].text;
-    if (head0 === "for" || head0 === "select") continue; // for x in …：后面的词不是命令
-    if (head0 === "case") { reasons.push("case statement"); continue; }
+    const hw = words[w];
+    const head0 = hw.text;
+    if ((head0 === "for" || head0 === "select") && !hw.quoted) continue; // for x in …：后面的词不是命令
+    if (head0 === "case" && !hw.quoted) { why("case statement"); continue; }
     if (head0 === "function" || (words[w + 1] && words[w + 1].text === "()") || /\(\)$/.test(head0)) { funcDef = true; continue; }
-    const head = head0; // 原样作为键（带路径的写法与裸命令名是不同的键）
-    const base = path.posix.basename(head.replace(/\\/g, "/"));
-    const lc = base.toLowerCase();
+    const head = head0; // 原样作为键
+    const names = commandNames(head0, hw.raw);
+    const is = (set) => names.some((n) => set.has(n));
+    const lc = names[names.length - 1] ?? "";
     heads.add(head);
-    const args = words.slice(w + 1).map((x) => x.text);
-    const argsRaw = words.slice(w + 1);
-    if (words[w].dollar) reasons.push("command name comes from a variable");
-    if (SHELLS.has(lc)) reasons.push("runs another shell (" + base + ")");
-    if (WRAPPERS.has(lc)) reasons.push("wrapper command (" + base + ") runs an arbitrary command");
-    if (EVALS.has(lc)) reasons.push(base + " executes dynamic code");
-    if (ALWAYS_DANGEROUS.has(lc)) reasons.push(base + " is always confirmed");
-    if (INTERPRETERS.has(lc) && args.some((a) => INLINE_CODE_FLAGS.has(a))) reasons.push(base + " with inline code");
-    if (lc === "rm" || lc === "del" || lc === "rd" || lc === "rmdir") {
-      if (args.some((a) => /^-[a-zA-Z]*[rRf]/.test(a) || a === "--recursive" || a === "--force" || /^\/[sSqQ]$/.test(a))) reasons.push("recursive/forced delete (" + base + " " + args.filter((a) => a.startsWith("-") || a.startsWith("/")).join(" ") + ")");
+    const argsW = words.slice(w + 1);
+    const args = argsW.map((x) => x.text);
+    const headExp = expansionOf(hw);
+    if (hw.dollar) why("command name comes from a variable");
+    else if (headExp.length && head0 !== "[") why("command name uses shell expansion (" + headExp.join(", ") + ")");
+    if (/[=\u0000-\u001f]/.test(head0)) why("unusual command name");
+    if (is(SHELLS)) why("runs another shell (" + lc + ")");
+    if (is(WRAPPERS)) why("wrapper command (" + lc + ") runs an arbitrary command");
+    if (is(EVALS)) why(lc + " executes dynamic code or changes command lookup");
+    if (is(ALWAYS_DANGEROUS)) why(lc + " is always confirmed");
+    // 按名字赋值的内建命令碰到危险变量
+    if (is(ASSIGNING_BUILTINS)) {
+      const assigned = lc === "printf" ? argsW.filter((a, k) => k > 0 && argsW[k - 1].text === "-v") : argsW;
+      for (const a of assigned) {
+        const nm = a.text.replace(/^-+[A-Za-z]*\s*/, "").replace(/(\[.*)?\+?=.*$/s, "");
+        if (DANGER_VAR.test(nm)) why(lc + " assigns " + nm + " (changes how commands are found or run)");
+      }
+      if ((lc === "mapfile" || lc === "readarray") && args.some((a) => /^-[a-zA-Z]*C/.test(a))) why(lc + " -C runs a callback");
     }
-    if (lc === "find" && args.some((a) => a === "-delete" || a === "-exec" || a === "-execdir" || a === "-ok")) reasons.push("find -delete/-exec");
+    // 位置参数（-- 之后都是位置参数）
+    const positional = [];
+    {
+      let dd = false;
+      for (const a of argsW) {
+        if (!dd && !a.quoted && a.text === "--") { dd = true; continue; }
+        if (!dd && isFlag(a)) continue;
+        positional.push(a);
+      }
+    }
+    // 解释器：只认「解释器 + 脚本文件（+ 参数）」；内联代码、从 stdin 读代码、预加载模块 → 每次都问
+    if (names.some((n) => INTERPRETER_RE.test(n)) && !is(SHELLS)) {
+      const isAwk = is(AWKS);
+      let script;
+      let inline = false;
+      for (let k = 0; k < argsW.length; k++) {
+        const a = argsW[k];
+        const x = a.text;
+        if (isFlag(a)) {
+          if (isAwk) {
+            if (/^-(f|-file|E|-exec|l|-load|i|-include)/.test(x)) inline = true; // 程序在文件里 / 加载扩展：看不见
+            if (/^-[vF]$/.test(x)) k += 1;
+            continue;
+          }
+          if (/^--?(eval|print|command|exec|require|import|loader|experimental-loader|input-type|interactive|encodedcommand)\b/i.test(x)) { inline = true; break; }
+          if (x !== "-m" && /^-[A-Za-z]*[ceEprM]/.test(x)) { inline = true; break; }
+          if (x === "-m") { script = argsW[k + 1]; break; } // python -m module
+          if (/^-[WXQI]$/.test(x)) k += 1;
+          continue;
+        }
+        script = a;
+        break;
+      }
+      if (isAwk && !inline && script !== undefined) {
+        const prog = script.text;
+        if (/system\s*\(|(^|[^|])\|(?!\|)|\b(print|printf)\b[^;}]*>|@load|@include|ENVIRON\s*\[/.test(prog)) inline = true;
+      }
+      const onlyInfo = args.length > 0 && args.every((a) => /^(--?version|-V|--help|-h|-v)$/.test(a));
+      if (/^(deno|bun)$/.test(lc) && script && /^(eval|repl|x)$/.test(script.text)) inline = true;
+      if (inline) why(lc + " with inline code / preloaded modules");
+      else if (script === undefined && !onlyInfo) why(lc + " reads its program from stdin or a hidden source");
+    }
+    if (/^(rm|del|erase|rd|rmdir)$/.test(lc) || names.includes("rm")) {
+      if (args.some((a) => /^-[a-zA-Z]*[rRf]/.test(a) || /^--(recursive|force|no-preserve-root)/.test(a) || /^\/[sSqQ]$/.test(a))) why("recursive/forced delete (" + lc + " " + args.filter((a) => a.startsWith("-") || a.startsWith("/")).join(" ") + ")");
+    }
+    if (lc === "find" && args.some((a) => /^-(delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/.test(a))) why("find -delete/-exec/-fprint");
+    if (lc === "sed") {
+      if (args.some((a) => /^-[a-zA-Z]*f$/.test(a) || a.startsWith("--file"))) why("sed program from a file");
+      const scripts = [];
+      for (let k = 0; k < argsW.length; k++) {
+        if (/^-[a-zA-Z]*e$/.test(args[k]) || args[k] === "--expression") { if (argsW[k + 1]) scripts.push(args[k + 1]); k += 1; }
+        else if (args[k].startsWith("--expression=")) scripts.push(args[k].slice(13));
+      }
+      if (scripts.length === 0 && positional[0]) scripts.push(positional[0].text);
+      if (scripts.some((p) => /(^|[;\n{}])\s*([0-9$,]+|\/[^/]*\/)?\s*!?\s*[ewWrR](\s|$)|\/[gpiImMe0-9]*[ewW]\s*($|[;}\s])/.test(p))) why("sed program can run commands or write files (e/w)");
+    }
     if (lc === "git") {
-      const sub = args.find((a) => !a.startsWith("-"));
-      if (sub === "push" || sub === "clean" || (sub === "reset" && args.includes("--hard")) || (sub === "checkout" && args.includes("--")) || (sub === "branch" && args.some((a) => /^-[dD]$/.test(a)))) reasons.push("git " + sub + " (destructive or remote)");
+      // git 的全局选项：-C <dir>、-c k=v、--git-dir/--work-tree/--exec-path …
+      let k = 0;
+      const dirs = [];
+      while (k < args.length) {
+        const a = args[k];
+        if (a === "-C") { dirs.push(argsW[k + 1]); k += 2; continue; }
+        if (a === "-c" || a.startsWith("--config-env")) { why("git -c / --config-env can make git run arbitrary commands"); k += a === "-c" ? 2 : 1; continue; }
+        const m = /^--(git-dir|work-tree|exec-path|namespace|super-prefix)(=(.*))?$/.exec(a);
+        if (m) {
+          const val = m[2] !== undefined ? valueWord(m[3]) : argsW[k + 1];
+          if (m[1] === "exec-path" && (m[2] !== undefined || argsW[k + 1])) why("git --exec-path runs helpers from another directory");
+          if (m[1] === "git-dir" || m[1] === "work-tree") dirs.push(val);
+          k += m[2] !== undefined ? 1 : 2;
+          continue;
+        }
+        if (a.startsWith("-")) { k += 1; continue; }
+        break;
+      }
+      for (const d of dirs) {
+        if (d === undefined || outsideFor(globTargetPrefix(d) ?? "$", cwds)) why("git operates on a directory outside the workspace");
+      }
+      const sub = args[k];
+      const rest = args.slice(k + 1);
+      const has = (re) => rest.some((a) => re.test(a));
+      const danger =
+        sub === "push" || sub === "clean" || sub === "filter-branch" || sub === "filter-repo" || sub === "send-email" ||
+        sub === "daemon" || sub === "instaweb" || sub === "credential" || sub === "restore" || sub === "prune" ||
+        sub === "difftool" || sub === "mergetool" ||
+        (sub === "reset" && has(/^--(hard|merge|keep)$/)) ||
+        (sub === "checkout" && has(/^(--|\.|-f|--force|-B|--ours|--theirs|-p|--patch)$/)) ||
+        (sub === "switch" && has(/^(-f|--force|--discard-changes|-C|--force-create)$/)) ||
+        (sub === "stash" && has(/^(drop|clear)$/)) ||
+        (sub === "branch" && has(/^(-[a-zA-Z]*[dDMf]|--delete|--force|--move)$/)) ||
+        (sub === "tag" && has(/^(-[a-zA-Z]*[df]|--delete|--force)$/)) ||
+        (sub === "rm" && has(/^(-[a-zA-Z]*[rf]|--force)$/)) ||
+        (sub === "submodule" && has(/^(foreach|deinit)$/)) ||
+        (sub === "rebase" && has(/^(-x|--exec(=.*)?|-[a-zA-Z]*x)$/)) ||
+        (sub === "bisect" && has(/^run$/)) ||
+        (sub === "config" && !has(/^(--get|--get-all|--get-regexp|--list|-l|--show-origin|--show-scope|--name-only|--get-urlmatch)$/)) ||
+        (sub === "update-ref" && has(/^(-d|--stdin)$/)) ||
+        (sub === "reflog" && has(/^(expire|delete)$/)) ||
+        (sub === "gc" && has(/^--prune/)) ||
+        (sub === "worktree" && has(/^(remove|prune)$/)) ||
+        (sub === "remote" && has(/^(add|set-url|remove|rm|rename)$/)) ||
+        (sub === "apply" && has(/^(--unsafe-paths|--directory(=.*)?)$/));
+      if (danger) why("git " + sub + " (destructive, remote or runs other programs)");
+      const remoteish = /^(clone|fetch|pull|ls-remote|archive|submodule)$/.test(sub ?? "");
+      if (has(/^--(upload-pack|receive-pack)(=.*)?$/) || (remoteish && has(/^(-u|--exec)(=.*)?$/)) || ((sub === "clone" || sub === "init") && has(/^(-c|--config|--template)(=.*)?$/)) || rest.some((a) => /^ext::/i.test(a))) why("git option that runs other programs or loads foreign config");
+      if (sub === "clone" || sub === "init") {
+        const pos = argsW.slice(k + 1).filter((a) => !isFlag(a));
+        const target = sub === "clone" ? pos[1] : pos[0];
+        if (target) { features.add(">"); addTarget(target); }
+      }
     }
-    if (lc === "chmod" && args.some((a) => /^-[a-zA-Z]*R/.test(a))) reasons.push("recursive chmod");
+    // make / npm / pnpm / yarn / cargo / cmake / go 换目录或换入口文件
+    const DIR_OPTS = { make: /^(-C|--directory|-f|--file|--makefile)(=(.*))?$/, npm: /^(--prefix|-C|--dir|--cwd)(=(.*))?$/, cargo: /^(--manifest-path|-C)(=(.*))?$/, cmake: /^(-B|-S|-C)(=(.*))?$/, go: /^(-C)(=(.*))?$/ };
+    const family = /^(make|gmake|mingw32-make|nmake)$/.test(lc) ? "make" : /^(npm|pnpm|yarn|bun)$/.test(lc) ? "npm" : /^(cargo|cmake|go)$/.test(lc) ? lc : undefined;
+    if (family !== undefined) {
+      for (let k = 0; k < args.length; k++) {
+        const m = DIR_OPTS[family].exec(args[k]);
+        if (!m) continue;
+        const val = m[2] !== undefined ? valueWord(m[3]) : argsW[k + 1];
+        if (val === undefined || outsideFor(globTargetPrefix(val) ?? "$", cwds)) why(lc + " " + m[1] + " points outside the workspace");
+      }
+      const p0 = positional[0] ? positional[0].text : "";
+      if ((lc === "npm" && /^(exec|x)$/.test(p0)) || ((lc === "pnpm" || lc === "yarn") && p0 === "dlx") || (lc === "bun" && p0 === "x")) why(lc + " " + p0 + " downloads and runs a package");
+    }
     // 写文件参数
-    const plain = argsRaw.filter((a) => !(a.text.startsWith("-") && !a.quoted));
-    const pathOf = (a) => (a.dollar ? "$" : "") + a.text;
-    if (WRITE_ALL_ARGS.has(lc)) {
-      for (const a of plain) writeTargets.push(pathOf(a));
-      if (plain.length > 0) features.add(">");
-    } else if (WRITE_LAST_ARG.has(lc)) {
-      const tIdx = args.findIndex((a) => a === "-t" || a === "--target-directory");
-      if (tIdx >= 0 && args[tIdx + 1] !== undefined) writeTargets.push(args[tIdx + 1]);
-      else if (plain.length > 0) writeTargets.push(pathOf(plain[plain.length - 1]));
-      if (plain.length > 0) features.add(">");
+    const pushPositional = (list) => { for (const a of list) addTarget(a); if (list.length > 0) features.add(">"); };
+    if (is(WRITE_ALL_ARGS)) {
+      pushPositional(positional); // mv 的源也会被删掉，所以 mv 的每个参数都算写
+    } else if (is(WRITE_LAST_ARG)) {
+      const tIdx = args.findIndex((a) => a === "-t" || a === "--target-directory" || a.startsWith("--target-directory="));
+      if (tIdx >= 0) {
+        const a = args[tIdx];
+        if (a.startsWith("--target-directory=")) addTargetText(a.slice(19));
+        else if (argsW[tIdx + 1]) addTarget(argsW[tIdx + 1]);
+        else why(lc + " -t without a directory");
+        features.add(">");
+      } else if (positional.length > 0) pushPositional([positional[positional.length - 1]]);
     } else if (lc === "sed" && args.some((a) => /^-[a-zA-Z]*i/.test(a) || a.startsWith("--in-place"))) {
-      const hasScriptFlag = args.some((a) => a === "-e" || a === "-f" || a.startsWith("--expression") || a.startsWith("--file"));
-      const files = hasScriptFlag ? plain : plain.slice(1);
-      for (const a of files) writeTargets.push(pathOf(a));
+      const hasScriptFlag = args.some((a) => /^-[a-zA-Z]*[ef]$/.test(a) || a.startsWith("--expression") || a.startsWith("--file"));
+      pushPositional(hasScriptFlag ? positional : positional.slice(1));
       features.add(">");
-    } else if (lc === "dd") {
-      for (const a of args) if (a.startsWith("of=")) writeTargets.push(a.slice(3));
+    } else if (lc === "sort") {
+      for (let k = 0; k < args.length; k++) {
+        if (args[k] === "-o" || args[k] === "--output") { if (argsW[k + 1]) addTarget(argsW[k + 1]); features.add(">"); }
+        else if (/^-o./.test(args[k])) { addTargetText(args[k].slice(2)); features.add(">"); }
+        else if (args[k].startsWith("--output=")) { addTargetText(args[k].slice(9)); features.add(">"); }
+      }
+    } else if (lc === "uniq" && positional.length >= 2) {
+      pushPositional([positional[1]]);
+    } else if (lc === "tar" || lc === "bsdtar") {
+      const cluster = args.find((a) => /^[a-zA-Z]+$/.test(a)) ?? "";
+      if (args.some((a) => /^(-P|--absolute-names|--overwrite|--unlink-first|--to-command(=.*)?)$/.test(a))) why("tar option that writes through absolute paths or runs commands");
+      let dirSet = false;
+      for (let k = 0; k < args.length; k++) {
+        if (args[k] === "-C" || args[k] === "--directory") { if (argsW[k + 1]) addTarget(argsW[k + 1]); dirSet = true; }
+        else if (args[k].startsWith("--directory=")) { addTargetText(args[k].slice(12)); dirSet = true; }
+      }
+      const creating = /[cru]/.test(cluster) || args.some((a) => /^-[a-zA-Z]*[cru]/.test(a) || /^--(create|append|update)$/.test(a));
+      if (creating) {
+        const fIdx = args.findIndex((a) => /^-[a-zA-Z]*f$/.test(a) || a === "--file");
+        if (fIdx >= 0 && argsW[fIdx + 1]) addTarget(argsW[fIdx + 1]);
+        else if (/f/.test(cluster)) { const p = positional.find((a) => a.text !== cluster); if (p) addTarget(p); }
+      } else if (!dirSet) addTargetText(".");
+      features.add(">");
+    } else if (lc === "unzip" || lc === "7z" || lc === "7za") {
+      for (let k = 0; k < args.length; k++) {
+        if (args[k] === "-d") { if (argsW[k + 1]) addTarget(argsW[k + 1]); }
+        else if (/^-o./.test(args[k])) addTargetText(args[k].slice(2));
+      }
+      features.add(">");
+    } else if (lc === "zip") {
+      if (positional[0]) pushPositional([positional[0]]);
+    } else if (lc === "cd" || lc === "pushd" || lc === "popd" || lc === "chdir") {
+      // 改变之后各段的工作目录
+      const dest = lc === "popd" ? undefined : positional[0];
+      const destText = dest === undefined ? undefined : globTargetPrefix(dest);
+      if (dest === undefined || destText === undefined || destText === "-") {
+        cwds = [undefined];
+        why(lc + " to a directory that cannot be determined");
+      } else {
+        const destAbs = plat === "win32" && isMsysDrive(destText) ? destText[1] + ":" + (destText.slice(2) || "\\") : destText;
+        const next = cwds.map((d) => (d === undefined ? undefined : PP.resolve(d, destAbs)));
+        if (next.some((d) => d === undefined || isOutsideWorkspace(d, { ...ctx, cwd: d }))) why(lc + " to a directory outside the workspace");
+        cwds = [...new Set([...cwds, ...next])]; // cd 可能失败：之前的目录也还可能是当前目录
+      }
     }
   }
-  if (funcDef) reasons.push("defines a function");
-  const outside = writeTargets.filter((t) => isOutsideWorkspace(t, ctx));
-  if (outside.length > 0) reasons.push("writes outside the workspace (" + outside.slice(0, 3).join(", ") + (outside.length > 3 ? ", …" : "") + ")");
-  if (ctx.cwd !== undefined && ctx.workspace !== undefined && isOutsideWorkspace(ctx.cwd, { ...ctx, cwd: ctx.workspace })) reasons.push("working directory is outside the workspace");
-  if (heads.size === 0 && reasons.length === 0) reasons.push("no command recognised");
+  if (funcDef) why("defines a function");
+  const outside = [];
+  for (const { w: tw, cwds: dirs } of writeTargets) {
+    const text = globTargetPrefix(tw);
+    if (text === undefined || outsideFor(text, dirs)) outside.push(tw.text);
+  }
+  if (outside.length > 0) why("writes outside the workspace (" + outside.slice(0, 3).join(", ") + (outside.length > 3 ? ", …" : "") + ")");
+  if (ctx.cwd !== undefined && ctx.workspace !== undefined && isOutsideWorkspace(ctx.cwd, { ...ctx, cwd: ctx.workspace })) why("working directory is outside the workspace");
+  if (heads.size === 0 && reasons.length === 0) why("no command recognised");
   const key = [...heads].sort().join("+") + (features.size ? " [" + [...features].sort().join("") + "]" : "");
   return { key, heads: [...heads].sort(), features: [...features].sort(), cacheable: reasons.length === 0, reasons };
 }
