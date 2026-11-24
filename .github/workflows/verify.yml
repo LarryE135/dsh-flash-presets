@@ -80,6 +80,28 @@ jobs:
           & $exe $repro
           exit $LASTEXITCODE
 
+      # 0.1.2：Job Object 改为第一次起子进程前才建。确认 --timeout 与父进程被 taskkill /F 两条路仍带走整棵树
+      # （子进程、后台任务、子 shell、find -exec / xargs 的孙进程），且结束后不残留 flash-sh.exe。
+      - name: flash-sh.exe 进程树收尾（Windows）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/job-tree.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 进程树收尾回归失败"; exit 1 }
+
+      # 0.1.2：管道 / here-string / heredoc 的逐行 read 改用 peek（0.1.1 是逐字节读，下游实测吞吐掉到 0.1.0 的 1/7.8）。
+      # 只计时、不判失败：同一个 exe 正常读法 vs FLASH_SH_READ_BYTES=1（强制逐字节 = 0.1.1 的管道读法）vs Git Bash，各 5 次取中位数。
+      - name: flash-sh.exe 逐行 read 计时（Windows，只打印）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          node plugins/flash-sh/test/read-bench.mjs $exe 5
+
       # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
       - name: 别名表 × 合成配置
         shell: bash

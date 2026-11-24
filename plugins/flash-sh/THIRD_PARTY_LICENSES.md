@@ -1,7 +1,7 @@
 # 第三方组件许可清单（vendor/win32-x64/flash-sh.exe）
 
 flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，下表是 x86_64-pc-windows-gnu 目标下
-实际进入构建图的全部 crate（`cargo metadata --filter-platform x86_64-pc-windows-gnu`，仅 normal 依赖，246 个）。
+实际进入构建图的全部 crate（`cargo metadata --filter-platform x86_64-pc-windows-gnu`，仅 normal 依赖，243 个）。
 多许可（`A OR B`）的 crate 按其中任一许可使用；本包选择 MIT（有 MIT 选项时）或 Apache-2.0。
 
 | crate | 版本 | 许可 | 仓库 |
@@ -234,10 +234,7 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | wild | 2.2.1 | Apache-2.0 OR MIT | https://gitlab.com/kornelski/wild |
 | winapi-util | 0.1.11 | Unlicense OR MIT | https://github.com/BurntSushi/winapi-util |
 | windows-link | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows-sys | 0.60.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows-sys | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows-targets | 0.53.5 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
-| windows_x86_64_gnu | 0.53.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | winnow | 1.0.5 | MIT | https://github.com/winnow-rs/winnow |
 | write16 | 1.0.0 | Apache-2.0 OR MIT | https://github.com/hsivonen/write16 |
 | writeable | 0.6.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |

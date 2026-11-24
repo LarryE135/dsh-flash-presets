@@ -26,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.1.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.1.tgz`。
+1. 把 `dsh-flash-sh-0.1.2.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.2.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.1.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.1.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.2.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.2.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.1.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.2.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -169,28 +169,49 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 - **支持**：`.`、`.a.b`、`."a"`、`.["k"]`、`.[n]`（含负下标）、`.[]`、后缀 `?`、`|`、`,`、`( )`、`[...]`、`{k: v}` / `{k}`、`$var`、
   比较 `== != < <= > >=`、`and` / `or` / `//`、`not`、算术 `+ - * / %`；函数 `keys`、`keys_unsorted`、`length`、`select(f)`、`map(f)`、
-  `empty`、`type`、`add`、`has(k)`、`to_entries`、`from_entries`、`with_entries(f)`（0.1.1 新增后三个；`from_entries` 按 jq 1.7
+  `empty`、`type`、`add`、`has(k)`、`to_entries`、`from_entries`、`with_entries(f)`（`from_entries` 按 jq 1.7
   的规则取键 `key` / `name` / `Name` / `Key`、取值 `value`，键不是字符串时报错）。
-- **选项**：`-r` / `--raw-output`、`-j` / `--join-output`（0.1.1 新增：同 `-r`，且每个结果后不加换行）、`-c`、`-e`、`-n`、`-s`、
+- **更新赋值**（0.1.2 新增）：`|=`、`=`、`+=`、`-=`、`*=`、`/=`、`%=`、`//=`，左边是路径表达式（`.a`、`.a.b[0]`、`.[e]`、`.[]`、`?`、
+  `|`、`,`、`select(f)`、`empty` 的组合），语义按 jq 1.7：`|=` 取右边第一个结果、右边没有结果时删除该路径（`.[] |= empty` → `[]`）；
+  `=` / `+=` 等的右边在原输入 `.` 上求值、每个结果各产出一份；不存在的路径按需补 `null` / 对象 / 数组。所以
+  `with_entries(.value += 1)`、`.a.b |= . + 1`、`.items[] |= select(.ok)`、`.x //= "默认"` 都能用。左边不是路径（如 `(.a | length) = 1`）
+  时报 `Invalid path expression with result …`，与 jq 相同。
+- **选项**：`-r` / `--raw-output`、`-j` / `--join-output`（同 `-r`，且每个结果后不加换行）、`-c`、`-e`、`-n`、`-s`、
   `--arg`、`--argjson`，短选项可合写（`-rc`、`-jc`）。
 - **不支持**（报 `jq: error: unsupported` 并返回 3；不认识的选项返回 2）：`reduce` / `foreach`、`if … then … else … end`、`as $x` 绑定、
-  `def` 自定义函数、字符串插值 `"\(.a)"`、切片 `.[1:2]`、递归 `..`、赋值 / 更新 `=` `|=` `+=`、`@csv` / `@tsv` / `@base64` 等格式化、
-  `tostring` / `tonumber` / `split` / `join` / `test` / `sort_by` / `group_by` / `unique` / `paths` 等其余内建函数、`--tab` / `--indent` /
-  `--slurpfile` / `--rawfile` 等选项。需要这些时装一个真 jq 放进 PATH（内置版只在找不到 jq 时才用）。
+  `def` 自定义函数、字符串插值 `"\(.a)"`、切片 `.[1:2]`（也不能作更新的左边）、递归 `..`、`?//`、`@csv` / `@tsv` / `@base64` 等格式化、
+  `tostring` / `tonumber` / `split` / `join` / `test` / `sort_by` / `group_by` / `unique` / `paths` / `getpath` / `setpath` / `del` 等其余内建函数、
+  `--tab` / `--indent` / `--slurpfile` / `--rawfile` 等选项。需要这些时装一个真 jq 放进 PATH（内置版只在找不到 jq 时才用）。
 
 ### read 与逐行读取
 
-0.1.1 修复了 0.1.0 的回归：在 Windows 上，`read` 从**管道、here-string（`<<<`）、here-document（`<<EOF`）**读时只读到第一行
-（`cmd | while read -r l`、`while read …; done <<< "$x"` 只处理第一条，且退出码为 0）。原因是只有常规文件才该一次读一整块，
-而判断「是不是常规文件」用的方法在 Windows 上把匿名管道也当成了文件。现在只有确认可以 seek 的磁盘文件才按块读、读完把文件位置
-退回本行末尾（与 bash 一致），管道 / FIFO / 控制台一律逐字节读，多读的字节不会在两次 `read` 之间丢失。
+**规则**：`read` 绝不从输入里多拿走一个字节——本行之后的内容属于下一个读的人（下一次 `read`、`read` 之后的 `cat` / `head`、
+子进程、管道里的另一段）。bash 在管道上为此一次只读一个字节。flash-sh 的做法按输入来源分三种：
 
-实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe）：
+- **管道 / FIFO / here-string / heredoc**（0.1.2 起）：先 *peek*（Windows `PeekNamedPipe`、Linux `tee(2)` 到私有管道）——只把管道里
+  现成的数据拷一份出来、不取走；在拷贝里找到分隔符后，再**恰好读到分隔符为止**。拷贝里剩下的部分仍在管道里，谁接着读都拿得到，
+  所以不需要「把多读的还回去」。拷贝只当预测用：每次真读出来的字节都和拷贝逐字节比对，不一致（有别的读者同时在读这个管道）就按
+  真读到的字节重新解析。这样每行只要 1 次真读（外加每 512 B–64 KB 一次 peek），0.1.1 是每个字节 1 次。
+- **磁盘文件**：一次读一块，`read` 返回前把文件位置挪到本行末尾（与 bash 相同）；块里剩下的部分留给同一个打开文件的下一次 `read`，
+  每行只剩一次 seek。期间只要运行过可能读写文件的东西（子进程、内建 applet、`echo`/`printf`/`test` 等少数纯内建以外的命令、
+  以写方式打开任何文件），这份缓存就作废、重新从文件读。
+- **控制台、设备等其他来源**：逐字节读。设环境变量 `FLASH_SH_READ_BYTES=1` 可以对所有来源强制逐字节读（排查用）。
+
+0.1.1 修过 0.1.0 的回归（Windows 上管道 / here-string / heredoc 只读到第一行），代价是管道上改成逐字节读、吞吐掉到约 1/8；
+0.1.2 用上面的 peek 把吞吐找回来，语义不变。
+
+实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 26 条 × 两种执行方式）：
 
 - `cmd | while read -r l`、`find … | while read -r f`、`while read …; done <<< "$x"`、`while read …; done <<EOF`、
-  `{ read a; read b; read c; }` 连续读、`read` 之后接 `cat` 读剩下的内容（管道 / heredoc / 文件 / `exec 3<file` 都对）；
-- `read -n N`、`read -d 分隔符`、`read -t 秒数`（含 `-t 0` 只探测）都正常；最后一行没有换行时 `read` 返回 1 且变量里是这行内容，与 bash 相同；
-- `readarray` / `mapfile` 从管道读（`cmd | { readarray -t a; …; }`、`readarray -t a < <(cmd)`）正常，需要整段读进数组时可以用它。
+  `{ read a; read b; read c; }` 连续读、子 shell / 函数里从管道读、嵌套管道、`read` 之后接 `cat` / `head -n 1` / `awk` / `mapfile`
+  读剩下的内容（管道 / heredoc / here-string / 文件 / `exec 3<file` 都对）、同一管道经两个 fd 交替读、1 MB 单行（文件和管道）；
+- `read -n N`、`read -d 分隔符`（含 `-d ''`）、`read -t 秒数`（含 `-t 0` 只探测；无数据时按时返回 142）都正常；
+  最后一行没有换行时 `read` 返回 1 且变量里是这行内容，与 bash 相同；
+- `readarray` / `mapfile` 从管道读（`cmd | { readarray -t a; …; }`、`readarray -t a < <(cmd)`）正常，需要整段读进数组时它最快。
+
+### 其他
+
+- `mkfifo` 没有内建（Windows 上也没有命名 FIFO 的等价物）。需要「边生产边读」时用进程替换 `< <(cmd)`，或先写临时文件再读。
 
 ## 验证
 
@@ -233,6 +254,8 @@ dsh-flash-presets 0.3.4 起（需要 presets ≥ 0.3.4，尚未发布）把本�
 npm test                                   # unit（必跑，不需要 DSH 与二进制；包内与仓库内都能跑）
 FLASH_SH_TEST_BIN=/path/to/flash-sh npm test   # + host：真实 cordis + dsh-tools 宿主（需要能解析到 @deepseek-ai/*，否则自动跳过）
                                            #   + read 回归：直接跑该可执行文件（管道 / here-string / heredoc 逐行读取，test/read-regress.mjs）
+                                           #   + 进程树收尾：--timeout 与父进程被杀时整棵树都结束（test/job-tree.mjs；find -exec / xargs 孙进程两条只在 Windows 判定）
+node test/read-bench.mjs [/path/to/flash-sh] [次数]   # 逐行 read 计时（只打印）：正常读法 vs FLASH_SH_READ_BYTES=1 逐字节 vs bash
 DSH_HOST_NM=/path/to/node_modules FLASH_SH_TEST_BIN=... node test/host.mjs   # host 换一套宿主包跑；实测 DSH 0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.5 都通过
                                            #   （0.2.2 起没有 tools.sdkSchemas、执行要挂 tool executor：测试会自动检测并挂上 native executor）
 DSH_REAL_NM=/path/to/dsh-install/node_modules FLASH_SH_TEST_BIN=... npm test   # 再加真实 DSH 安装的 plugin add / dump-config / 启动（需要 bash）

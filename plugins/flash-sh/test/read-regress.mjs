@@ -32,8 +32,35 @@ const CASES = [
   ["管道：最后一行无换行", `printf 'a\\nlast' | { while read -r l; do echo "L:$l"; done; echo "tail:$l"; }`, "L:a\ntail:last\n"],
   ["管道：readarray", `printf 'x\\ny\\nz\\n' | { readarray -t arr; echo "\${#arr[@]}:\${arr[*]}"; }`, "3:x y z\n"],
   ["管道：3000 行", `seq 1 3000 | { n=0; s=0; while read -r v; do n=$((n+1)); s=$((s+v)); done; echo "$n $s"; }`, "3000 4501500\n"],
+  // 0.1.2：下游第三轮报告 §6.2 的 4 条，加管道 peek 改造相关的边界
+  ["子 shell 内管道读", `( printf 'a\\nb\\n' | while read -r l; do echo "<$l>"; done )`, "<a>\n<b>\n"],
+  ["函数从管道读", `f(){ while read -r l; do echo "{$l}"; done; }; printf 'a\\nb\\n' | f`, "{a}\n{b}\n"],
+  ["嵌套管道", `printf '1\\n2\\n' | while read -r a; do printf 'x\\ny\\n' | while read -r b; do echo -n "$a$b "; done; done; echo`, "1x 1y 2x 2y \n"],
+  ["1 MB 单行：文件", `d=$(mktemp -d) && awk 'BEGIN{s="x"; while (length(s) < 1000000) s = s s; print substr(s, 1, 1000000)}' > "$d/big" && { read -r l; echo \${#l}; } < "$d/big"; rm -rf "$d"`, "1000000\n"],
+  ["1 MB 单行：管道", `awk 'BEGIN{s="x"; while (length(s) < 1000000) s = s s; print substr(s, 1, 1000000)}' | { read -r l; echo \${#l}; }`, "1000000\n"],
+  ["管道：read 后 head -n 1 读剩余", `printf 'a\\nb\\nc\\n' | { read -r x; head -n 1; echo "x=$x"; }`, "b\nx=a\n"],
+  ["here-string：read 后 awk 读剩余", `{ read -r x; awk '{print "awk:" $0}'; echo "x=$x"; } <<< $'h1\\nh2\\nh3'`, "awk:h2\nawk:h3\nx=h1\n"],
+  ["管道：read、cat、再 read", `printf '1\\n2\\n3\\n4\\n' | { read -r a; read -r b; cat; read -r c; echo "a=$a b=$b c=$c rc=$?"; }`, "3\n4\na=1 b=2 c= rc=1\n"],
+  ["管道：同一管道两个 fd 交替读", `printf '1\\n2\\n3\\n4\\n' | { exec 3<&0; read -r a; read -r -u 3 b; read -r c; read -r -u 3 d; echo "$a$b$c$d"; }`, "1234\n"],
+  ["管道：read 后 mapfile", `printf 'h\\n1\\n2\\n' | { read -r h; mapfile -t rest; echo "$h \${#rest[@]} \${rest[*]}"; }`, "h 2 1 2\n"],
+  ["read -t 超时精度（0.3 s，管道无数据）", `s=$(date +%s%N); sleep 2 | { read -r -t 0.3 x; echo "rc=$?"; e=$(date +%s%N); d=$(( (e - s) / 1000000 )); (( d >= 250 && d < 1500 )) && echo ok || echo "elapsed=$d"; }`, "rc=142\nok\n"],
 ];
 
+// 脚本文件方式要把临时文件路径交给被测程序：Windows exe 在非 Windows 宿主上（WSL interop、跨平台 CI）
+// 读不到 os.tmpdir() 给的 Linux 路径，会整排假红（下游第三轮报告 §6.3）。只有被测程序与宿主同平台时才跑这种方式。
+function isWindowsExe(p) {
+  try {
+    const fd = fs.openSync(p, "r");
+    const b = Buffer.alloc(2);
+    fs.readSync(fd, b, 0, 2, 0);
+    fs.closeSync(fd);
+    return b.toString("latin1") === "MZ";
+  } catch {
+    return /\.exe$/i.test(p);
+  }
+}
+const fileModeOk = isWindowsExe(bin) === (process.platform === "win32");
+if (!fileModeOk) console.log("（被测程序与宿主平台不同：只跑 -c 方式，脚本文件方式跳过）");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-read-"));
 let failed = 0;
 let passed = 0;
@@ -41,7 +68,8 @@ console.log("read 回归（" + bin + "）");
 for (const [label, script, want] of CASES) {
   const file = path.join(tmp, "case.sh");
   fs.writeFileSync(file, script + "\n");
-  for (const [mode, args] of [["file", [file]], ["-c", ["-c", script]]]) {
+  const modes = fileModeOk ? [["file", [file]], ["-c", ["-c", script]]] : [["-c", ["-c", script]]];
+  for (const [mode, args] of modes) {
     const r = spawnSync(bin, args, { encoding: "utf8", timeout: 30000, cwd: tmp });
     const out = (r.stdout ?? "").replace(/\r\n/g, "\n");
     const good = r.status === 0 && out === want;
