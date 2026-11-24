@@ -70,11 +70,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 的 read 回归用例失败"; exit 1 }
           # 报告里的原始最小复现，直接打印输出（供人工核对；期望 <a> <b> / x y / 123）
           $repro = Join-Path $env:RUNNER_TEMP 'read-repro.sh'
-          Set-Content -Path $repro -Encoding utf8NoBOM -Value @'
+          # 用 LF 写：Set-Content 在 Windows 上按 CRLF 分行，`}\r` 在 bash 里也不是 `}`（会报 unexpected end of file）
+          $text = @'
           printf 'a\nb\n' | while read -r l; do echo "<$l>"; done
           while read -r l; do echo "$l"; done <<< $'x\ny'
           printf '1\n2\n3\n' | { read -r a; read -r b; read -r c; echo "$a$b$c"; }
           '@
+          [IO.File]::WriteAllText($repro, ($text -replace "`r`n", "`n") + "`n")
           & $exe $repro
           exit $LASTEXITCODE
 
