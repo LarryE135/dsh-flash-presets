@@ -10,7 +10,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 process.env.DSH_FLASH_SH_NO_SCHEMASTERY = "1";
 const target = process.argv[2] ? path.resolve(process.argv[2]) : path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "lib", "index.js");
 const mod = await import(pathToFileURL(target).href);
-const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-adv-")));
+// 放在家目录下而不是 /tmp：/tmp 与 os.tmpdir() 是允许写的临时目录，放在那里会让「写到工作区外」的用例失去意义
+const root = fs.realpathSync(fs.mkdtempSync(path.join(os.homedir(), ".flash-sh-adv-")));
 const ws = path.join(root, "ws");
 fs.mkdirSync(path.join(ws, "sub"), { recursive: true });
 fs.mkdirSync(path.join(root, "outside"));

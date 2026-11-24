@@ -196,14 +196,28 @@ export function sha256File(file) {
 }
 
 // ── 子进程环境脱敏 ───────────────────────────────────────────────────────────────────────────
-const SECRET_NAME = /KEY|PASSWORD|PASSWD|SECRET|TOKEN|CREDENTIAL/i;
+// 名字里的凭据字样（不分大小写）。_PAT / _AUTH 按「词」匹配：不误伤 *_PATH（NODE_PATH、LD_LIBRARY_PATH）与 GIT_AUTHOR_*。
+const SECRET_NAME = /KEY|PASSWORD|PASSWD|SECRET|TOKEN|CREDENTIAL|COOKIE|JWT|(^|_)PAT($|_)|(^|_)AUTH(?!OR(_|$))/i;
+// 整个前缀都不传：DSH 自己的、云 / 代码托管 / 包管理的配置（里面常夹带凭据或会改变子进程行为）
+const SECRET_PREFIX = /^(DSH_|AWS_|GITHUB_|GH_|NPM_CONFIG_|YARN_NPM_|AZURE_DEVOPS_)/i;
+// 值是带账号密码的 URL（postgres://u:p@h、https://u:p@proxy）
+const URL_WITH_CREDENTIALS = /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i;
 
-/** 传给 flash-sh 的环境：去掉疑似凭据（名字含 KEY/PASSWORD/PASSWD/SECRET/TOKEN/CREDENTIAL，不分大小写）与全部 DSH_*。 */
+/** 这个环境变量会不会被 childEnv 剥掉（doctor / 测试用）。 */
+export function isSecretEnv(name, value = "") {
+  return SECRET_PREFIX.test(name) || SECRET_NAME.test(name) || URL_WITH_CREDENTIALS.test(String(value));
+}
+
+/**
+ * 传给 flash-sh 的环境：去掉疑似凭据——名字含 KEY/PASSWORD/PASSWD/SECRET/TOKEN/CREDENTIAL/COOKIE/JWT、
+ * 以 _PAT / _AUTH 为词（GIT_AUTHOR_* 除外），前缀 DSH_/AWS_/GITHUB_/GH_/NPM_CONFIG_/YARN_NPM_/AZURE_DEVOPS_，
+ * 以及值是带账号密码的 URL 的变量。
+ */
 export function childEnv(env = process.env) {
   const out = {};
   for (const [k, v] of Object.entries(env)) {
     if (v === undefined) continue;
-    if (/^DSH_/i.test(k) || SECRET_NAME.test(k)) continue;
+    if (isSecretEnv(k, v)) continue;
     out[k] = v;
   }
   return out;
@@ -383,8 +397,8 @@ function realpathLoose(abs, P) {
 /**
  * 写目标是否落在工作区外（或无法判定）。/dev/null、NUL 与临时目录（/tmp、os.tmpdir()）不算外部。
  * UNC（\\server\share、//server/share、\\.\设备）与 CON/COM1 等设备名一律算外部。
- * followLinks（默认：platform 与本机一致时开）：目标在字面上位于工作区内时，再按真实路径（解开符号链接 / 联接点）复核；
- * UNC 路径不做 realpath（避免为了判定而去连网络共享）。
+ * followLinks（默认：platform 与本机一致时开）：字面上落在工作区 / 临时目录内时，再按真实路径（解开符号链接 / 联接点）
+ * 复核一次，必须仍落在某个允许的根里；UNC 路径不做 realpath（避免为了判定而去连网络共享）。
  */
 export function isOutsideWorkspace(target, { cwd, workspace, platform = process.platform, tmpdir = os.tmpdir(), followLinks } = {}) {
   if (typeof target !== "string" || target === "") return true;
@@ -394,23 +408,24 @@ export function isOutsideWorkspace(target, { cwd, workspace, platform = process.
   const win = platform === "win32";
   const P = win ? path.win32 : path.posix;
   let t = target;
-  if (win && isMsysDrive(t)) t = t[1] + ":" + (t.slice(2) || "\\");
+  if (win && isMsysDrive(t)) t = t[1].toUpperCase() + ":" + (t.slice(2) || "\\");
   if (win && (isUncLike(t) || WIN_DEVICE.test(P.basename(t)))) return true;
-  if (t === "/tmp" || t.startsWith("/tmp/")) return false;
   if (win && isUncLike(cwd) && !isUncLike(workspace)) return true;
+  // flash-sh 在 Windows 上把 /tmp 映射到临时目录
+  if (win && (t === "/tmp" || t.startsWith("/tmp/"))) t = P.join(tmpdir, t.slice(4) || ".");
   const abs = P.resolve(cwd, t);
-  const inside = (root, p = abs) => {
-    const rel = P.relative(P.resolve(root), p);
+  const roots = [workspace, tmpdir, ...(win ? [] : ["/tmp"])].map((r) => P.resolve(r));
+  const inside = (root, p) => {
+    const rel = P.relative(root, p);
     return rel === "" || (!rel.startsWith("..") && !P.isAbsolute(rel));
   };
-  if (inside(tmpdir)) return false;
-  if (!inside(workspace)) return true;
+  if (!roots.some((r) => inside(r, abs))) return true;
   const follow = followLinks ?? (platform === process.platform);
   if (!follow || isUncLike(abs)) return false;
   const realAbs = realpathLoose(abs, P);
-  const realWs = realpathLoose(P.resolve(workspace), P);
-  if (realAbs === undefined || realWs === undefined) return true;
-  return !inside(realWs, realAbs);
+  if (realAbs === undefined) return true;
+  const realRoots = roots.map((r) => realpathLoose(r, P)).filter((r) => r !== undefined);
+  return !realRoots.some((r) => inside(r, realAbs));
 }
 
 /** 带展开的写目标取「确定的前缀」：花括号 / $ / ~、或 glob 所在的那一段以 . 或 [ 开头（可能匹配 ..）→ undefined（无法判定）。 */
@@ -517,6 +532,7 @@ export function classifyCommand(command, ctx = {}) {
     heads.add(head);
     const argsW = words.slice(w + 1);
     const args = argsW.map((x) => x.text);
+    if (plat === "win32" && argsW.some((a) => /^[\\/]{2}[^\\/]/.test(a.text))) why("touches a network share or device path (UNC)");
     const headExp = expansionOf(hw);
     if (hw.dollar) why("command name comes from a variable");
     else if (headExp.length && head0 !== "[") why("command name uses shell expansion (" + headExp.join(", ") + ")");
@@ -939,21 +955,33 @@ function spillDir() {
   }
 }
 
-/** 删掉 root 下名字以 SPILL_PREFIX 开头、修改时间早于 maxAgeMs 的目录；返回删掉的路径。 */
+const SPILL_FILE = /^([0-9a-f]{32}|\d+-\d+-\d+-[0-9a-f]{6})\.(stdout|stderr)\.log$/;
+
+/**
+ * 删掉 root 下本插件留下、修改时间早于 maxAgeMs 的 spill 目录；返回删掉的路径。
+ * 只删「看起来确实是自己的」：名字以 SPILL_PREFIX 开头的真目录（不是符号链接 / 联接点）、
+ * POSIX 上属主是当前用户、里面只有 spill 日志文件（名字符合 SPILL_FILE 的普通文件）；
+ * 逐个 unlink 再 rmdir，不做递归删除——目录里混进了别的东西就整个跳过。
+ */
 export function cleanupStaleSpills(root = os.tmpdir(), maxAgeMs = SPILL_MAX_AGE_MS, now = Date.now()) {
   const removed = [];
   let entries = [];
   try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch (error) { return removed; }
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
   for (const e of entries) {
-    if (!e.isDirectory() || !e.name.startsWith(SPILL_PREFIX)) continue;
+    if (!e.name.startsWith(SPILL_PREFIX)) continue;
     const p = path.join(root, e.name);
     if (p === spillState.dir) continue;
     try {
-      const st = fs.statSync(p);
-      if (now - st.mtimeMs > maxAgeMs) {
-        fs.rmSync(p, { recursive: true, force: true });
-        removed.push(p);
-      }
+      const st = fs.lstatSync(p);
+      if (!st.isDirectory() || st.isSymbolicLink()) continue;
+      if (uid !== undefined && st.uid !== uid) continue;
+      if (now - st.mtimeMs <= maxAgeMs) continue;
+      const inner = fs.readdirSync(p, { withFileTypes: true });
+      if (!inner.every((f) => f.isFile() && SPILL_FILE.test(f.name))) continue;
+      for (const f of inner) fs.unlinkSync(path.join(p, f.name));
+      fs.rmdirSync(p);
+      removed.push(p);
     } catch (error) {}
   }
   return removed;
@@ -993,7 +1021,8 @@ export class Capture {
     try {
       const dir = spillDir();
       spillState.seq += 1;
-      this.file = path.join(dir, process.pid + "-" + Date.now() + "-" + spillState.seq + "-" + crypto.randomBytes(3).toString("hex") + "." + this.label + ".log");
+      // 文件名只含 128 位随机数（不带 pid / 时间 / 序号，猜不到）；目录本身是 mkdtemp 的 0700 目录，文件用 O_EXCL 0600 新建
+      this.file = path.join(dir, crypto.randomBytes(16).toString("hex") + "." + this.label + ".log");
       this.fd = fs.openSync(this.file, "wx", 0o600);
       const head = Buffer.concat(this.pre);
       this.write(head);
@@ -1073,20 +1102,43 @@ export class Capture {
   }
 }
 
-function killTree(child, how) {
-  if (!child || child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === "win32" && typeof child.pid === "number") {
-    try {
-      const k = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-      k.on("error", () => { try { child.kill(); } catch (e) {} });
-      return;
-    } catch (error) {}
-  }
-  try { child.kill(how); } catch (error) {}
+/**
+ * Windows 上杀整棵进程树的命令：用 %SystemRoot%\System32\taskkill.exe 的绝对路径（不走 PATH，防止被同名程序顶替），
+ * 参数 /PID <pid> /T（连同子进程）/F（强制）。
+ */
+export function taskkillCommand(pid, env = process.env) {
+  const root = env.SystemRoot || env.SYSTEMROOT || env.windir || env.WINDIR || "C:\\Windows";
+  return { file: path.win32.join(root, "System32", "taskkill.exe"), args: ["/PID", String(pid), "/T", "/F"] };
 }
 
+function killTree(child, how) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  const direct = () => { try { child.kill(how); } catch (error) {} };
+  if (process.platform === "win32" && typeof child.pid === "number") {
+    const { file, args } = taskkillCommand(child.pid);
+    try {
+      const k = spawn(file, args, { windowsHide: true, stdio: "ignore" });
+      k.on("error", direct);
+      // taskkill 失败（拒绝访问等）时退回直接杀；进程已经退出时它返回 128，再 kill 一次也无害
+      k.on("exit", (code) => { if (code !== 0) direct(); });
+      return;
+    } catch (error) {
+      direct();
+      return;
+    }
+  }
+  // POSIX（仅开发验证模式）：子进程是自己进程组的组长（spawn detached），杀整个组，孙进程一起走
+  if (typeof child.pid === "number") {
+    try { process.kill(-child.pid, how); return; } catch (error) {}
+  }
+  direct();
+}
+
+/** 杀掉之后最多再等这么久 close；还不来（孙进程攥着管道不放）就强行收尾，保证调用一定返回。 */
+export const CLOSE_DEADLINE_MS = 3000;
+
 /** 运行一次 flash-sh；与宿主无关，便于单测。 */
-export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signal, env, graceMs = GUARD_GRACE_MS }) {
+export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signal, env, graceMs = GUARD_GRACE_MS, closeDeadlineMs = CLOSE_DEADLINE_MS }) {
   return new Promise((resolve) => {
     const secs = Math.max(1, Math.ceil(timeoutMs / 1000));
     let child;
@@ -1096,6 +1148,7 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
         env: env ?? childEnv(process.env),
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32", // POSIX：独立进程组，超时 / 取消时能连孙进程一起杀
       });
     } catch (error) {
       resolve({ exitCode: 127, stdout: "", stderr: "", timedOut: false, truncated: false, error: errorText(error) });
@@ -1106,14 +1159,28 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
     child.stdout.on("data", (b) => out.push(b));
     child.stderr.on("data", (b) => err.push(b));
     let killedBy = null;
+    let deadline;
+    let settled = false;
+    const armDeadline = () => {
+      if (deadline !== undefined) return;
+      deadline = setTimeout(() => {
+        // 杀过了，close 还没来：多半是孙进程继承了 stdout/stderr 还活着。不再等，断开管道强行收尾。
+        try { child.stdout.destroy(); } catch (error) {}
+        try { child.stderr.destroy(); } catch (error) {}
+        finish(null, null, "did not exit within " + closeDeadlineMs + " ms after being killed; output pipes closed by the plugin");
+      }, closeDeadlineMs);
+      if (typeof deadline.unref === "function") deadline.unref();
+    };
     // 兜底：exe 自己会在 --timeout 到点时杀树并以 124 退出；这里多给 graceMs 宽限再硬杀
     const guard = setTimeout(() => {
       killedBy = "guard";
       killTree(child, "SIGKILL");
+      armDeadline();
     }, secs * 1000 + graceMs);
     const onAbort = () => {
       killedBy = "abort";
-      killTree(child, "SIGTERM");
+      killTree(child, process.platform === "win32" ? "SIGTERM" : "SIGKILL");
+      armDeadline();
     };
     if (signal) {
       if (signal.aborted) onAbort();
@@ -1121,8 +1188,11 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
     }
     let spawnError;
     child.on("error", (e) => { spawnError = e; });
-    child.on("close", (code, sig) => {
+    const finish = (code, sig, stuck) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(guard);
+      if (deadline !== undefined) clearTimeout(deadline);
       if (signal) signal.removeEventListener("abort", onAbort);
       out.finish();
       err.finish();
@@ -1148,6 +1218,7 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
       else if (killedBy === "abort") problems.push("cancelled");
       else if (killedBy === "guard") problems.push("flash-sh did not stop at its own timeout; killed by the plugin after a " + graceMs + " ms grace");
       else if (sig) problems.push("terminated by " + sig);
+      if (stuck) problems.push(stuck);
       for (const c of [out, err]) {
         if (c.truncated && c.spillError) problems.push("could not save the full " + c.label + " (" + c.spillError + ")");
         else if (c.truncated && c.spillCapped) problems.push("full " + c.label + " saved only up to the " + (SPILL_TOTAL_CAP >> 20) + " MB spill cap");
@@ -1155,8 +1226,28 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
       }
       if (problems.length) result.error = problems.join("; ");
       resolve(result);
-    });
+    };
+    child.on("close", (code, sig) => finish(code, sig));
   });
+}
+
+/**
+ * 解析 workdir（绝对，或相对于会话工作区）。Windows 上把 /d/x 这种 MSYS 写法换成 D:\x（与 flash-sh 的理解一致，
+ * 也与审批分类器一致）；UNC / \\.\ 设备路径只在工作区本身就在同一个网络共享下时才允许——
+ * 否则连 stat 都不做就拒绝（在 Windows 上，访问 \\host\share 本身就会向对方发起 SMB 认证）。
+ */
+export function resolveWorkdir(workdir, base, workspace, platform = process.platform) {
+  if (typeof workdir !== "string" || workdir.trim() === "") return base;
+  const win = platform === "win32";
+  const P = win ? path.win32 : path.posix;
+  let wd = workdir;
+  if (win && isMsysDrive(wd)) wd = wd[1].toUpperCase() + ":" + (wd.slice(2) || "\\");
+  const cwd = P.isAbsolute(wd) && !(win && /^[\\/](?![\\/])/.test(wd)) ? P.resolve(wd) : P.resolve(base, wd);
+  if (win && isUncLike(cwd)) {
+    const rel = typeof workspace === "string" && isUncLike(workspace) ? P.relative(P.resolve(workspace), cwd) : "..";
+    if (rel.startsWith("..") || P.isAbsolute(rel)) throw new Error("flash_sh: workdir on a network share or device path outside the workspace is not allowed: " + cwd);
+  }
+  return cwd;
 }
 
 export function toolDefinition(ctx, cfg, bin, opts = {}) {
@@ -1193,10 +1284,7 @@ export function toolDefinition(ctx, cfg, bin, opts = {}) {
       timeoutMs = Math.min(timeoutMs, cfg.maxTimeoutMs);
       const workspace = await resolveCwd(ctx, exec);
       const base = workspace ?? process.cwd();
-      let cwd = base;
-      if (typeof a.workdir === "string" && a.workdir.trim() !== "") {
-        cwd = path.isAbsolute(a.workdir) ? a.workdir : path.resolve(base, a.workdir);
-      }
+      const cwd = resolveWorkdir(a.workdir, base, workspace);
       let isDir = false;
       try { isDir = fs.statSync(cwd).isDirectory(); } catch (error) {}
       if (!isDir) throw new Error("flash_sh: workdir is not an existing directory: " + cwd);

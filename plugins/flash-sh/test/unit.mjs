@@ -363,6 +363,90 @@ if (process.platform !== "win32") {
   console.log("  - Windows 上跳过 POSIX 假 exe 的超时标记测试（host 自测用真实 exe 覆盖）");
 }
 
+// ── 第二轮审计：环境脱敏补充 / spill 命名与清理 / taskkill 参数 / 杀不掉时强行收尾 / workdir 越界 ────────────
+{
+  const e = mod.childEnv({
+    PATH: "/bin", NODE_PATH: "/n", LD_LIBRARY_PATH: "/l", GIT_AUTHOR_NAME: "a", GIT_AUTHOR_EMAIL: "a@x", PWD: "/w", HTTP_PROXY: "http://proxy:8080",
+    AWS_REGION: "r", AWS_PROFILE: "p", aws_access_key_id: "k", GITHUB_WORKSPACE: "/g", GITHUB_PAT: "p", GH_ENTERPRISE_TOKEN: "t", NPM_CONFIG_REGISTRY: "https://r", NPM_CONFIG__AUTH: "x",
+    "npm_config_//registry.npmjs.org/:_authToken": "t", AZURE_DEVOPS_EXT_PAT: "p", MY_PAT: "p", PAT: "p", DOCKER_AUTH_CONFIG: "{}", X_AUTHORIZATION: "b", SSH_AUTH_SOCK: "/s",
+    CI_JOB_JWT: "j", SESSION_COOKIE: "c", DATABASE_URL: "postgres://u:pw@h/db", HTTPS_PROXY: "http://user:pw@proxy:8080",
+  });
+  const kept = ["PATH", "NODE_PATH", "LD_LIBRARY_PATH", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "PWD", "HTTP_PROXY"];
+  ok(kept.every((k) => k in e), "childEnv 保留 *_PATH、GIT_AUTHOR_*、PWD、不带账号密码的代理", JSON.stringify(Object.keys(e)));
+  const gone = ["AWS_REGION", "AWS_PROFILE", "aws_access_key_id", "GITHUB_WORKSPACE", "GITHUB_PAT", "GH_ENTERPRISE_TOKEN", "NPM_CONFIG_REGISTRY", "NPM_CONFIG__AUTH", "npm_config_//registry.npmjs.org/:_authToken", "AZURE_DEVOPS_EXT_PAT", "MY_PAT", "PAT", "DOCKER_AUTH_CONFIG", "X_AUTHORIZATION", "SSH_AUTH_SOCK", "CI_JOB_JWT", "SESSION_COOKIE", "DATABASE_URL", "HTTPS_PROXY"];
+  ok(gone.every((k) => !(k in e)), "childEnv 去掉 AWS_* / GITHUB_* / GH_* / NPM_CONFIG_*（不分大小写）/ *_PAT / *_AUTH* / JWT / COOKIE / 值里带账号密码的 URL", JSON.stringify(gone.filter((k) => k in e)));
+}
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-spill2-"));
+  mod._resetSpill({ dir: root });
+  const names = [];
+  for (let i = 0; i < 3; i++) { const c = new mod.Capture(4, "stdout"); c.push(Buffer.from("0123456789")); c.finish(); names.push(path.basename(c.file)); }
+  ok(names.every((n) => /^[0-9a-f]{32}\.stdout\.log$/.test(n)) && new Set(names).size === 3, "spill 文件名是 128 位随机数（不含 pid / 时间 / 序号）", names.join(" "));
+  mod._resetSpill({ dir: undefined });
+  const past = (Date.now() - 25 * 3600 * 1000) / 1000;
+  const mine = fs.mkdtempSync(path.join(root, mod.SPILL_PREFIX));
+  fs.writeFileSync(path.join(mine, "0".repeat(32) + ".stdout.log"), "x");
+  const mixed = fs.mkdtempSync(path.join(root, mod.SPILL_PREFIX));
+  fs.writeFileSync(path.join(mixed, "someone-elses.txt"), "keep");
+  const nested = fs.mkdtempSync(path.join(root, mod.SPILL_PREFIX));
+  fs.mkdirSync(path.join(nested, "sub"));
+  const victim = fs.mkdtempSync(path.join(root, "victim-"));
+  fs.writeFileSync(path.join(victim, "precious"), "keep");
+  let linked = false;
+  try { fs.symlinkSync(victim, path.join(root, mod.SPILL_PREFIX + "link"), process.platform === "win32" ? "junction" : "dir"); linked = true; } catch (error) {}
+  for (const d of [mine, mixed, nested, victim]) fs.utimesSync(d, past, past);
+  const removed = mod.cleanupStaleSpills(root);
+  ok(removed.length === 1 && removed[0] === mine && !fs.existsSync(mine), "清理只删「只装着 spill 日志」的过期目录", JSON.stringify(removed));
+  ok(fs.existsSync(path.join(mixed, "someone-elses.txt")) && fs.existsSync(path.join(nested, "sub")), "目录里混进别的文件 / 子目录 → 整个跳过，不递归删除");
+  ok(fs.existsSync(path.join(victim, "precious")) && (!linked || fs.existsSync(path.join(root, mod.SPILL_PREFIX + "link"))), "名字像 spill 的符号链接 / 联接点不跟进、不删" + (linked ? "" : "（本机建不了链接，只验证了其余部分）"));
+  fs.rmSync(root, { recursive: true, force: true });
+}
+{
+  const t = mod.taskkillCommand(4242, { SystemRoot: "C:\\Windows" });
+  ok(t.file === "C:\\Windows\\System32\\taskkill.exe" && JSON.stringify(t.args) === '["/PID","4242","/T","/F"]', "taskkill：System32 绝对路径 + /PID <pid> /T /F", JSON.stringify(t));
+  ok(mod.taskkillCommand(1, {}).file === "C:\\Windows\\System32\\taskkill.exe" && mod.taskkillCommand(1, { windir: "D:\\Win" }).file === "D:\\Win\\System32\\taskkill.exe", "taskkill：没有 SystemRoot 时用 windir / 默认 C:\\Windows");
+}
+if (process.platform !== "win32") {
+  // 孙进程攥着 stdout 不放：插件杀掉进程组后一定返回，不挂死
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-stuck-"));
+  const fake = path.join(dir, "fake");
+  fs.writeFileSync(fake, '#!/bin/sh\nshift 3\nsleep 30 &\necho started\nwait\n', { mode: 0o755 });
+  const t0 = Date.now();
+  const r = await mod.runFlashSh(fake, { command: "x", cwd: dir, timeoutMs: 1000, maxOutputBytes: 1000, graceMs: 200, closeDeadlineMs: 500 });
+  const ms = Date.now() - t0;
+  ok(r.timedOut === true && ms < 4000 && /started/.test(r.stdout), "exe 与它的孙进程都不退：硬杀进程组后 " + ms + " ms 内返回", JSON.stringify(r));
+  const ac = new AbortController();
+  setTimeout(() => ac.abort(), 300);
+  const t1 = Date.now();
+  const r2 = await mod.runFlashSh(fake, { command: "x", cwd: dir, timeoutMs: 20000, maxOutputBytes: 1000, signal: ac.signal, closeDeadlineMs: 500 });
+  ok(r2.exitCode === 130 || /cancelled/.test(r2.error ?? ""), "取消：杀掉进程组并返回（" + (Date.now() - t1) + " ms）", JSON.stringify(r2));
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+{
+  const R = (wd, base, ws) => { try { return mod.resolveWorkdir(wd, base, ws, "win32"); } catch (error) { return "ERR:" + error.message; } };
+  ok(R("/d/x", "C:\\w", "C:\\w") === "D:\\x", "Windows：workdir /d/x → D:\\x（与 flash-sh、分类器一致）");
+  ok(R("sub\\..\\..\\up", "C:\\w\\proj", "C:\\w\\proj") === "C:\\w\\up", "Windows：.. 按词法归一（之后由审批分类器判断在不在工作区）");
+  ok(/^ERR:.*network share/.test(R("\\\\evil\\share", "C:\\w", "C:\\w")) && /^ERR:/.test(R("//evil/share/x", "C:\\w", "C:\\w")) && /^ERR:/.test(R("\\\\.\\PhysicalDrive0", "C:\\w", "C:\\w")), "Windows：UNC / \\\\.\\ 设备 workdir 在 stat 之前就拒绝（不触发 SMB 认证）");
+  ok(R("\\\\srv\\share\\proj\\sub", "\\\\srv\\share\\proj", "\\\\srv\\share\\proj") === "\\\\srv\\share\\proj\\sub", "工作区本身在网络共享上时，共享内的 workdir 照常");
+  ok(mod.resolveWorkdir("../x", "/w/p", "/w/p", "linux") === "/w/x" && mod.resolveWorkdir("", "/w/p", "/w/p", "linux") === "/w/p", "POSIX：相对路径按工作区解析，空 = 工作区");
+  const W = { workspace: "C:\\w\\proj", platform: "win32", tmpdir: "C:\\T", followLinks: false };
+  ok(mod.classifyCommand("ls", { ...W, cwd: "D:\\w\\proj" }).cacheable === false && mod.classifyCommand("ls", { ...W, cwd: "C:\\w\\proj\\..\\other" }).cacheable === false, "workdir 换盘符 / .. 出工作区 → 每次都问");
+  ok(mod.classifyCommand("ls //evil/share", { ...W, cwd: "C:\\w\\proj" }).cacheable === false, "命令参数里有 UNC 路径 → 每次都问（读也会触发 SMB 认证）");
+  if (process.platform !== "win32") {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.homedir(), ".flash-sh-wd-"))); // 不放 /tmp：临时目录本身是允许的根
+    fs.mkdirSync(path.join(root, "ws"));
+    fs.mkdirSync(path.join(root, "out"));
+    fs.symlinkSync(path.join(root, "out"), path.join(root, "ws", "esc"));
+    const ctx = { workspace: path.join(root, "ws"), platform: process.platform, tmpdir: "/nonexistent" };
+    ok(mod.classifyCommand("ls", { ...ctx, cwd: path.join(root, "ws", "esc") }).cacheable === false && mod.classifyCommand("ls", { ...ctx, cwd: path.join(root, "ws") }).cacheable === true, "workdir 是指向工作区外的符号链接 → 每次都问");
+    const tmpLinkDir = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-tmplink-"));
+    fs.symlinkSync(path.join(root, "out"), path.join(tmpLinkDir, "l"));
+    ok(mod.classifyCommand("echo x > " + path.join(tmpLinkDir, "l", "f"), { ...ctx, cwd: path.join(root, "ws"), tmpdir: os.tmpdir() }).cacheable === false && mod.classifyCommand("echo x > " + path.join(tmpLinkDir, "f"), { ...ctx, cwd: path.join(root, "ws"), tmpdir: os.tmpdir() }).cacheable === true, "临时目录豁免也按真实路径复核：经 /tmp 里的符号链接写到外面 → 每次都问");
+    fs.rmSync(tmpLinkDir, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 // ── 协调器：presets 子功能优先，独立行让位；任一方卸载后另一方接管 ────────────────
 {
   const mkRegistry = () => {
