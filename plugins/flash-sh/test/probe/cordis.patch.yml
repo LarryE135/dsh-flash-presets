@@ -1,0 +1,3 @@
+- insert:
+    - id: flash-sh-probe
+      name: 'dsh-flash-sh-probe'

@@ -1,0 +1,15 @@
+# dsh-flash-sh —— 组合包补丁层（独立插件版 flash-sh）
+# 实例 id 是 flash-sh-standalone。dsh-flash-presets 0.3.4 起把本包作为可选依赖、在它的 flash-presets 行下以 flashSh 子功能挂上
+# （那边不新增行）；工具名都叫 flash_sh，进程内协调器保证只注册一个，presets 的 flashSh 优先，本行让位并写日志
+# （见 README「与 dsh-flash-presets 同时安装」）。
+# 默认关闭（enabled: false）—— 它会在本机执行命令，要用户显式打开：
+#   · 在 profile 的 cordis.patch.yml 里追加（注意：会替换本行整个 config，要保留的字段需重述）：
+#       - id: flash-sh-standalone
+#         config:
+#           enabled: true
+#   · 或设置用户环境变量 DSH_FLASH_SH=1（不能写进 .env：DSH 拒绝 .env 里出现 DSH_* 变量）。
+- insert:
+    - id: flash-sh-standalone
+      name: 'dsh-flash-sh'
+      config:
+        enabled: false

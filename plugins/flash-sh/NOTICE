@@ -1,0 +1,43 @@
+dsh-flash-sh
+Copyright (c) 2026 LarryE135
+
+本包（lib/、cordis.patch.yml、文档）以 MIT License 发布，见 LICENSE。
+
+vendor/win32-x64/flash-sh.exe 是 flash-sh（本仓库 native/flash-sh，MIT）的 Windows x64 构建，
+静态链接了以下第三方开源组件（完整清单与版本见 THIRD_PARTY_LICENSES.md）：
+
+  - uutils coreutils（uu_cat、uu_ls、uu_sort 等 40 余个 applet 与 uucore）——MIT License
+      https://github.com/uutils/coreutils    Copyright (c) uutils developers
+  - uutils sed ——MIT License
+      https://github.com/uutils/sed           Copyright (c) uutils developers
+  - ICU4X（icu_* 系列）——Unicode License v3（Unicode-3.0）
+      https://github.com/unicode-org/icu4x    Copyright (c) Unicode, Inc.
+  - 其余 Rust crate 为 MIT、Apache-2.0、MIT/Apache-2.0 双许可、Unlicense/MIT、Zlib、CC0-1.0 等宽松许可；
+    其中 calendrical_calculations、normalize-line-endings 仅以 Apache-2.0 授权，self_cell 按
+    "Apache-2.0 OR GPL-2.0-only" 选用 Apache-2.0。Apache-2.0 全文：https://www.apache.org/licenses/LICENSE-2.0
+
+uutils（coreutils、sed）的 MIT 许可全文：
+
+---
+
+MIT License
+
+Copyright (c) uutils developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

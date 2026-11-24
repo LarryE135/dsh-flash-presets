@@ -1,0 +1,64 @@
+{
+  "name": "dsh-flash-sh",
+  "version": "0.1.0",
+  "description": "flash-sh for DeepSeek Harness: an optional Bash-compatible shell tool (flash_sh) for Windows x64 hosts, backed by a bundled single-file Rust interpreter (no Git Bash / WSL / MSYS2). Off by default. Usable standalone or as the flashSh feature of dsh-flash-presets.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "bash",
+    "shell",
+    "windows",
+    "flash-sh"
+  ],
+  "license": "MIT",
+  "author": "LarryE135 (https://github.com/LarryE135)",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "files": [
+    "lib",
+    "vendor",
+    "scripts/check-flash-sh.ps1",
+    "test",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "engines": {
+    "node": ">=22.15",
+    "dsh": ">=0.2.1-rc.5 <0.2.3-0"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml",
+      "platforms": [
+        "win32"
+      ]
+    }
+  }
+}
