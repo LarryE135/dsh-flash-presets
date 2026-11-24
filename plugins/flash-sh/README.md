@@ -198,7 +198,10 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 - **控制台、设备等其他来源**：逐字节读。设环境变量 `FLASH_SH_READ_BYTES=1` 可以对所有来源强制逐字节读（排查用）。
 
 0.1.1 修过 0.1.0 的回归（Windows 上管道 / here-string / heredoc 只读到第一行），代价是管道上改成逐字节读、吞吐掉到约 1/8；
-0.1.2 用上面的 peek 把吞吐找回来，语义不变。
+0.1.2 用上面的 peek 找回一部分，语义不变。GitHub windows-latest 实测（同一个 exe，5 次中位数）：管道 10 万行 318–330 ms，
+强制逐字节 463–519 ms，Git Bash 2.8 s；100 万行 3.0–3.1 s 对 4.8–5.4 s（Git Bash 31–32 s）；文件 20 万行 665–681 ms。即管道上比 0.1.1
+快约 1.5–1.8 倍、仍快于 Git Bash，但没有回到 0.1.0 的水平（0.1.0 在管道上整块读，快但会丢数据）。逐行读很大的管道输出时，
+`readarray -t a < <(cmd)` 或先写临时文件再 `while read … < 文件` 更快。
 
 实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 26 条 × 两种执行方式）：
 
