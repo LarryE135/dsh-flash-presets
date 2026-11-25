@@ -4,18 +4,22 @@
 // 对照：同一个 exe 加 FLASH_SH_READ_BYTES=1（强制逐字节读，即 0.1.1 在管道上的读法）；有 Git Bash 时一并计时。
 // 每个 shell 每项先跑一次计数版（循环体 n=$((n+1))），行数不对标 BAD：计时用的 `do :; done` 不数行，
 // 只读了一部分行的实现也会显得很快（下游测 0.1.0 的管道数字就是这样来的）。
-//   node test/read-bench.mjs [flash-sh 可执行文件] [次数，默认 5] [--ref 另一个 exe（只计数+计时，如 0.1.0）]
+//   node test/read-bench.mjs [flash-sh 可执行文件] [次数，默认 5] [--ref 另一个 exe（只计数+计时，如 0.1.0）] [--json 输出文件]
+// --json（0.1.6）：另写一份机器可读结果（每项全部样本、中位数、行数是否正确、exe 版本与 sha256、平台），便于 CI 与基线自动比对。
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
+import crypto from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const ri = argv.indexOf("--ref");
 const ref = ri >= 0 ? argv.splice(ri, 2)[1] : null;
+const ji = argv.indexOf("--json");
+const jsonOut = ji >= 0 ? argv.splice(ji, 2)[1] : null;
 const bin = argv[0] || process.env.FLASH_SH_TEST_BIN || path.join(here, "..", "vendor", "win32-x64", "flash-sh.exe");
 const runs = Number(argv[1] || 5);
 if (!fs.existsSync(bin)) {
@@ -41,11 +45,29 @@ function med(a) {
   const s = [...a].sort((x, y) => x - y);
   return s[Math.floor(s.length / 2)];
 }
+const report = {
+  schema: 1,
+  date: new Date().toISOString(),
+  platform: process.platform + "-" + process.arch,
+  runs,
+  shells: shells.map(([name, exe]) => {
+    const v = spawnSync(exe, ["--version"], { encoding: "utf8", windowsHide: true });
+    let sha256 = null;
+    try {
+      sha256 = crypto.createHash("sha256").update(fs.readFileSync(exe)).digest("hex");
+    } catch {}
+    return { name, exe, version: ((v.stdout || "").split(/\r?\n/)[0] || "").trim(), sha256 };
+  }),
+  cases: [],
+  startup: [],
+};
 console.log("read 吞吐（" + bin + "，每项 " + runs + " 次取中位数，单位 ms；行数都对时不标注）");
 console.log(["用例", ...shells.map((s) => s[0])].join(" | "));
 for (const [label, script, count, want] of CASES) {
   const cells = [];
-  for (const [, exe, extra] of shells) {
+  const jc = { label, expectLines: want, results: [] };
+  report.cases.push(jc);
+  for (const [name, exe, extra] of shells) {
     const c = spawnSync(exe, ["-c", count], { cwd: dir, env: { ...process.env, ...extra }, encoding: "utf8", timeout: 300000, windowsHide: true });
     const got = (c.stdout || "").trim();
     const lines = got === String(want) ? "" : " 行数BAD:" + (got || "?");
@@ -57,6 +79,7 @@ for (const [label, script, count, want] of CASES) {
       ts.push(performance.now() - t0);
       rc = r.status;
     }
+    jc.results.push({ shell: name, medianMs: +med(ts).toFixed(1), samplesMs: ts.map((t) => +t.toFixed(1)), rc, lines: got, linesOk: lines === "" });
     cells.push(med(ts).toFixed(0) + (rc === 0 ? "" : " (rc" + rc + ")") + lines);
   }
   console.log([label, ...cells].join(" | "));
@@ -79,5 +102,10 @@ for (const [label, exe, args] of START) {
     ts.push(performance.now() - t0);
   }
   console.log(label + " | " + med(ts).toFixed(1));
+  report.startup.push({ label, medianMs: +med(ts).toFixed(1), samplesMs: ts.map((t) => +t.toFixed(1)) });
+}
+if (jsonOut) {
+  fs.writeFileSync(jsonOut, JSON.stringify(report, null, 2) + "\n");
+  console.log("\nJSON 结果已写入 " + jsonOut);
 }
 fs.rmSync(dir, { recursive: true, force: true });

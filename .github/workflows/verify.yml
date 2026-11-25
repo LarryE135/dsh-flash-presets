@@ -107,6 +107,7 @@ jobs:
 
       # 0.1.2：Job Object 改为第一次起子进程前才建。确认 --timeout 与父进程被 taskkill /F 两条路仍带走整棵树
       # （子进程、后台任务、子 shell、find -exec / xargs 的孙进程），且结束后不残留 flash-sh.exe。
+      # 0.1.6：测试拷一份 exe 到独有目录再跑、只数这份拷贝的进程，并全程开一个原路径诱饵进程，验证与别的 flash-sh 负载并发也不误判。
       - name: flash-sh.exe 进程树收尾（Windows）
         if: runner.os == 'Windows' && !cancelled()
         shell: pwsh
@@ -138,7 +139,18 @@ jobs:
         run: |
           $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
           $ref = Join-Path $env:RUNNER_TEMP 'flash-sh-0.1.0.exe'
-          if (Test-Path $ref) { node plugins/flash-sh/test/read-bench.mjs $exe 5 --ref $ref } else { node plugins/flash-sh/test/read-bench.mjs $exe 5 }
+          $json = Join-Path $env:RUNNER_TEMP 'read-bench.json'
+          if (Test-Path $ref) { node plugins/flash-sh/test/read-bench.mjs $exe 5 --ref $ref --json $json } else { node plugins/flash-sh/test/read-bench.mjs $exe 5 --json $json }
+
+      # 0.1.6：read-bench 的机器可读结果（全部样本 + 中位数 + 行数是否正确 + exe 版本与 sha256），供与基线自动比对。
+      - name: 上传 read-bench JSON
+        if: runner.os == 'Windows' && !cancelled()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: read-bench-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/read-bench.json
+          if-no-files-found: ignore
 
       # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
       - name: 别名表 × 合成配置

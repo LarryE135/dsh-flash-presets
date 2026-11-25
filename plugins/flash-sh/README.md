@@ -26,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.5.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.5.tgz`。
+1. 把 `dsh-flash-sh-0.1.6.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.6.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.5.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.5.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.6.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.6.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.5.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.6.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -223,24 +223,24 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ### 与 bash / Git Bash 的其他已知差异
 
-0.1.2 实机测试（Windows 11 + DSH 0.2.2-rc.5，对照 Git Bash 5.2.37，108 个用例 15 处差异）列出的差异，按 0.1.5 的实际情况（0.1.5 只改了构建路径与版本号，行为与 0.1.4 相同）：
+0.1.2 实机测试（Windows 11 + DSH 0.2.2-rc.5，对照 Git Bash 5.2.37，108 个用例 15 处差异）列出的差异，按 0.1.6 的实际情况（0.1.5、0.1.6 的 exe 行为与 0.1.4 相同；0.1.5 只改构建路径，0.1.6 只改测试与文档）：
 
-| 项 | flash-sh 0.1.5 | bash / Git Bash | 说明 |
+| 项 | flash-sh 0.1.6 | bash / Git Bash | 说明 |
 | --- | --- | --- | --- |
 | `sh`、`bash` | **0.1.4 起可用**：`sh -c …`、`sh 脚本`、`bash -c …`、`bash 脚本` 都用 flash-sh 自己执行（Windows 上一律如此，不会调到 PATH 里的 Git Bash 或 System32 的 WSL `bash.exe`） | `/usr/bin/sh` | 行为等同 `bash`（不是 dash / POSIX 模式）。审批上 `sh -c` 与 `bash -c` 同等对待：每次都问 |
 | `cmp`、`nproc` | **0.1.4 起内置**（`cmp -s / -l / -b`；`nproc --all / --ignore`，认 `OMP_NUM_THREADS`） | 有 | |
 | `id`、`stat`、`chmod`、`ps` | 没有 | 有 | Windows 上没有对应的权限 / 进程模型。替代：`whoami`；文件大小 `wc -c < f`；修改时间 `date -r f`；进程用 PowerShell 的 `Get-Process` |
 | `/dev/zero`、`/dev/urandom`、`/dev/random` | **0.1.4 起可读**：`< /dev/urandom` 重定向，以及内置命令的文件参数（`head -c 16 /dev/urandom`、`od -N4 /dev/zero`、`cat /dev/zero \| head -c 5`）；随机字节取自系统 CSPRNG（`BCryptGenRandom`） | 有 | 只特判读取：`ls /dev`、`[ -e /dev/zero ]`、写入它们、把它们当参数传给外部程序（`git`、`python`…）都不行。`/dev/null` 一直可用 |
 | `time` | **0.1.4 起可用**：`time 命令` / `time -p`，`TIMEFORMAT`（`%R %U %S %P`，精度与 `l` 格式）；输出到 stderr | 有 | Windows 上 user / sys 只计 flash-sh 进程自己，不含它起的子进程 |
-| `type -a` | **0.1.4 起列出全部**（关键字、函数、内建、内置 applet、PATH 上的每一个） | 列全部 | 内置 applet 会多列一行 `… is a flash-sh applet` |
+| `type -a` | 0.1.4 起列出全部：关键字、函数、内建、内置 applet，再加上 **PATH 上真实存在的每一个可执行文件** | 列全部 | Windows 的 PATH 里通常没有 `echo.exe`、`cat.exe` 这类文件，所以 `type -a echo` 一般只有 `echo is a shell builtin` 一行；Git Bash 多出的 `/usr/bin/echo` 是 MSYS2 自带的 exe，把 `C:\Program Files\Git\usr\bin` 加进 PATH 后 flash-sh 也会列出。Linux 构建上与 bash 逐行相同。内置 applet 会多列一行 `… is a flash-sh applet` |
 | `read -p 提示` | **0.1.4 起与 bash 相同**：只在输入是终端时把提示写到 stderr | 同左 | 0.1.2 把提示写进了 stdout |
 | `timeout 5 echo ok` | **0.1.4 起可用**：内建命令（`echo`、`printf`、`test`…）PATH 上找不到时用一个新的 flash-sh 执行 | 可用（调 `/usr/bin/echo`） | 与 bash 一样，shell 函数不能交给 `timeout` |
 | `${#s}`（多字节） | 按字符数（`中文` = 2） | UTF-8 locale 下同样是 2；C locale 下按字节（6） | 不改：flash-sh 始终按 UTF-8 字符计。需要字节数用 `printf %s "$s" \| wc -c` |
 | `$( )` 里的 NUL | 保留（`x=$(printf 'a\0b')` 长度 3） | 丢掉 NUL 并警告（长度 2） | 不要靠命令替换搬二进制数据，改用临时文件 |
 | `ls -l` 权限位 | 恒为 `-rwxrwxrwx` | 真实权限 | Windows 文件没有 Unix 权限位；不要解析 `ls -l` 的权限列 |
 | `du -sh` 小目录 | `0` | `1.0K` | uutils du 在 Windows 上对很小的目录可能显示 0；要文件的字节数用 `wc -c < 文件` 或 `du -b` |
-| `ulimit -n` | 恒报 `unlimited` | 3200 等 | 只是占位，`ulimit` 不会真的设限 |
-| `kill -INT $$`（子 shell 里打自己的父 shell） | 进程以 130 结束 | Linux bash 5.2：等前台任务结束后继续执行；Git Bash：同样不触发 trap | 在顶层 `trap … INT; kill -INT $$` 两边都正常触发 trap |
+| `ulimit`（`-n`、`-a` 等） | 恒报 `unlimited` | 3200 等真实上限 | **只是占位**：`ulimit` 不读也不设任何限制。不要用 `ulimit -n` / `ulimit -a` 的输出判断能开多少文件或进程 |
+| `kill -INT $$`（子 shell 里打自己的父 shell） | 进程以 130 结束 | Linux bash 5.x：把信号推迟到前台任务结束后再处理，随后顶层 trap 触发；Git Bash：同样不触发 trap | **不要依赖子 shell 里的 `kill -INT $$`**。顶层 `trap … INT; kill -INT $$` 三者行为相同（trap 触发、继续执行、rc=0） |
 | CRLF 结尾的脚本 | 行尾的 `\r` 保留在单词里（与 Linux bash 相同） | Git Bash 会忽略 `\r` | Windows 上写脚本文件请用 LF 换行 |
 | `mapfile -u`、`mapfile -n` | **0.1.4 起与 bash 相同**（`-n N` 只从输入里取 N 行，`-u fd`、`-s`、`-O`） | 同左 | 0.1.3 及以前 `-n` 会把剩下的输入也读走、`-u` 不支持 |
 
@@ -301,6 +301,9 @@ npm test                                   # unit（必跑，不需要 DSH 与�
 FLASH_SH_TEST_BIN=/path/to/flash-sh npm test   # + host：真实 cordis + dsh-tools 宿主（需要能解析到 @deepseek-ai/*，否则自动跳过）
                                            #   + read 回归：直接跑该可执行文件（管道 / here-string / heredoc 逐行读取，test/read-regress.mjs）
                                            #   + 进程树收尾：--timeout 与父进程被杀时整棵树都结束（test/job-tree.mjs；find -exec / xargs 孙进程两条只在 Windows 判定）
+                                           #     0.1.6 起先把 exe 拷到独有临时目录再跑，残留只按这份拷贝的路径数（需要 PowerShell），
+                                           #     并全程开一个原路径的诱饵进程验证隔离；可以和别的 flash-sh 负载（DSH、基准）同时跑。
+                                           #     没有 PowerShell 时退回全局映像名计数，并在输出里提示不能并发
 node test/read-bench.mjs [/path/to/flash-sh] [次数]   # 逐行 read 计时（只打印）：正常读法 vs FLASH_SH_READ_BYTES=1 逐字节 vs bash
 DSH_HOST_NM=/path/to/node_modules FLASH_SH_TEST_BIN=... node test/host.mjs   # host 换一套宿主包跑；实测 DSH 0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.5 都通过
                                            #   （0.2.2 起没有 tools.sdkSchemas、执行要挂 tool executor：测试会自动检测并挂上 native executor）
