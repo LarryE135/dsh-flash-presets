@@ -43,6 +43,20 @@ const CASES = [
   ["管道：read、cat、再 read", `printf '1\\n2\\n3\\n4\\n' | { read -r a; read -r b; cat; read -r c; echo "a=$a b=$b c=$c rc=$?"; }`, "3\n4\na=1 b=2 c= rc=1\n"],
   ["管道：同一管道两个 fd 交替读", `printf '1\\n2\\n3\\n4\\n' | { exec 3<&0; read -r a; read -r -u 3 b; read -r c; read -r -u 3 d; echo "$a$b$c$d"; }`, "1234\n"],
   ["管道：read 后 mapfile", `printf 'h\\n1\\n2\\n' | { read -r h; mapfile -t rest; echo "$h \${#rest[@]} \${rest[*]}"; }`, "h 2 1 2\n"],
+  // 0.1.3：自建管道/文件延迟交还（read 不再每行向系统取）。以下确认交还时机：break 后别的命令读剩余、命令替换 / 流水线段 /
+  // 子 shell / 函数 / eval 读同一 stdin、两个 fd 交替、mapfile、文件重定向后 applet 子进程接着读、大量行计数、lastpipe
+  ["延迟交还：break 后 wc 读剩余", `seq 1 20000 | { while read -r l; do [ "$l" = 12345 ] && break; done; echo "l=$l"; wc -l | tr -d ' '; }`, "l=12345\n7655\n"],
+  ["延迟交还：命令替换里 head 读 stdin", `seq 1 5 | { read -r a; x=$(head -n 2); read -r b; echo "$a|$x|$b"; }`, "1|2\n3|\n"],
+  ["延迟交还：流水线段读父 stdin", `seq 1 6 | { read -r a; read -r b | cat; read -r c; { read -r d; echo "d=$d"; } | cat; read -r e; echo "$a$c$e"; }`, "d=4\n135\n"],
+  ["延迟交还：子 shell / 函数 / eval / cat", `f(){ read -r fv; }; seq 1 9 | { read -r a; (read -r b; echo "sub=$b"); f; eval 'read -r e'; read -r g; echo "$a $fv $e $g"; cat; }`, "sub=2\n1 3 4 5\n6\n7\n8\n9\n"],
+  ["延迟交还：管道与 heredoc 两个 fd 交替", `seq 1 6 | { while read -r a && read -r -u 3 b; do echo "$a:$b"; done 3<<EOF\nx\ny\nz\nEOF\ncat; }`, "1:x\n2:y\n3:z\n5\n6\n"],
+  ["延迟交还：break 后 mapfile", `seq 1 10 | { while read -r l; do [ $l = 4 ] && break; done; mapfile -t r; echo "\${#r[@]} \${r[0]}"; }`, "6 5\n"],
+  ["延迟交还：break 后 awk", `seq 1 10 | { while read -r l; do [ $l = 6 ] && break; done; awk '{s+=$1} END{print s}'; }`, "34\n"],
+  ["延迟交还：文件 break 后 head 再 read", `d=$(mktemp -d) && seq 1 30000 > "$d/f" && { while read -r l; do [ "$l" = 23456 ] && break; done; head -n 1; read -r x; echo "x=$x"; } < "$d/f"; rm -rf "$d"`, "23457\nx=23458\n"],
+  ["延迟交还：管道 20 万行计数", `seq 1 200000 | { n=0; s=0; while read -r v; do n=$((n+1)); s=$((s+v)); done; echo "$n $s"; }`, "200000 20000100000\n"],
+  ["延迟交还：lastpipe", `shopt -s lastpipe; seq 1 5 | { read -r a; read -r b; }; echo "$a$b"`, "12\n"],
+  ["延迟交还：read -t 不把已用的行当成新输入", `{ printf '1\\n'; sleep 1; printf '2\\n'; } | { read -r a; read -r -t 0.3 b; echo "rc=$? b=[$b]"; read -r c; echo "c=$c"; }`, "rc=142 b=[]\nc=2\n"],
+  ["延迟交还：read -t 0 不把已用的行当成新输入", `{ printf '1\\n'; sleep 1; printf '2\\n'; } | { read -r a; read -t 0 && echo avail || echo none; read -r c; echo "c=$c"; }`, "none\nc=2\n"],
   ["read -t 超时精度（0.3 s，管道无数据）", `s=$(date +%s%N); sleep 2 | { read -r -t 0.3 x; echo "rc=$?"; e=$(date +%s%N); d=$(( (e - s) / 1000000 )); (( d >= 250 && d < 1500 )) && echo ok || echo "elapsed=$d"; }`, "rc=142\nok\n"],
 ];
 

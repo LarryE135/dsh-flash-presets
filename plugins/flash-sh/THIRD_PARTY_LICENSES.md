@@ -1,7 +1,7 @@
 # 第三方组件许可清单（vendor/win32-x64/flash-sh.exe）
 
 flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，下表是 x86_64-pc-windows-gnu 目标下
-实际进入构建图的全部 crate（`cargo metadata --filter-platform x86_64-pc-windows-gnu`，仅 normal 依赖，243 个）。
+实际进入构建图的全部 crate（`cargo metadata --filter-platform x86_64-pc-windows-gnu`，仅 normal 依赖，225 个）。
 多许可（`A OR B`）的 crate 按其中任一许可使用；本包选择 MIT（有 MIT 选项时）或 Apache-2.0。
 
 | crate | 版本 | 许可 | 仓库 |
@@ -27,9 +27,7 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/stream-ciphers |
 | clap | 4.6.9 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clap_builder | 4.6.7 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
-| clap_complete | 4.6.12 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clap_lex | 1.1.2 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
-| clap_mangen | 0.3.4 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | colorchoice | 1.0.5 | MIT OR Apache-2.0 | https://github.com/rust-cli/anstyle.git |
 | console | 0.16.6 | MIT | https://github.com/console-rs/console |
 | const-oid | 0.10.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
@@ -43,19 +41,16 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | data-encoding | 2.11.1 | MIT | https://github.com/ia0/data-encoding |
 | data-encoding-macro | 0.1.21 | MIT | https://github.com/ia0/data-encoding |
 | data-encoding-macro-internal | 0.1.19 | MIT | https://github.com/ia0/data-encoding |
-| difflib | 0.4.0 | MIT | https://github.com/DimaKudosh/difflib |
 | digest | 0.11.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | displaydoc | 0.2.7 | MIT OR Apache-2.0 | https://github.com/yaahc/displaydoc |
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 | https://gitlab.com/kornelski/dunce |
 | either | 1.19.0 | MIT OR Apache-2.0 | https://github.com/rayon-rs/either |
 | encode_unicode | 1.0.0 | Apache-2.0 OR MIT | https://github.com/tormol/encode_unicode |
 | errno | 0.3.15 | MIT OR Apache-2.0 | https://github.com/lambda-fairy/rust-errno |
-| fancy-regex | 0.18.0 | MIT | https://github.com/fancy-regex/fancy-regex |
 | fancy-regex | 0.20.2 | MIT | https://github.com/fancy-regex/fancy-regex |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/fastrand |
 | filetime | 0.2.30 | MIT/Apache-2.0 | https://github.com/alexcrichton/filetime |
 | fixed_decimal | 0.7.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
-| float-cmp | 0.10.0 | MIT | https://github.com/mikedilger/float-cmp |
 | fluent | 0.17.0 | Apache-2.0 OR MIT | https://github.com/projectfluent/fluent-rs |
 | fluent-bundle | 0.16.0 | Apache-2.0 OR MIT | https://github.com/projectfluent/fluent-rs |
 | fluent-langneg | 0.13.1 | Apache-2.0 OR MIT | https://github.com/projectfluent/fluent-langneg-rs |
@@ -88,8 +83,6 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | icu_properties | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | icu_properties_data | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | icu_provider | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
-| icu_segmenter | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
-| icu_segmenter_data | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | icu_time | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | icu_time_data | 2.4.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | indicatif | 0.18.6 | MIT | https://github.com/console-rs/indicatif |
@@ -115,7 +108,6 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | memmap2 | 0.9.12 | MIT OR Apache-2.0 | https://github.com/RazrFalcon/memmap2-rs |
 | nix | 0.31.4 | MIT | https://github.com/nix-rust/nix |
 | nom | 8.0.0 | MIT | https://github.com/rust-bakery/nom |
-| normalize-line-endings | 0.3.0 | Apache-2.0 | https://github.com/derekdreery/normalize-line-endings |
 | notify | 8.2.2 | CC0-1.0 | https://github.com/notify-rs/notify.git |
 | notify-types | 2.3.1 | MIT OR Apache-2.0 | https://github.com/notify-rs/notify.git |
 | nu-ansi-term | 0.50.3 | MIT | https://github.com/nushell/nu-ansi-term |
@@ -127,14 +119,10 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | os_display | 0.1.4 | MIT | https://github.com/blyxxyz/os_display |
 | outref | 0.5.2 | MIT | https://github.com/Nugine/outref |
 | parse_datetime | 0.17.0 | MIT | https://github.com/uutils/parse_datetime |
-| phf | 0.14.0 | MIT | https://github.com/rust-phf/rust-phf |
-| phf_shared | 0.14.0 | MIT | https://github.com/rust-phf/rust-phf |
 | platform-info | 2.2.1 | MIT | https://github.com/uutils/platform-info |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT | https://github.com/taiki-e/portable-atomic |
 | potential_utf | 0.1.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 | https://github.com/cryptocorrosion/cryptocorrosion |
-| predicates | 3.1.4 | MIT OR Apache-2.0 | https://github.com/assert-rs/predicates-rs |
-| predicates-core | 1.0.10 | MIT OR Apache-2.0 | https://github.com/assert-rs/predicates-rs |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 |
 | quote | 1.0.47 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote |
 | rand | 0.10.4 | MIT OR Apache-2.0 | https://github.com/rust-random/rand |
@@ -145,20 +133,17 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | regex | 1.13.2 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex |
 | regex-automata | 0.4.19 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex |
 | regex-syntax | 0.8.12 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex |
-| roff | 1.1.1 | MIT OR Apache-2.0 | https://github.com/rust-cli/roff-rs |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | https://github.com/rust-lang/rustc-hash |
 | rustix | 1.1.6 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/rustix |
 | same-file | 1.0.6 | Unlicense/MIT | https://github.com/BurntSushi/same-file |
-| sed | 0.3.0 | MIT | https://github.com/uutils/sed |
+| sed | 0.3.0 | MIT | https://github.com/uutils/sed （flash-sh 源码里的 vendor/sed 补丁版：只把依赖改到 uucore 0.13 / fancy-regex 0.20，库源码只改两处类型参数） |
 | self_cell | 1.3.0 | Apache-2.0 OR GPL-2.0-only | https://github.com/Voultapher/self_cell |
 | serde | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | sha2 | 0.11.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | sha3 | 0.12.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
-| siphasher | 1.0.4 | MIT OR Apache-2.0 | https://github.com/jedisct1/rust-siphash |
 | smallvec | 1.16.6 | MIT OR Apache-2.0 | https://github.com/smallvec/smallvec |
-| smawk | 0.3.3 | MIT | https://github.com/mgeisler/smawk |
 | sponge-cursor | 0.1.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 | https://github.com/storyyeller/stable_deref_trait |
 | strsim | 0.11.1 | MIT | https://github.com/rapidfuzz/strsim-rs |
@@ -167,7 +152,6 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | synstructure | 0.14.0 | MIT | https://github.com/mystor/synstructure |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | terminal_size | 0.4.4 | MIT OR Apache-2.0 | https://github.com/eminence/terminal-size |
-| textwrap | 0.16.4 | MIT | https://github.com/mgeisler/textwrap |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
 | thiserror-impl | 2.0.21 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
 | tinystr | 0.8.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
@@ -224,9 +208,7 @@ flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，�
 | uu_wc | 0.13.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uu/wc |
 | uu_whoami | 0.13.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uu/whoami |
 | uu_yes | 0.13.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uu/yes |
-| uucore | 0.12.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uucore |
 | uucore | 0.13.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uucore |
-| uucore_procs | 0.12.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uucore_procs |
 | uucore_procs | 0.13.0 | MIT | https://github.com/uutils/coreutils/tree/main/src/uucore_procs |
 | uutils_term_grid | 0.8.1 | MIT | https://github.com/uutils/uutils-term-grid |
 | vsimd | 0.8.0 | MIT | https://github.com/Nugine/simd |

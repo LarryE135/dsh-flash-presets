@@ -26,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.2.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.2.tgz`。
+1. 把 `dsh-flash-sh-0.1.3.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.3.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.2.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.2.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.3.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.3.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.2.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.3.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -189,25 +189,33 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 子进程、管道里的另一段）。bash 在管道上为此一次只读一个字节。flash-sh 的做法按输入来源分三种：
 
 - **管道 / FIFO / here-string / heredoc**（0.1.2 起）：先 *peek*（Windows `PeekNamedPipe`、Linux `tee(2)` 到私有管道）——只把管道里
-  现成的数据拷一份出来、不取走；在拷贝里找到分隔符后，再**恰好读到分隔符为止**。拷贝里剩下的部分仍在管道里，谁接着读都拿得到，
-  所以不需要「把多读的还回去」。拷贝只当预测用：每次真读出来的字节都和拷贝逐字节比对，不一致（有别的读者同时在读这个管道）就按
-  真读到的字节重新解析。这样每行只要 1 次真读（外加每 512 B–64 KB 一次 peek），0.1.1 是每个字节 1 次。
-- **磁盘文件**：一次读一块，`read` 返回前把文件位置挪到本行末尾（与 bash 相同）；块里剩下的部分留给同一个打开文件的下一次 `read`，
-  每行只剩一次 seek。期间只要运行过可能读写文件的东西（子进程、内建 applet、`echo`/`printf`/`test` 等少数纯内建以外的命令、
-  以写方式打开任何文件），这份缓存就作废、重新从文件读。
+  现成的数据拷一份出来、不取走；在拷贝里找分隔符。拷贝里剩下的部分仍在管道里，谁接着读都拿得到，所以不需要「把多读的还回去」。
+  - **本 shell 自己建的、没交给别人的管道**（0.1.3 起：流水线里 `cmd | while read` 的那根管道、here-string、heredoc）：用掉的行
+    也先留在管道里，拷贝用完时才一次取走（**延迟交还**），每行不再有系统调用。在任何别的读者碰到这根管道之前先把用掉的字节
+    取走（结清）：运行别的命令或 applet、起子进程、流水线开始、`read` 换到另一个 fd、`read -t` 等输入、`mapfile` 等。一旦这根
+    管道交给过子进程、后台任务或同时运行的两段流水线，就不再延迟（那时可能有别人同时在读）。
+  - **其他管道**（从父进程继承来的 stdin 等）：每行恰好读到分隔符为止（1 次真读），真读出来的字节和拷贝逐字节比对，不一致
+    （有别的读者同时在读）就按真读到的字节重新解析。
+- **磁盘文件**：一次读一块，块里剩下的部分留给同一个打开文件的下一次 `read`。`< 文件` 这种本 shell 打开、没交给别人的文件
+  （0.1.3 起）文件位置先停在块尾，在别的读者之前才挪回本行末尾；其他文件（继承来的、交给过子进程的）每次 `read` 返回前就挪回去
+  （与 bash 相同，每行一次 seek）。期间只要运行过可能读写文件的东西（子进程、内建 applet、`echo`/`printf`/`test` 等少数纯内建
+  以外的命令、以写方式打开任何文件），这份缓存就作废、重新从文件读。
 - **控制台、设备等其他来源**：逐字节读。设环境变量 `FLASH_SH_READ_BYTES=1` 可以对所有来源强制逐字节读（排查用）。
 
-0.1.1 修过 0.1.0 的回归（Windows 上管道 / here-string / heredoc 只读到第一行），代价是管道上改成逐字节读、吞吐掉到约 1/8；
-0.1.2 用上面的 peek 找回一部分，语义不变。GitHub windows-latest 实测（同一个 exe，5 次中位数）：管道 10 万行 318–330 ms，
-强制逐字节 463–519 ms，Git Bash 2.8 s；100 万行 3.0–3.1 s 对 4.8–5.4 s（Git Bash 31–32 s）；文件 20 万行 665–681 ms。即管道上比 0.1.1
-快约 1.5–1.8 倍、仍快于 Git Bash，但没有回到 0.1.0 的水平（0.1.0 在管道上整块读，快但会丢数据）。逐行读很大的管道输出时，
-`readarray -t a < <(cmd)` 或先写临时文件再 `while read … < 文件` 更快。
+0.1.1 修过 0.1.0 的回归（Windows 上管道 / here-string / heredoc 只读到第一行），代价是管道上改成逐字节读；0.1.2 用 peek 找回一部分；
+0.1.3 的延迟交还去掉了每行的系统调用。Linux 构建实测（同一构建配置，5 次中位数，计数确认行数正确）：管道 10 万行 242 → 104 ms、
+100 万行 2.34 → 1.04 s、here-string 2 万行 38.5 → 22.4 ms、heredoc 1 万行 13.8 → 11.7 ms、文件 20 万行 236 → 215 ms（0.1.2 → 0.1.3）。
+注意：下游报告里 0.1.0 的管道数字（10 万行 0.057 s）是用不数行的循环测的。按 0.1.0 源码，它在 Windows 管道上每次 `read` 读走一块
+（最多 256 B）、只用第一行、其余丢掉，循环实际只跑了一小部分行，那个数字不能当目标（CI 的 read 计时步骤对 0.1.0 计数）。需要整段读进数组时 `readarray -t a < <(cmd)` 仍然最快。
 
-实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 26 条 × 两种执行方式）：
+实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 38 条 × 两种执行方式）：
 
 - `cmd | while read -r l`、`find … | while read -r f`、`while read …; done <<< "$x"`、`while read …; done <<EOF`、
   `{ read a; read b; read c; }` 连续读、子 shell / 函数里从管道读、嵌套管道、`read` 之后接 `cat` / `head -n 1` / `awk` / `mapfile`
   读剩下的内容（管道 / heredoc / here-string / 文件 / `exec 3<file` 都对）、同一管道经两个 fd 交替读、1 MB 单行（文件和管道）；
+- 延迟交还的交还时机（0.1.3）：`while read` 中途 `break` 后 `wc` / `head` / `awk` / `mapfile` 读剩余、命令替换 / 流水线段 / 子 shell /
+  函数 / `eval` 读同一 stdin、管道与 heredoc 两个 fd 交替、文件重定向 `break` 后 applet 接着读、20 万行计数、`lastpipe`、`read -t` / `-t 0`
+  不把已用的行当成新输入；
 - `read -n N`、`read -d 分隔符`（含 `-d ''`）、`read -t 秒数`（含 `-t 0` 只探测；无数据时按时返回 142）都正常；
   最后一行没有换行时 `read` 返回 1 且变量里是这行内容，与 bash 相同；
 - `readarray` / `mapfile` 从管道读（`cmd | { readarray -t a; …; }`、`readarray -t a < <(cmd)`）正常，需要整段读进数组时它最快。
