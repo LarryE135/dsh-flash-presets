@@ -101,6 +101,9 @@ jobs:
             if ($sec3 -ne 1 -or $bad3 -ne 0) { $fail++; $out }
           }
           if ($fail) { Write-Error "check-flash-sh.ps1 第 3 项判定错误"; exit 1 }
+          # 自检脚本在 runner 上找不到 DSH 安装，其余项会报 FAIL、以非 0 退出；本步只断言第 3 项。
+          # 不显式 exit 0 的话，Actions 包装会把最后一个原生命令的 $LASTEXITCODE 当作本步结果。
+          exit 0
 
       # 0.1.2：Job Object 改为第一次起子进程前才建。确认 --timeout 与父进程被 taskkill /F 两条路仍带走整棵树
       # （子进程、后台任务、子 shell、find -exec / xargs 的孙进程），且结束后不残留 flash-sh.exe。
