@@ -40,7 +40,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$ExpectedSha256 = '826808f34a1113d1fb45a772ff10a10c426cd8a4d2323ab82f1bbd6cab358aa1'
+$ExpectedSha256 = 'f4dd7e332eda1633a9db84a4229ebcfe167202bfae6decc4d307846a995d8e64'
 $RowId = 'flash-sh-standalone'
 $PackageName = 'dsh-flash-sh'
 
@@ -236,7 +236,7 @@ if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
     } else {
       Write-Warn2 '没找到 flash-sh.exe.sha256'
     }
-    if ($hash -eq $ExpectedSha256) { Write-Ok '与 dsh-flash-sh 0.1.4 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.4 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
+    if ($hash -eq $ExpectedSha256) { Write-Ok '与 dsh-flash-sh 0.1.5 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.5 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
   }
 
   # ── 3. 执行 ────────────────────────────────────────────────────────────────

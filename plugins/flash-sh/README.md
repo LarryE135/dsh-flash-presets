@@ -26,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.4.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.4.tgz`。
+1. 把 `dsh-flash-sh-0.1.5.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.5.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.4.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.4.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.5.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.5.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.4.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.5.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -223,9 +223,9 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ### 与 bash / Git Bash 的其他已知差异
 
-0.1.2 实机测试（Windows 11 + DSH 0.2.2-rc.5，对照 Git Bash 5.2.37，108 个用例 15 处差异）列出的差异，按 0.1.4 的实际情况：
+0.1.2 实机测试（Windows 11 + DSH 0.2.2-rc.5，对照 Git Bash 5.2.37，108 个用例 15 处差异）列出的差异，按 0.1.5 的实际情况（0.1.5 只改了构建路径与版本号，行为与 0.1.4 相同）：
 
-| 项 | flash-sh 0.1.4 | bash / Git Bash | 说明 |
+| 项 | flash-sh 0.1.5 | bash / Git Bash | 说明 |
 | --- | --- | --- | --- |
 | `sh`、`bash` | **0.1.4 起可用**：`sh -c …`、`sh 脚本`、`bash -c …`、`bash 脚本` 都用 flash-sh 自己执行（Windows 上一律如此，不会调到 PATH 里的 Git Bash 或 System32 的 WSL `bash.exe`） | `/usr/bin/sh` | 行为等同 `bash`（不是 dash / POSIX 模式）。审批上 `sh -c` 与 `bash -c` 同等对待：每次都问 |
 | `cmp`、`nproc` | **0.1.4 起内置**（`cmp -s / -l / -b`；`nproc --all / --ignore`，认 `OMP_NUM_THREADS`） | 有 | |
