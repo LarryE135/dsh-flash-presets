@@ -26,14 +26,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.3.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.3.tgz`。
+1. 把 `dsh-flash-sh-0.1.4.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.4.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.3.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.3.tgz` 都行）。
+   `C:\...\dsh-flash-sh-0.1.4.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.4.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.3.tgz`。
+> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.4.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -205,10 +205,11 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 0.1.1 修过 0.1.0 的回归（Windows 上管道 / here-string / heredoc 只读到第一行），代价是管道上改成逐字节读；0.1.2 用 peek 找回一部分；
 0.1.3 的延迟交还去掉了每行的系统调用。Linux 构建实测（同一构建配置，5 次中位数，计数确认行数正确）：管道 10 万行 242 → 104 ms、
 100 万行 2.34 → 1.04 s、here-string 2 万行 38.5 → 22.4 ms、heredoc 1 万行 13.8 → 11.7 ms、文件 20 万行 236 → 215 ms（0.1.2 → 0.1.3）。
+0.1.2 实机测试（Windows 11 x64，5 次中位数）：管道 10 万行 287 ms、100 万行 2265 ms、文件重定向 20 万行 504 ms（Git Bash 5.2.37 分别为 1804 ms、18402 ms、7095 ms）；0.1.3 / 0.1.4 尚无实机数据。
 注意：下游报告里 0.1.0 的管道数字（10 万行 0.057 s）是用不数行的循环测的。按 0.1.0 源码，它在 Windows 管道上每次 `read` 读走一块
 （最多 256 B）、只用第一行、其余丢掉，循环实际只跑了一小部分行，那个数字不能当目标（CI 的 read 计时步骤对 0.1.0 计数）。需要整段读进数组时 `readarray -t a < <(cmd)` 仍然最快。
 
-实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 38 条 × 两种执行方式）：
+实测正常（Linux 构建对照 bash 5.2，Windows CI 上直接跑 exe，`test/read-regress.mjs` 45 条 × 两种执行方式）：
 
 - `cmd | while read -r l`、`find … | while read -r f`、`while read …; done <<< "$x"`、`while read …; done <<EOF`、
   `{ read a; read b; read c; }` 连续读、子 shell / 函数里从管道读、嵌套管道、`read` 之后接 `cat` / `head -n 1` / `awk` / `mapfile`
@@ -219,6 +220,40 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 - `read -n N`、`read -d 分隔符`（含 `-d ''`）、`read -t 秒数`（含 `-t 0` 只探测；无数据时按时返回 142）都正常；
   最后一行没有换行时 `read` 返回 1 且变量里是这行内容，与 bash 相同；
 - `readarray` / `mapfile` 从管道读（`cmd | { readarray -t a; …; }`、`readarray -t a < <(cmd)`）正常，需要整段读进数组时它最快。
+
+### 与 bash / Git Bash 的其他已知差异
+
+0.1.2 实机测试（Windows 11 + DSH 0.2.2-rc.5，对照 Git Bash 5.2.37，108 个用例 15 处差异）列出的差异，按 0.1.4 的实际情况：
+
+| 项 | flash-sh 0.1.4 | bash / Git Bash | 说明 |
+| --- | --- | --- | --- |
+| `sh`、`bash` | **0.1.4 起可用**：`sh -c …`、`sh 脚本`、`bash -c …`、`bash 脚本` 都用 flash-sh 自己执行（Windows 上一律如此，不会调到 PATH 里的 Git Bash 或 System32 的 WSL `bash.exe`） | `/usr/bin/sh` | 行为等同 `bash`（不是 dash / POSIX 模式）。审批上 `sh -c` 与 `bash -c` 同等对待：每次都问 |
+| `cmp`、`nproc` | **0.1.4 起内置**（`cmp -s / -l / -b`；`nproc --all / --ignore`，认 `OMP_NUM_THREADS`） | 有 | |
+| `id`、`stat`、`chmod`、`ps` | 没有 | 有 | Windows 上没有对应的权限 / 进程模型。替代：`whoami`；文件大小 `wc -c < f`；修改时间 `date -r f`；进程用 PowerShell 的 `Get-Process` |
+| `/dev/zero`、`/dev/urandom`、`/dev/random` | **0.1.4 起可读**：`< /dev/urandom` 重定向，以及内置命令的文件参数（`head -c 16 /dev/urandom`、`od -N4 /dev/zero`、`cat /dev/zero \| head -c 5`）；随机字节取自系统 CSPRNG（`BCryptGenRandom`） | 有 | 只特判读取：`ls /dev`、`[ -e /dev/zero ]`、写入它们、把它们当参数传给外部程序（`git`、`python`…）都不行。`/dev/null` 一直可用 |
+| `time` | **0.1.4 起可用**：`time 命令` / `time -p`，`TIMEFORMAT`（`%R %U %S %P`，精度与 `l` 格式）；输出到 stderr | 有 | Windows 上 user / sys 只计 flash-sh 进程自己，不含它起的子进程 |
+| `type -a` | **0.1.4 起列出全部**（关键字、函数、内建、内置 applet、PATH 上的每一个） | 列全部 | 内置 applet 会多列一行 `… is a flash-sh applet` |
+| `read -p 提示` | **0.1.4 起与 bash 相同**：只在输入是终端时把提示写到 stderr | 同左 | 0.1.2 把提示写进了 stdout |
+| `timeout 5 echo ok` | **0.1.4 起可用**：内建命令（`echo`、`printf`、`test`…）PATH 上找不到时用一个新的 flash-sh 执行 | 可用（调 `/usr/bin/echo`） | 与 bash 一样，shell 函数不能交给 `timeout` |
+| `${#s}`（多字节） | 按字符数（`中文` = 2） | UTF-8 locale 下同样是 2；C locale 下按字节（6） | 不改：flash-sh 始终按 UTF-8 字符计。需要字节数用 `printf %s "$s" \| wc -c` |
+| `$( )` 里的 NUL | 保留（`x=$(printf 'a\0b')` 长度 3） | 丢掉 NUL 并警告（长度 2） | 不要靠命令替换搬二进制数据，改用临时文件 |
+| `ls -l` 权限位 | 恒为 `-rwxrwxrwx` | 真实权限 | Windows 文件没有 Unix 权限位；不要解析 `ls -l` 的权限列 |
+| `du -sh` 小目录 | `0` | `1.0K` | uutils du 在 Windows 上对很小的目录可能显示 0；要文件的字节数用 `wc -c < 文件` 或 `du -b` |
+| `ulimit -n` | 恒报 `unlimited` | 3200 等 | 只是占位，`ulimit` 不会真的设限 |
+| `kill -INT $$`（子 shell 里打自己的父 shell） | 进程以 130 结束 | Linux bash 5.2：等前台任务结束后继续执行；Git Bash：同样不触发 trap | 在顶层 `trap … INT; kill -INT $$` 两边都正常触发 trap |
+| CRLF 结尾的脚本 | 行尾的 `\r` 保留在单词里（与 Linux bash 相同） | Git Bash 会忽略 `\r` | Windows 上写脚本文件请用 LF 换行 |
+| `mapfile -u`、`mapfile -n` | **0.1.4 起与 bash 相同**（`-n N` 只从输入里取 N 行，`-u fd`、`-s`、`-O`） | 同左 | 0.1.3 及以前 `-n` 会把剩下的输入也读走、`-u` 不支持 |
+
+### Windows：低完整性目录与杀毒软件
+
+- **低完整性标签目录**：如果 `flash-sh.exe`（或拷贝它的目录）带 `Mandatory Label\Low Mandatory Level`（`icacls 目录` 能看到，
+  某些下载目录、沙盒工具建的目录会带），从那里启动的程序继承 Low 完整性，写 `%TEMP%` 和 `C:` 一律被拒（`os error 5`，
+  `mktemp: 拒绝访问`）。这是 Windows 的强制完整性控制，与 flash-sh 无关——把 exe 放回 profile 的 `node_modules` 下或任意普通目录即可。
+  `test/read-regress.mjs` 0.1.4 起会先探测可写性，不可写时明确提示并跳过相关用例，不再报成失败。
+- **杀毒软件拦截**：自检第 3 项报「无法执行」或执行很慢，多半是杀软在隔离 / 扫描 `flash-sh.exe`。核对 `check-flash-sh.ps1` 第 2 项的
+  sha256 与发布值一致后，把 `…\node_modules\dsh-flash-sh\vendor\win32-x64\` 加入排除项。
+- **溢出文件**：输出超过上限时完整输出写到 `%TEMP%\dsh-flash-sh-spill-*`。0.1.4 起 DSH 正常退出时删除本次的目录；进程被强杀没来得及删的，
+  下次启动时清理 24 小时以前的（只删本插件前缀、只装着溢出日志的目录）。
 
 ### 其他
 

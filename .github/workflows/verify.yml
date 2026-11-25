@@ -80,6 +80,28 @@ jobs:
           & $exe $repro
           exit $LASTEXITCODE
 
+      # 0.1.4（0.1.2 实机报告 P1 / P2）：自检脚本在 PowerShell 7 与 Windows PowerShell 5.1 下都要正确判定第 3 项
+      # （以前 $LASTEXITCODE = -1 遮住自动变量，pwsh 7 下误报「执行异常：退出码 -1，输出：ok」）；
+      # 以及 exe 的 --version、vendor sha256、自检脚本里的期望值与 package.json 一致。
+      - name: 自检脚本第 3 项（pwsh 7 与 PowerShell 5.1）+ 版本一致性（Windows）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/version.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "版本不一致"; exit 1 }
+          $fail = 0
+          foreach ($host_ in @('pwsh', 'powershell')) {
+            $out = & $host_ -NoProfile -ExecutionPolicy Bypass -File plugins/flash-sh/scripts/check-flash-sh.ps1 -BinPath $exe -DshHome "$env:RUNNER_TEMP/no-dsh" 6>&1 2>&1 | Out-String
+            $sec3 = ($out -split "`n" | Select-String -SimpleMatch 'flash-sh 可执行，输出 ok').Count
+            $bad3 = ($out -split "`n" | Select-String -SimpleMatch '执行异常').Count
+            "$host_：第 3 项 OK 行 $sec3，执行异常行 $bad3"
+            if ($sec3 -ne 1 -or $bad3 -ne 0) { $fail++; $out }
+          }
+          if ($fail) { Write-Error "check-flash-sh.ps1 第 3 项判定错误"; exit 1 }
+
       # 0.1.2：Job Object 改为第一次起子进程前才建。确认 --timeout 与父进程被 taskkill /F 两条路仍带走整棵树
       # （子进程、后台任务、子 shell、find -exec / xargs 的孙进程），且结束后不残留 flash-sh.exe。
       - name: flash-sh.exe 进程树收尾（Windows）

@@ -8,15 +8,17 @@ vendor/win32-x64/flash-sh.exe 是 flash-sh（本仓库 native/flash-sh，MIT）�
 
   - uutils coreutils（uu_cat、uu_ls、uu_sort 等 40 余个 applet 与 uucore）——MIT License
       https://github.com/uutils/coreutils    Copyright (c) uutils developers
-  - uutils sed ——MIT License
-      https://github.com/uutils/sed           Copyright (c) uutils developers
+  - uutils sed 0.3.0 ——MIT License（随 flash-sh 源码 vendor/sed 的补丁版：只改依赖版本与两处类型参数）
+      https://github.com/uutils/sed           Copyright (c) 2025 Diomidis Spinellis
   - ICU4X（icu_* 系列）——Unicode License v3（Unicode-3.0）
       https://github.com/unicode-org/icu4x    Copyright (c) Unicode, Inc.
   - 其余 Rust crate 为 MIT、Apache-2.0、MIT/Apache-2.0 双许可、Unlicense/MIT、Zlib、CC0-1.0 等宽松许可；
-    其中 calendrical_calculations、normalize-line-endings 仅以 Apache-2.0 授权，self_cell 按
-    "Apache-2.0 OR GPL-2.0-only" 选用 Apache-2.0。Apache-2.0 全文：https://www.apache.org/licenses/LICENSE-2.0
+    其中 calendrical_calculations 仅以 Apache-2.0 授权，self_cell 按 "Apache-2.0 OR GPL-2.0-only" 选用 Apache-2.0，
+    dunce 按 "CC0-1.0 OR MIT-0 OR Apache-2.0" 选用 CC0-1.0。
 
-uutils（coreutils、sed）的 MIT 许可全文：
+每个 crate 所选许可的全文（含各自的版权声明；Apache-2.0、Unicode-3.0、Zlib、CC0-1.0 全文）见 THIRD_PARTY_LICENSE_TEXTS.txt。
+
+uutils coreutils 的 MIT 许可全文（sed 的版权人不同，见上；其全文在 THIRD_PARTY_LICENSE_TEXTS.txt）：
 
 ---
 

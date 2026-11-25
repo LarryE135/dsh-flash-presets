@@ -40,7 +40,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$ExpectedSha256 = 'c83f196a579e4b839f4e7e2ada061f3baf8f0faeff2eb595358db70568be2589'
+$ExpectedSha256 = '826808f34a1113d1fb45a772ff10a10c426cd8a4d2323ab82f1bbd6cab358aa1'
 $RowId = 'flash-sh-standalone'
 $PackageName = 'dsh-flash-sh'
 
@@ -236,15 +236,19 @@ if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
     } else {
       Write-Warn2 '没找到 flash-sh.exe.sha256'
     }
-    if ($hash -eq $ExpectedSha256) { Write-Ok '与 dsh-flash-sh 0.1.3 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.3 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
+    if ($hash -eq $ExpectedSha256) { Write-Ok '与 dsh-flash-sh 0.1.4 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.4 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
   }
 
   # ── 3. 执行 ────────────────────────────────────────────────────────────────
   Write-Section '3. 执行 flash-sh -c "echo ok"'
   try {
-    $LASTEXITCODE = -1
+    # 不给 $LASTEXITCODE 赋值：在脚本作用域里赋值会建一个同名局部变量，遮住自动变量——PowerShell 7 的原生命令
+    # 只写全局的 $LASTEXITCODE，于是读到的永远是这里赋的值（0.1.2 实机报告 P1）。先清掉全局值，再读全局值。
+    $global:LASTEXITCODE = $null
     $out = & $BinPath --timeout 10 -c 'echo ok' 2>&1
-    $code = $LASTEXITCODE
+    $runCode = $global:LASTEXITCODE
+    if ($null -eq $runCode) { $runCode = -1 }
+    $code = $runCode
     $text = ($out | Out-String).Trim()
     if ($code -eq 0 -and $text -eq 'ok') { Write-Ok 'flash-sh 可执行，输出 ok' }
     else { Write-Bad ('执行异常：退出码 ' + $code + '，输出：' + $text) }

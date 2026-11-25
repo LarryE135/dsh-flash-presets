@@ -57,6 +57,15 @@ const CASES = [
   ["延迟交还：lastpipe", `shopt -s lastpipe; seq 1 5 | { read -r a; read -r b; }; echo "$a$b"`, "12\n"],
   ["延迟交还：read -t 不把已用的行当成新输入", `{ printf '1\\n'; sleep 1; printf '2\\n'; } | { read -r a; read -r -t 0.3 b; echo "rc=$? b=[$b]"; read -r c; echo "c=$c"; }`, "rc=142 b=[]\nc=2\n"],
   ["延迟交还：read -t 0 不把已用的行当成新输入", `{ printf '1\\n'; sleep 1; printf '2\\n'; } | { read -r a; read -t 0 && echo avail || echo none; read -r c; echo "c=$c"; }`, "none\nc=2\n"],
+  // 0.1.4（0.1.2 实机报告）：sh / bash 指向 flash-sh 自己、/dev/zero 与 /dev/urandom、timeout 跑内建、read -p 非终端不打提示、
+  // time 保留字、mapfile -n 只取 N 行、read -N 不拆分、cmp / nproc
+  ["sh -c / bash -c / sh 脚本", `sh -c 'echo via-sh'; bash -c 'echo "via-bash $1"' x y; printf 'echo "script $1"\\n' > s.sh; sh s.sh arg; echo pipe | sh -c 'read v; echo "got $v"'`, "via-sh\nvia-bash y\nscript arg\ngot pipe\n"],
+  ["/dev/zero 与 /dev/urandom", `head -c 16 /dev/zero | wc -c | tr -d ' '; head -c 16 /dev/urandom | wc -c | tr -d ' '; tr -dc a-z < /dev/urandom | head -c 8 | wc -c | tr -d ' '; head -c 100000 /dev/zero > z.bin; wc -c < z.bin | tr -d ' '; od -An -tx1 -N3 /dev/zero | tr -d ' '`, "16\n16\n8\n100000\n000000\n"],
+  ["timeout 跑内建命令", `timeout 5 echo ok; timeout 5 printf '%s\\n' p; timeout 5 false; echo "rc=$?"`, "ok\np\nrc=1\n"],
+  ["read -p：输入不是终端时不打提示", `echo x | { read -r -p 'prompt> ' v; echo "v=$v"; } 2>&1`, "v=x\n"],
+  ["time 保留字（输出到 stderr，3 行）", `{ time -p true; } 2>&1 | cut -d' ' -f1 | tr '\\n' ,; echo; { time true; } 2>&1 | wc -l | tr -d ' '`, "real,user,sys,\n4\n"],
+  ["mapfile -n 只取 N 行、read -N 不拆分", `seq 1 9 | { mapfile -t -n 2 a; read -r b; echo "\${a[*]} $b"; }; printf 'a b\\n' | { read -N 4 -r v w; echo "[$v][$w]"; }`, "1 2 3\n[a b\n][]\n"],
+  ["cmp / nproc", `printf 'ab\\n' > a; printf 'xb\\n' > c; cmp a a && echo same; cmp a c | sed 's/char/byte/'; echo "rc=\${PIPESTATUS[0]}"; n=$(nproc); [ "$n" -ge 1 ] && echo nproc-ok`, "same\na c differ: byte 1, line 1\nrc=1\nnproc-ok\n"],
   ["read -t 超时精度（0.3 s，管道无数据）", `s=$(date +%s%N); sleep 2 | { read -r -t 0.3 x; echo "rc=$?"; e=$(date +%s%N); d=$(( (e - s) / 1000000 )); (( d >= 250 && d < 1500 )) && echo ok || echo "elapsed=$d"; }`, "rc=142\nok\n"],
 ];
 
@@ -78,8 +87,34 @@ if (!fileModeOk) console.log("（被测程序与宿主平台不同：只跑 -c �
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-read-"));
 let failed = 0;
 let passed = 0;
+let skipped = 0;
 console.log("read 回归（" + bin + "）");
+
+// 0.1.2 实机报告 P4：先确认被测 exe 能写临时目录和工作目录。exe 放在带「低完整性标签」（Low Mandatory Level）的目录里时，
+// 从那里启动的程序继承 Low 完整性，写 %TEMP% / C: 一律被拒（os error 5，mktemp 报「拒绝访问」）——这是 Windows 的强制完整性
+// 控制，不是 flash-sh 的缺陷。这时用到临时目录 / 写文件的用例跳过并说明原因，不报成失败。
+const probe = (args) => spawnSync(bin, args, { encoding: "utf8", timeout: 30000, cwd: tmp });
+const runs = probe(["-c", "echo ok"]);
+const pt = probe(["-c", 'd=$(mktemp -d) && echo ok > "$d/p" && cat "$d/p" && rm -rf "$d"']);
+const pw = probe(["-c", "echo ok > ./.flash-sh-probe && cat ./.flash-sh-probe && rm -f ./.flash-sh-probe"]);
+const canRun = runs.status === 0 && (runs.stdout ?? "").trim() === "ok";
+const tmpOk = !canRun || pt.status === 0 && (pt.stdout ?? "").trim() === "ok";
+const cwdOk = !canRun || pw.status === 0 && (pw.stdout ?? "").trim() === "ok";
+if (!tmpOk || !cwdOk) {
+  console.log("");
+  console.log("  ⚠ 被测 exe 写不了" + (!tmpOk ? "临时目录（mktemp）" : "") + (!tmpOk && !cwdOk ? "和" : "") + (!cwdOk ? "工作目录" : "") + "：" + JSON.stringify(((!tmpOk ? pt : pw).stderr || "").trim().slice(0, 200)));
+  console.log("    常见原因：exe 放在带低完整性标签（icacls 显示 Mandatory Label\\Low Mandatory Level）的目录里，或被杀毒软件拦截。");
+  console.log("    请把 flash-sh.exe 复制到普通目录（例如 %USERPROFILE%\\flash-sh-test）后再跑；下面用到临时目录 / 写文件的用例先跳过。");
+  console.log("");
+}
+const needsWrite = (script) => /mktemp|(^|[^0-9&>])>{1,2}\s*(?!&|\/dev\/null)/.test(script);
+
 for (const [label, script, want] of CASES) {
+  if ((!tmpOk || !cwdOk) && needsWrite(script)) {
+    skipped += 1;
+    console.log("  - " + label + "：跳过（被测 exe 写不了临时目录 / 工作目录，见上）");
+    continue;
+  }
   const file = path.join(tmp, "case.sh");
   fs.writeFileSync(file, script + "\n");
   const modes = fileModeOk ? [["file", [file]], ["-c", ["-c", script]]] : [["-c", ["-c", script]]];
@@ -99,5 +134,5 @@ for (const [label, script, want] of CASES) {
   }
 }
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log("read 回归：" + passed + "/" + (passed + failed) + " 通过");
+console.log("read 回归：" + passed + "/" + (passed + failed) + " 通过" + (skipped ? "，" + skipped + " 条因环境不可写跳过（不是 flash-sh 的问题，见上方提示）" : ""));
 process.exit(failed ? 1 : 0);

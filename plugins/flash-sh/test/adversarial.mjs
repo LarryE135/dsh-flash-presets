@@ -23,6 +23,17 @@ const W = { cwd: "C:\\w\\proj", workspace: "C:\\w\\proj", platform: "win32", tmp
 // 用户此前用无害写法批准过的类
 const APPROVED = new Set(["ls", "echo", "cat", "rm [>]", "cp [>]", "mv [>]", "git", "python3", "python", "perl", "ruby", "node", "awk", "sed", "cd+ls", "chmod [>]", "ln [>]", "tar [>]", "sort", "uniq", "touch [>]", "echo [>]", "ls [>]", "npm", "make", "find", "tee [>]", "head+ls [|]", "cat+python [|]", "echo+python [|]", "cd+echo [>]", "cd+touch [>]", "zip [>]", "unzip [>]"]);
 const cases = [
+  // 0.1.4：exe 内 sh / bash 都是 flash-sh 自己。sh 的各种写法与 bash -c 同等：每次都问
+  ["sh -c 'rm -rf ~'", L, "sh -c"],
+  ["s''h -c 'rm -rf ~'", L, "空引号拆开 sh"],
+  ["\\sh -c ls", L, "反斜杠转义 sh"],
+  ["\"sh\" ./x.sh", L, "引号包 sh 跑脚本"],
+  ["exec sh -c ls", L, "exec sh"],
+  ["builtin command sh -c ls", L, "builtin command sh"],
+  ["printf 'rm -rf ~' | sh", L, "管道喂给 sh"],
+  ["sh < evil.sh", L, "sh 从重定向读脚本"],
+  ["S=sh; $S -c ls", L, "变量里的 sh"],
+  ["ls; sh -s < x", L, "sh -s"],
   // 换一种写法混过去
   ["alias ls='rm -rf ~'; ls", L, "别名"],
   ["r\\m -rf build", L, "反斜杠拆命令名"],

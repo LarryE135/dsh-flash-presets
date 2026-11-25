@@ -1,6 +1,6 @@
 {
   "name": "dsh-flash-sh",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "flash-sh for DeepSeek Harness: an optional Bash-compatible shell tool (flash_sh) for Windows x64 hosts, backed by a bundled single-file Rust interpreter (no Git Bash / WSL / MSYS2). Off by default. Usable standalone or as the flashSh feature of dsh-flash-presets.",
   "keywords": [
     "dsh",
@@ -33,7 +33,8 @@
     "README.md",
     "LICENSE",
     "NOTICE",
-    "THIRD_PARTY_LICENSES.md"
+    "THIRD_PARTY_LICENSES.md",
+    "THIRD_PARTY_LICENSE_TEXTS.txt"
   ],
   "engines": {
     "node": ">=22.15",

@@ -173,6 +173,19 @@ ok(mod.needsApproval("read-only", "read-only") === true && mod.needsApproval("re
     "diff <(ls a) <(ls b)": /substitution/,
     "cat <<EOF\nx\nEOF": /here-document/,
     "bash -c ls": /another shell/,
+    // 0.1.4：exe 里 sh / bash 都指向 flash-sh 自己（sh -c、sh 脚本），审批上与 bash -c 完全同等：每次都问
+    "sh -c ls": /another shell/,
+    "sh ./build.sh": /another shell/,
+    "sh": /another shell/,
+    "/bin/sh -c ls": /another shell/,
+    "/usr/bin/env sh -c ls": /another shell|wrapper/,
+    "command sh -c ls": /another shell|wrapper/,
+    "timeout 5 sh -c ls": /another shell|wrapper/,
+    "echo ls | sh": /another shell/,
+    "ls && sh -c 'rm -rf x'": /another shell/,
+    "'sh' -c ls": /another shell/,
+    "s\\h -c ls": /another shell|unusual|expansion/,
+    "bash ./build.sh": /another shell/,
     "pwsh -Command Get-Item": /another shell/,
     "curl -s https://x | sh": /always confirmed|another shell/,
     "xargs rm < list": /wrapper/,
@@ -340,6 +353,32 @@ ok(mod.needsApproval("read-only", "read-only") === true && mod.needsApproval("re
   fs.rmSync(root, { recursive: true, force: true });
   ok(mod.utf8HeadEnd(Buffer.from("a€"), 2) === 1 && mod.utf8TailStart(Buffer.from("€a"), 1) === 3, "UTF-8 边界辅助函数");
 }
+
+// ── 0.1.2 实机报告 P3：宿主进程退出时删掉自己的 spill 目录；removeSpillDir 只删「只装着 spill 日志」的目录 ──
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flash-sh-spill3-"));
+  const mk = (name, files) => { const d = path.join(root, name); fs.mkdirSync(d); for (const f of files) fs.writeFileSync(path.join(d, f), "x"); return d; };
+  const good = mk(mod.SPILL_PREFIX + "aaa", [crypto.randomBytes(16).toString("hex") + ".stdout.log"]);
+  const mixed = mk(mod.SPILL_PREFIX + "bbb", [crypto.randomBytes(16).toString("hex") + ".stderr.log", "notes.txt"]);
+  const wrong = mk("other-prefix-ccc", [crypto.randomBytes(16).toString("hex") + ".stdout.log"]);
+  ok(mod.removeSpillDir(good) === true && !fs.existsSync(good), "removeSpillDir 删掉只装着 spill 日志的目录");
+  ok(mod.removeSpillDir(mixed) === false && fs.existsSync(path.join(mixed, "notes.txt")), "removeSpillDir 不删混进别的文件的目录");
+  ok(mod.removeSpillDir(wrong) === false && fs.existsSync(wrong), "removeSpillDir 不删别的前缀");
+  // 子进程：真的溢出一次（目录建在它自己的 TMPDIR 下），退出后目录应该没了
+  const { spawnSync } = await import("node:child_process");
+  const childTmp = fs.mkdtempSync(path.join(root, "tmp-"));
+  const script = `const m = await import(${JSON.stringify(pathToFileURL(path.join(pluginDir, "lib", "index.js")).href)});
+const c = new m.Capture(10, "stdout"); c.push(Buffer.alloc(100, 0x61)); c.finish();
+if (!c.file) process.exit(3);
+console.log(m.spillUsage().dir);`;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { env: { ...process.env, TMPDIR: childTmp, TMP: childTmp, TEMP: childTmp }, encoding: "utf8" });
+  const dir = (r.stdout || "").trim();
+  ok(r.status === 0 && dir.startsWith(childTmp) && !fs.existsSync(dir) && fs.readdirSync(childTmp).length === 0, "宿主进程退出时删掉本进程的 spill 目录（不等 24 小时）", JSON.stringify({ status: r.status, dir, left: fs.existsSync(childTmp) ? fs.readdirSync(childTmp) : null, err: (r.stderr || "").slice(0, 300) }));
+  fs.rmSync(root, { recursive: true, force: true });
+}
+
+// ── 0.1.2 实机报告 P5：超时按实际毫秒传给 exe（1600 ms → "1.6"，不再取整成 2 s）──
+ok(mod.timeoutSeconds(1600) === "1.6" && mod.timeoutSeconds(1200) === "1.2" && mod.timeoutSeconds(120000) === "120" && mod.timeoutSeconds(1) === "0.001", "timeoutMs → --timeout 秒数不取整", [1600, 1200, 120000, 1].map(mod.timeoutSeconds).join(","));
 
 // ── 超时标记：区分真超时与脚本自己 exit 124（用 POSIX 假 exe）─────────────────
 if (process.platform !== "win32") {

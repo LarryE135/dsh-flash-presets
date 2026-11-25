@@ -948,6 +948,10 @@ function spillDir() {
   try {
     spillState.dir = fs.mkdtempSync(path.join(os.tmpdir(), SPILL_PREFIX));
     try { fs.chmodSync(spillState.dir, 0o700); } catch (error) {}
+    // 宿主进程退出时删掉本进程自己的 spill 目录（只删 spill 日志与空目录；别的 DSH 进程各有各的 mkdtemp 目录，互不影响）。
+    // 进程被强杀时来不及删的，下次启动由 cleanupStaleSpills 按 24 小时清掉（0.1.2 实机报告 P3）。
+    const own = spillState.dir;
+    process.once("exit", () => { try { removeSpillDir(own); } catch (error) {} });
     return spillState.dir;
   } catch (error) {
     spillState.dirError = error;
@@ -956,6 +960,22 @@ function spillDir() {
 }
 
 const SPILL_FILE = /^([0-9a-f]{32}|\d+-\d+-\d+-[0-9a-f]{6})\.(stdout|stderr)\.log$/;
+
+/**
+ * 删掉一个 spill 目录：名字须以 SPILL_PREFIX 开头、是真目录（不是链接）、里面只有 spill 日志文件；
+ * 逐个 unlink 再 rmdir，不递归。混进了别的东西就不动，返回 false。
+ */
+export function removeSpillDir(dir) {
+  if (typeof dir !== "string" || !path.basename(dir).startsWith(SPILL_PREFIX)) return false;
+  let st;
+  try { st = fs.lstatSync(dir); } catch (error) { return false; }
+  if (!st.isDirectory() || st.isSymbolicLink()) return false;
+  const inner = fs.readdirSync(dir, { withFileTypes: true });
+  if (!inner.every((f) => f.isFile() && SPILL_FILE.test(f.name))) return false;
+  for (const f of inner) fs.unlinkSync(path.join(dir, f.name));
+  fs.rmdirSync(dir);
+  return true;
+}
 
 /**
  * 删掉 root 下本插件留下、修改时间早于 maxAgeMs 的 spill 目录；返回删掉的路径。
@@ -1137,10 +1157,17 @@ function killTree(child, how) {
 /** 杀掉之后最多再等这么久 close；还不来（孙进程攥着管道不放）就强行收尾，保证调用一定返回。 */
 export const CLOSE_DEADLINE_MS = 3000;
 
+/** timeoutMs → exe 的 --timeout 参数（秒，最多 3 位小数，至少 0.001）。 */
+export function timeoutSeconds(timeoutMs) {
+  const ms = Math.max(1, Math.round(Number(timeoutMs) || 0));
+  return String(ms / 1000);
+}
+
 /** 运行一次 flash-sh；与宿主无关，便于单测。 */
 export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signal, env, graceMs = GUARD_GRACE_MS, closeDeadlineMs = CLOSE_DEADLINE_MS }) {
   return new Promise((resolve) => {
-    const secs = Math.max(1, Math.ceil(timeoutMs / 1000));
+    // 按实际毫秒传（1600 ms → "1.6"），不再向上取整成整秒：exe 的提示是 "timed out after 1.6s"（0.1.2 实机报告 P5）
+    const secs = timeoutSeconds(timeoutMs);
     let child;
     try {
       child = spawn(bin, ["--timeout", String(secs), "-c", command], {
@@ -1176,7 +1203,7 @@ export function runFlashSh(bin, { command, cwd, timeoutMs, maxOutputBytes, signa
       killedBy = "guard";
       killTree(child, "SIGKILL");
       armDeadline();
-    }, secs * 1000 + graceMs);
+    }, Number(secs) * 1000 + graceMs);
     const onAbort = () => {
       killedBy = "abort";
       killTree(child, process.platform === "win32" ? "SIGTERM" : "SIGKILL");
