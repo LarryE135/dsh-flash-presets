@@ -315,7 +315,7 @@ npm view dsh-flash-presets dist.fileCount dist.unpackedSize dist.shasum
 node scripts/sync-published-version.mjs      # publishedVersion 忘了跟进，lint 就拦不住旧版本号
 ```
 
-预期：6 行预设、1 行 `flash-presets`（0.3.2 及以前是 `flash-presets-alias`）。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块，不是 npm bundle 形态，别拿它去校验临时 profile。
+预期：6 行预设、1 行 `flash-presets`（0.3.2 及以前是 `flash-presets-alias`）。**注意** `verify-presets.mjs` 的第二层（安装层）针对的是 `scripts/install.sh` 写的托管块；0.3.4 起它认得插件卡安装（profile 的 `dsh.profile.bundles` 含本包且没有托管块时跳过托管块与 PTC 展示层两项，不判失败），插件卡的安装层仍以 `doctor` 与 `dump-config` 为准。
 
 ```bash
 # c) npm 页面内容（README 只在 publish 时刷新，必须单独核对）

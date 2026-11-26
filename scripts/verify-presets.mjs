@@ -256,12 +256,26 @@ check(brokenAnchors.length === 0, '文档内 #锚点 都指向存在的标题（
 if (!repoOnly) {
 const modernInstalled = fs.existsSync(patchFile);
 const legacyInstalled = fs.existsSync(legacyRoot);
+// 插件卡安装（dsh plugin add dsh-flash-presets）：预设行由组合包提供，profile 补丁里没有托管块、也没有预设切片。
+// 与 doctor [2] 同一判据：profile 的 package.json 里 dsh.profile.bundles 含本包。
+const bundleInstalled = (() => {
+  try {
+    const pj = JSON.parse(fs.readFileSync(path.join(dshHome, 'profiles', profile, 'package.json'), 'utf8'));
+    return ((pj.dsh && pj.dsh.profile && pj.dsh.profile.bundles) || []).includes('dsh-flash-presets');
+  } catch { return false; }
+})();
+const patchText = modernInstalled ? (read(patchFile) || '') : '';
+const scriptBlock = patchText.includes(BEGIN) && patchText.includes(END);
 console.log('\n[安装] 检测到: '
-  + (modernInstalled ? '插件行式（' + patchFile + '）'
+  + (modernInstalled && (scriptBlock || !bundleInstalled) ? '插件行式（' + patchFile + '）'
+    : bundleInstalled ? '插件卡（组合包 dsh-flash-presets）'
     : legacyInstalled ? '旧版目录式（' + legacyRoot + '）' : '未安装'));
 
-if (modernInstalled) {
-  const text = read(patchFile) || '';
+if (bundleInstalled && !scriptBlock) {
+  // 托管块与 PTC 展示层两项只对脚本安装有意义；插件卡的安装层交给 doctor / dump-config 校验，这里不判失败。
+  console.log('  插件卡安装：安装层（预设行、PTC 展示层）由 doctor 与 dsh dump-config 校验，本脚本跳过托管块相关检查');
+} else if (modernInstalled) {
+  const text = patchText;
   check(text.includes(BEGIN) && text.includes(END), 'profile 补丁里有托管块标记');
   const block = text.includes(BEGIN) && text.includes(END)
     ? text.slice(text.indexOf(BEGIN), text.indexOf(END) + END.length)

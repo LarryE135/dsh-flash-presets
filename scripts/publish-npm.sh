@@ -95,6 +95,16 @@ echo "发布 $PKG_VER 到 npm…"
 npm publish
 echo "复核 registry…"
 node scripts/verify-published.mjs --version "$VER"
+# gitHead 复核（发版清单 §3.4）：registry 记录的提交必须就是 tag 指向的提交。
+WANT_HEAD="$(git rev-parse "$TAG^{commit}")"
+GOT_HEAD="$(npm view "dsh-flash-presets@$VER" gitHead 2>/dev/null || true)"
+if [ "$GOT_HEAD" = "$WANT_HEAD" ]; then
+  echo "gitHead 复核：$GOT_HEAD = $TAG"
+elif [ -z "$GOT_HEAD" ]; then
+  echo "⚠ 暂时查不到 dsh-flash-presets@$VER 的 gitHead（registry 缓存）：稍后手动 npm view dsh-flash-presets@$VER gitHead，应为 $WANT_HEAD"
+else
+  fail "npm 上 $VER 的 gitHead（${GOT_HEAD}）≠ ${TAG}（${WANT_HEAD}）" "包已经发出，改不了：记进 Release 说明，下个版本从 tag 提交发"
+fi
 echo
 echo "完成。下一步（顺序要紧，npm 已在才发 Release）："
-echo "  bash scripts/publish.sh     # 推 main + tag + 建 GitHub Release"
+echo "  RELEASE_NOTES=<说明.md> bash scripts/publish.sh     # 核对 tag 在 origin/main 上 + 推 tag + 建 GitHub Release"
