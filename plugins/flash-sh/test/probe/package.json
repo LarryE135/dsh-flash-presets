@@ -1,0 +1,17 @@
+{
+  "name": "fl-bash-probe",
+  "version": "0.0.0",
+  "private": true,
+  "description": "test-only probe bundle for fl-bash: after boot, reports whether fl_bash is registered (and how many times), dumps the plugin inventory the plugin page reads, runs fl_bash once through the real tool pipeline, then exits.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

@@ -58,8 +58,8 @@ const RUNTIME = [
 // 默认值必须与 lib/row-overrides.js 的 BUNDLE_DEFAULTS 一致（verify-core.mjs 断言）。
 const BUNDLE_ROW = [
   '',
-  '# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门，都挂在这一行下面，',
-  '# 各自按需要的宿主服务启动，缺哪个服务只影响对应功能。0.3.2 及以前它们是 4 行',
+  '# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门，',
+  '# 都挂在这一行下面，各自按需要的宿主服务启动，缺哪个服务只影响对应功能。0.3.2 及以前它们是 4 行',
   '# （flash-presets-core / plan-mode-ui / flash-presets-alias / delivery-gate），按旧 id 写的覆盖仍会被读回生效。',
   '# 环境变量优先于这里：DSH_FLASH_PRESETS_CONCURRENCY=0、DSH_FLASH_PRESETS_ALIAS=0、DSH_DELIVERY_GATE=0/1。',
   '# 交付门默认关闭（deliveryGate.enabled: false）—— 它会执行工作区里的验收脚本，要用户显式打开。',
@@ -76,6 +76,25 @@ const BUNDLE_ROW = [
   '        deliveryGate:',
   '          enabled: false',
   '          maxRounds: 2',
+].join('\n');
+
+// Bash 工具 fl-bash：插件页上单独的一个组件（不挂在 flash-presets 行下）。行的模块是本包的子路径
+// dsh-flash-presets/fl-bash（lib/fl-bash-row.js），它再动态 import 可选依赖 fl-bash：任何平台都能加载，
+// 平台不对 / 依赖没装上只写一行 info，不会变成红行。默认值必须与 lib/fl-bash-row.js 的 ROW_DEFAULTS 一致。
+const FL_BASH_ROW = [
+  '',
+  '',
+  '# Bash 工具（单独一个组件）：fl-bash —— Windows x64 上的 Bash 兼容 shell 工具 fl_bash，内置单文件解释器，',
+  '# 不需要 Git Bash / WSL / MSYS2。默认关闭（enabled: false）—— 它在本机执行命令，要用户显式打开：',
+  '#   在插件页打开它的设置，或在 profile 的 cordis.patch.yml 里写 `- id: fl-bash` + `config: { enabled: true }`，',
+  '#   或设置用户环境变量 DSH_FL_BASH=1（旧名 DSH_FLASH_SH 仍认）。配置项见 fl-bash 的 README。',
+  '# 实现由可选依赖 fl-bash 提供（os/cpu 限定，其他平台不安装、不下载 exe）。',
+  '- insert:',
+  '    - id: fl-bash',
+  "      name: 'dsh-flash-presets/fl-bash'",
+  '      config:',
+  '        enabled: false',
+  '',
 ].join('\n');
 // 0.3.2 上下文瘦身（第二轮研究实测，见 docs/研究-DSH-0.2.2-rc.3-上下文注入.md）：
 //   · tool-skill 默认把整段技能描述塞进目录；技能一多就是上千字符。压到 60 字符，语义保留。
@@ -103,7 +122,7 @@ function compose() {
     if (!fs.existsSync(abs)) throw new Error('缺少源预设文件: ' + rel);
     return fs.readFileSync(abs, 'utf8').replace(/\s+$/, '');
   });
-  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + BUNDLE_ROW + LEAN_ROWS + '\n';
+  const out = HEADER + parts.join('\n\n') + '\n' + RUNTIME + BUNDLE_ROW + FL_BASH_ROW + LEAN_ROWS + '\n';
   const inserts = (out.match(/^-\s*insert:/gm) ?? []).length;
   if (inserts < SOURCES.length) throw new Error('合成结果里的 insert 条目数异常: ' + inserts);
   for (const rel of SOURCES) {

@@ -185,7 +185,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - **脚本路径升级会移除旧卡**：托管块是整块替换的，0.2.5 时代的三卡（`flash-lean-ptc-v1` / `-v2` / `-v3`）升级后只剩 `flash-lean-ptc-v3` 与 `-balance`。这条路径**没有旧 id 兜底**（别名层只随插件卡发行），引用 `-v1` / `-v2` 的旧会话升级后会 `agent-preset/not-found`。升级脚本会打印警告；需要旧会话继续可打开，请改装插件卡（`dsh plugin --profile <名称> add dsh-flash-presets`），它带兼容层。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
-- **0.3.2 → 0.3.4：插件页上的组件从 6 个变成 3 个**（两个预设 + 一行「Flash 精简预设」）。原来的 `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` 四行合进 `flash-presets` 一行，功能和默认值不变。你按旧行 id 写在 profile 补丁里的覆盖（比如打开交付门、关掉并发、在插件页关过某一行）升级后**仍然生效**：插件启动时读回并换算，启动日志打一行 `[flash-presets] 沿用旧行 …`，DSH 自己会对每条打一句 `entry "…" not found`（无害）。想消掉这句，按[运行时组件开关](#运行时组件开关)改写即可，`doctor` 第 6 节会列出来。
+- **0.3.2 → 0.3.4：插件页上的组件从 6 个变成 4 个**（两个预设 + 一行「Flash 精简预设」+ Windows Bash 工具 fl-bash）。原来的 `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` 四行合进 `flash-presets` 一行，功能和默认值不变。你按旧行 id 写在 profile 补丁里的覆盖（比如打开交付门、关掉并发、在插件页关过某一行）升级后**仍然生效**：插件启动时读回并换算，启动日志打一行 `[flash-presets] 沿用旧行 …`，DSH 自己会对每条打一句 `entry "…" not found`（无害）。想消掉这句，按[运行时组件开关](#运行时组件开关)改写即可，`doctor` 第 6 节会列出来。
 - 如果 profile 的 `selectedDefault` 指向 `flash-lean-ptc-v3-lite`，建议改成 `flash-lean-ptc-v3`（留在旧值也能被兼容层解析）。
 
 ## 计划模式（可选组件）
@@ -207,9 +207,28 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 注意：出厂配置把这行写成 `enabled: false`，插件 schema 的默认值也是**关**（0.3.1 是 `true`，0.3.2 改回 `false` —— 0.3.1 那一版会让普通对话也被验收门追着跑）。0.3.1 的代码只认 `DSH_DELIVERY_GATE=0`，设 `1` 打不开；从 0.3.2 起 `=1` 才真正生效。
 - **版本提示**：交付门 0.3.0 里没有，**0.3.1 起随 npm 发布**（包内含 `lib/delivery-gate.js`，`cordis.patch.yml` 里也有这一行：`enabled: false` / `maxRounds: 2`，脚本按平台选 —— Windows 先 `verify.ps1`、其余先 `verify.sh`）。0.3.0 想用只能从 git 装（`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`）；npm 上的 0.3.1、0.3.2（正式版）与 0.3.3（误发版）都带这一行，**不需要再等下一版**。
 
+## Windows 上的 Bash 工具 fl-bash（单独的组件，默认关闭）
+
+在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `fl_bash`（内置单文件解释器 `flash-sh.exe`，不需要 Git Bash / WSL；
+不占用 `bash` / `pwsh` / `run_code`）。它在插件页上是**单独的一个组件「fl-bash」**，不挂在「Flash 精简预设」那一行下面。
+
+- **从哪来**：实现在独立包 [`fl-bash`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) 里（单一来源，本包不带副本；0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
+  本包把它声明为 `optionalDependencies`，它的 `package.json` 写了 `os: ["win32"]`、`cpu: ["x64"]`：Windows x64 上插件管理器（pnpm）会顺带装上；
+  **macOS / Linux / Windows ARM64 上直接跳过，不下载 7.9 MB 的 exe，也不报错**。这些平台上插件页仍显示 fl-bash 组件（正常运行、不是红行），只是不注册工具。
+- **打开**：profile 补丁里写 `- id: fl-bash` / `config.enabled: true`，或设用户环境变量 `DSH_FL_BASH=1`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。
+  其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在这一行的 `config` 里，含义见 fl-bash 的 README。
+  预览版的旧写法（`flash-presets` 行的 `config.flashSh`、行 id `flash-sh`）升级后仍然生效，启动日志会提示改写。
+- **安全**：`fl_bash` 不受 DSH 文件沙箱约束。默认 `approval: sandboxed` —— 会话不是「完全访问」时要你审批（读不到会话模式也要审批，审批出错就不执行）；
+  同一会话里同一类命令批准一次后不再问，`rm -rf`、写到工作区外（按真实路径判断）、`bash -c` / `eval` / 内联代码、改 `PATH` 等危险命令每次都问，
+  看不懂的写法也每次都问。子进程拿不到名字含 `KEY` / `PASSWORD` / `SECRET` / `TOKEN` 等字样或 `_PAT` / `_AUTH` 的环境变量、`DSH_*` / `AWS_*` / `GITHUB_*` /
+  `NPM_CONFIG_*`，以及值里带账号密码的 URL（完整规则见 fl-bash 的 README）。配置不合法（如 `timeoutMs: 0`）时不启用，日志写明原因。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
+- **启动日志**：非 Windows x64 上启用时只写一行 `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`；可选依赖没装上时写一行
+  `…加载不到 fl-bash…`，其余功能都不受影响。
+- **和单独安装的 fl-bash 并存**：插件页上是两行（本包的 `fl-bash`、独立包的 `fl-bash-standalone`），两边都启用时只注册一个 `fl_bash`，本包这一行优先，独立包那一行写日志跳过；本包这一行关掉后它自动接管。
+
 ## 运行时组件开关
 
-0.3.4 起，`run_code` 优化、计划模式、旧会话兼容、交付门都挂在组合包的 `flash-presets` 一行下面，插件页上只占一个组件。每个功能按自己需要的宿主服务启动，缺哪个服务只影响对应功能（桌面端没有 `webServer` 时只有计划模式不启动）。单独开关写在 profile 补丁（`~/.dsh/profiles/<名称>/cordis.patch.yml`）里：
+0.3.4 起，`run_code` 优化、计划模式、旧会话兼容、交付门都挂在组合包的 `flash-presets` 一行下面，插件页上只占一个组件（Bash 工具 fl-bash 是另一行，见上一节）。每个功能按自己需要的宿主服务启动，缺哪个服务只影响对应功能（桌面端没有 `webServer` 时只有计划模式不启动）。单独开关写在 profile 补丁（`~/.dsh/profiles/<名称>/cordis.patch.yml`）里：
 
 ```yaml
 - id: flash-presets
@@ -222,7 +241,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 
 只写你要改的段即可，没写的段用组合包默认值。环境变量优先于这里：`DSH_FLASH_PRESETS_CONCURRENCY=0`、`DSH_FLASH_PRESETS_ALIAS=0`、`DSH_DELIVERY_GATE=0/1`。
 
-0.3.2 及以前的旧写法与新写法的对应：`flash-presets-core` 的 `config.toolConcurrency` → `toolConcurrency`；`plan-mode-ui` 的 `config` → `planMode`；`delivery-gate` 的 `config` → `deliveryGate`；任一旧行的 `disabled: true` → 对应段的 `enabled: false`。旧写法不改也生效（同一项新旧都写时以新写法为准）。
+0.3.2 及以前的旧写法与新写法的对应：`flash-presets-core` 的 `config.toolConcurrency` → `toolConcurrency`；`plan-mode-ui` 的 `config` → `planMode`；`delivery-gate` 的 `config` → `deliveryGate`；任一旧行的 `disabled: true` → 对应段的 `enabled: false`。旧写法不改也生效（同一项新旧都写时以新写法为准）。feat/flash-sh 预览安装包里的 `flash-sh` 行、以及 `config.flashSh` → `id: fl-bash` 的 `config`（同样会被读回）；单独安装的 fl-bash 自己那一行 `fl-bash-standalone` 不换算（它仍是一行独立组件）。
 
 ## 注意事项
 

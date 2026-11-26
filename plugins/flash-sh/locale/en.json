@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "fl-bash",
+    "description": "fl_bash, a Bash-compatible shell tool for Windows x64 with a bundled single-file interpreter (no Git Bash / WSL / MSYS2). Off by default; it runs commands on this machine only after you turn it on."
+  }
+}

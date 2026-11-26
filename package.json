@@ -110,7 +110,11 @@
     "./delivery-gate": {
       "default": "./lib/delivery-gate.js"
     },
-    "./locale/*.json": "./locale/*.json"
+    "./fl-bash": {
+      "default": "./lib/fl-bash-row.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./fl-bash/locale/*.json": "./locale/fl-bash/*.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": ">=0.2.1-rc.5 <0.2.3-0 || >=0.2.2-0 <0.2.3-0",
@@ -121,6 +125,9 @@
     "@deepseek-ai/dsh-llm": {
       "optional": true
     }
+  },
+  "optionalDependencies": {
+    "fl-bash": "^0.1.6"
   },
   "dsh": {
     "bundle": {

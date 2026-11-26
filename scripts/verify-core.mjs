@@ -12,6 +12,9 @@ import { coreStatus } from "../lib/core.js";
 import core from "../lib/core.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const problems = [];
 const check = (ok, label, detail) => {
@@ -149,6 +152,100 @@ check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expect
   for (const [k, v] of Object.entries(st.features)) {
     if (k === "planMode" || k === "deliveryGate") check(v === "mounted" || /^load-failed/.test(v), k + " 已挂载或明确记为 load-failed", v);
   }
+}
+
+// ⑦ fl-bash 组件（Windows Bash 工具）：插件页上单独的一行 id: fl-bash（name dsh-flash-presets/fl-bash → lib/fl-bash-row.js），
+//   不挂在 flash-presets 行下；实现只在可选依赖 fl-bash 里；默认关；非 Windows x64 不加载；加载失败只写 info；
+//   与单独安装的 fl-bash 同时启用时只注册一个（由 fl-bash 的协调器保证，这里验证本行用 owner=dsh-flash-presets 挂载）。
+{
+  check(!fs.existsSync(path.join(root, "lib", "flash-sh.js")), "presets 的 lib/ 里没有 flash-sh.js 副本（单一来源：plugins/flash-sh）");
+  const pkgJ = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  check(typeof pkgJ.optionalDependencies?.["fl-bash"] === "string" && !pkgJ.dependencies?.["fl-bash"] && !pkgJ.optionalDependencies?.["dsh-flash-sh"], "fl-bash 只作为 optionalDependencies 声明（旧名 dsh-flash-sh 已去掉）", JSON.stringify(pkgJ.optionalDependencies));
+  check(!pkgJ.files.some((f) => /^plugins|vendor/.test(f)), "presets 的 files 不带 plugins/ 与 vendor/（exe 不进 presets 包）", JSON.stringify(pkgJ.files));
+  check(pkgJ.exports["./fl-bash"]?.default === "./lib/fl-bash-row.js" && pkgJ.exports["./fl-bash/locale/*.json"] === "./locale/fl-bash/*.json", "exports 有 ./fl-bash 与它的 locale（插件页按 <模块名>/locale/*.json 读标题）");
+  const flashPkg = JSON.parse(fs.readFileSync(path.join(root, "plugins", "flash-sh", "package.json"), "utf8"));
+  check(flashPkg.name === "fl-bash", "plugins/flash-sh 的包名是 fl-bash", flashPkg.name);
+  check(JSON.stringify(flashPkg.os) === '["win32"]' && JSON.stringify(flashPkg.cpu) === '["x64"]', "fl-bash 声明 os:[win32] cpu:[x64]（非 Windows x64 上 npm/pnpm 跳过可选依赖）");
+  const { satisfies } = await (async () => { try { return await import("semver"); } catch { return { satisfies: null }; } })();
+  if (satisfies) check(satisfies(flashPkg.version, pkgJ.optionalDependencies["fl-bash"]), "optionalDependencies 的范围覆盖仓库里 fl-bash 的版本（" + flashPkg.version + "）");
+  check(ro.BUNDLE_DEFAULTS.flashSh === undefined && !/flashSh:/.test(composed), "flash-presets 行不再有 flashSh 子功能");
+  const flRow = rowOf("fl-bash") || "";
+  check(/- id: fl-bash\n\s+name: 'dsh-flash-presets\/fl-bash'\n\s+config:\n\s+enabled: false/.test(composed), "组合配置里有单独的 fl-bash 组件行（默认 enabled: false）", flRow.slice(0, 200));
+  for (const lang of ["zh", "en"]) {
+    const m = JSON.parse(fs.readFileSync(path.join(root, "locale", "fl-bash", lang + ".json"), "utf8"));
+    check(m.meta && m.meta.title === "fl-bash" && typeof m.meta.description === "string", "locale/fl-bash/" + lang + ".json：插件页标题 fl-bash");
+  }
+  const row = await import("../lib/fl-bash-row.js");
+  check(row.ROW_DEFAULTS.enabled === false, "fl-bash 行默认关");
+  const P = row.plan;
+  check(P({}, {}, "win32", "x64").state === "off" && P({ enabled: true }, { DSH_FL_BASH: "0" }, "win32", "x64").state === "off" && P({ enabled: true }, { DSH_FLASH_SH: "0" }, "win32", "x64").state === "off", "默认关；DSH_FL_BASH=0（旧名 DSH_FLASH_SH=0）压过 enabled");
+  check(P({}, { DSH_FL_BASH: "1" }, "win32", "x64").load === true && P({}, { DSH_FLASH_SH: "1" }, "win32", "x64").load === true && P({}, { DSH_FL_BASH: "0", DSH_FLASH_SH: "1" }, "win32", "x64").load === false, "DSH_FL_BASH=1 打开；旧名仍认；新名优先");
+  const lin = P({ enabled: true }, {}, "linux", "x64");
+  check(lin.load === false && /^skipped: linux-x64$/.test(lin.state) && /只在 Windows x64/.test(lin.log), "Linux 上启用：跳过，不加载，一行 info");
+  check(P({ enabled: true }, {}, "win32", "arm64").load === false, "Windows arm64：跳过");
+  check(P({ enabled: true, allowNonWindows: true }, {}, "linux", "x64").load === true && P({ enabled: true }, { DSH_FL_BASH_ANY_PLATFORM: "1" }, "darwin", "arm64").load === true && P({ enabled: true }, { DSH_FLASH_SH_ANY_PLATFORM: "1" }, "darwin", "arm64").load === true, "allowNonWindows / DSH_FL_BASH_ANY_PLATFORM=1（旧名同）：开发模式照样加载");
+  // 旧写法读回：flash-presets 的 config.flashSh、预览版行 id flash-sh；用户在 id: fl-bash 上写过就以它为准
+  {
+    let e = row.effective({ enabled: false }, [{ id: "flash-sh", config: { enabled: true, timeoutMs: 5000 } }]);
+    check(e.cfg.enabled === true && e.cfg.timeoutMs === 5000 && e.found.length === 1, "旧行 flash-sh 的覆盖读回到 fl-bash 行", JSON.stringify(e));
+    e = row.effective({ enabled: false }, [{ id: "flash-presets", config: { flashSh: { enabled: true } } }]);
+    check(e.cfg.enabled === true && e.found.length === 1, "flash-presets 的 config.flashSh 读回到 fl-bash 行", JSON.stringify(e));
+    e = row.effective({ enabled: false }, [{ id: "flash-sh", config: { enabled: true } }, { id: "flash-presets", config: { flashSh: { enabled: false } } }]);
+    check(e.cfg.enabled === false, "旧行开、flash-presets.config.flashSh 关 → 后者优先");
+    e = row.effective({ enabled: false }, [{ id: "flash-presets", config: { flashSh: { enabled: true } } }, { id: "fl-bash", config: { enabled: false } }]);
+    check(e.cfg.enabled === false, "用户在 id: fl-bash 上写的压过旧写法");
+    e = row.effective({ enabled: false }, [{ id: "flash-sh", disabled: "yes", config: { enabled: true } }]);
+    check(e.cfg.enabled === false, "旧行 flash-sh 的 disabled 不是字面量布尔 → 按关闭处理（失败即关闭）", JSON.stringify(e));
+    e = row.effective({ enabled: false }, [{ id: "fl-bash-standalone", config: { enabled: true } }, { id: "flash-sh-standalone", config: { enabled: true } }]);
+    check(e.cfg.enabled === false, "单独安装那一行（fl-bash-standalone / 旧 flash-sh-standalone）的覆盖不换算到本行");
+    for (const [label, v] of [["字符串", { enabled: "true" }], ["数字", { enabled: 1 }]]) check(P(row.effective(v, []).cfg, {}, "win32", "x64").state === "off", "enabled 为 " + label + " → 关（只认字面量 true）");
+  }
+  // 挂载：用替身模块验证 owner、配置透传、失败只写 info
+  const run = async (cfg, loader) => {
+    row._setLoader(loader);
+    const mounted = [];
+    const logs = [];
+    const fakeCtx = { get: () => undefined, plugin: (p, conf) => { mounted.push({ p, conf }); } };
+    const saved = { info: console.info, warn: console.warn, error: console.error };
+    console.info = console.warn = console.error = (...a) => logs.push(a.join(" "));
+    try { await row.apply(fakeCtx, cfg); } finally { Object.assign(console, saved); row._setLoader(undefined); }
+    return { mounted, logs, st: row.rowState() };
+  };
+  const savedEnv = {};
+  for (const k of ["DSH_FL_BASH", "DSH_FLASH_SH", "DSH_FL_BASH_ANY_PLATFORM", "DSH_FLASH_SH_ANY_PLATFORM"]) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+  let loads = 0;
+  const owners = [];
+  const stub = async () => { loads += 1; return { createPlugin: ({ owner }) => { owners.push(owner); return { name: "fl-bash", inject: ["tools"], apply() {} }; } }; };
+  const intentOf = () => globalThis[Symbol.for("dsh-flash-sh/presets-intent@1")]?.state;
+  let r = await run({ enabled: false }, stub);
+  check(loads === 0 && r.st.state === "off" && r.mounted.length === 0, "默认关：不 import fl-bash");
+  check(intentOf() === "none" && row.INTENT_KEY === Symbol.for("dsh-flash-sh/presets-intent@1"), "关：向独立行表态 none（独立行不必再等）", String(intentOf()));
+  r = await run({ enabled: true, allowNonWindows: true, approval: "read-only" }, stub);
+  check(loads === 1 && owners[0] === "dsh-flash-presets" && r.mounted[0]?.conf.approval === "read-only" && r.st.state === "mounted", "启用（开发模式）：动态 import，createPlugin({owner:'dsh-flash-presets'}) 挂载，配置原样透传", JSON.stringify(r.st));
+  check(r.logs.some((l) => /\[fl-bash\] 组件 fl-bash｜mounted/.test(l)), "汇总日志带状态", r.logs.join(" | "));
+  check(intentOf() === "loading", "挂上：表态 loading（claim 由 fl-bash 自己登记）", String(intentOf()));
+  r = await run({ enabled: true, allowNonWindows: true }, async () => { throw new Error("Cannot find package 'fl-bash'"); });
+  check(r.st.state.startsWith("unavailable") && r.logs.filter((l) => /加载不到 fl-bash/.test(l)).length === 1 && intentOf() === "none", "依赖没装上：一行 info、表态 none", JSON.stringify(r.st));
+  {
+    const realMod = await import("../plugins/flash-sh/lib/index.js");
+    r = await run({ enabled: true, allowNonWindows: true, timeoutMs: 0 }, async () => realMod);
+    check(r.st.state.startsWith("config-invalid") && r.mounted.length === 0 && intentOf() === "none" && r.logs.some((l) => /配置不合法/.test(l)), "timeoutMs:0：校验不过 → 不挂、warn、表态 none", JSON.stringify(r.st));
+    r = await run({ enabled: true, allowNonWindows: true, approval: "always" }, async () => realMod);
+    check(r.st.state.startsWith("config-invalid"), "approval 非法值 → config-invalid", JSON.stringify(r.st));
+  }
+  if (process.platform !== "win32" || process.arch !== "x64") {
+    loads = 0;
+    r = await run({ enabled: true }, stub);
+    check(loads === 0 && r.st.state.startsWith("skipped:") && r.logs.filter((l) => /只在 Windows x64 上可用/.test(l)).length === 1, "本机（非 Windows x64）启用：不 import，一行 info", JSON.stringify(r.st));
+  }
+  r = await run({ enabled: true, allowNonWindows: true }, async () => ({ default: { name: "fl-bash", apply() {} } }));
+  check(/版本过旧/.test(r.st.state), "装的是没有 createPlugin 的旧版：跳过并说明");
+  for (const [k, v] of Object.entries(savedEnv)) if (v !== undefined) process.env[k] = v;
+  // flash-presets 行本身不再碰 fl-bash
+  const bundleSrc = fs.readFileSync(path.join(root, "lib", "bundle.js"), "utf8");
+  check(!/import\(\s*['"]fl-bash|dsh-flash-sh['"]|createPlugin/.test(bundleSrc), "lib/bundle.js 不再加载 fl-bash（它是单独的组件）");
+  const real = await import("../plugins/flash-sh/lib/index.js");
+  check(typeof real.createPlugin === "function" && real.OWNERS["dsh-flash-presets"].priority > real.OWNERS["fl-bash"].priority && real.TOOL_NAME === "fl_bash" && real.name === "fl-bash", "fl-bash 导出 createPlugin、工具名 fl_bash，presets 的组件行优先于单独安装那一行");
 }
 
 if (problems.length > 0) {

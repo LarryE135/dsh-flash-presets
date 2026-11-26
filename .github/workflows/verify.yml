@@ -55,6 +55,103 @@ jobs:
         timeout-minutes: 12
         run: npm run verify
 
+      # dsh-flash-sh 0.1.0 的 P1 回归只在真 Windows 上出现（管道 / here-string / heredoc 里 read 只读到第一行）：
+      # 直接跑 vendor 里随包发出的 flash-sh.exe，断言每条用例的输出完整（脚本文件与 -c 两种方式各跑一遍）。
+      - name: flash-sh.exe 直接跑 read 回归用例（Windows）
+        if: runner.os == 'Windows' && !cancelled()   # 前面的闸门红了也照跑：这一步单独回答「发出去的 exe 在真 Windows 上读得全不全」
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower() + "  flash-sh.exe"
+          Get-Content plugins/flash-sh/vendor/win32-x64/flash-sh.exe.sha256
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/read-regress.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 的 read 回归用例失败"; exit 1 }
+          # 报告里的原始最小复现，直接打印输出（供人工核对；期望 <a> <b> / x y / 123）
+          $repro = Join-Path $env:RUNNER_TEMP 'read-repro.sh'
+          # 用 LF 写：Set-Content 在 Windows 上按 CRLF 分行，`}\r` 在 bash 里也不是 `}`（会报 unexpected end of file）
+          $text = @'
+          printf 'a\nb\n' | while read -r l; do echo "<$l>"; done
+          while read -r l; do echo "$l"; done <<< $'x\ny'
+          printf '1\n2\n3\n' | { read -r a; read -r b; read -r c; echo "$a$b$c"; }
+          '@
+          [IO.File]::WriteAllText($repro, ($text -replace "`r`n", "`n") + "`n")
+          & $exe $repro
+          exit $LASTEXITCODE
+
+      # 0.1.4（0.1.2 实机报告 P1 / P2）：自检脚本在 PowerShell 7 与 Windows PowerShell 5.1 下都要正确判定第 3 项
+      # （以前 $LASTEXITCODE = -1 遮住自动变量，pwsh 7 下误报「执行异常：退出码 -1，输出：ok」）；
+      # 以及 exe 的 --version、vendor sha256、自检脚本里的期望值与 package.json 一致。
+      - name: 自检脚本第 3 项（pwsh 7 与 PowerShell 5.1）+ 版本一致性（Windows）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/version.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "版本不一致"; exit 1 }
+          $fail = 0
+          foreach ($host_ in @('pwsh', 'powershell')) {
+            $out = & $host_ -NoProfile -ExecutionPolicy Bypass -File plugins/flash-sh/scripts/check-flash-sh.ps1 -BinPath $exe -DshHome "$env:RUNNER_TEMP/no-dsh" 6>&1 2>&1 | Out-String
+            $sec3 = ($out -split "`n" | Select-String -SimpleMatch 'flash-sh 可执行，输出 ok').Count
+            $bad3 = ($out -split "`n" | Select-String -SimpleMatch '执行异常').Count
+            "$host_：第 3 项 OK 行 $sec3，执行异常行 $bad3"
+            if ($sec3 -ne 1 -or $bad3 -ne 0) { $fail++; $out }
+          }
+          if ($fail) { Write-Error "check-flash-sh.ps1 第 3 项判定错误"; exit 1 }
+          # 自检脚本在 runner 上找不到 DSH 安装，其余项会报 FAIL、以非 0 退出；本步只断言第 3 项。
+          # 不显式 exit 0 的话，Actions 包装会把最后一个原生命令的 $LASTEXITCODE 当作本步结果。
+          exit 0
+
+      # 0.1.2：Job Object 改为第一次起子进程前才建。确认 --timeout 与父进程被 taskkill /F 两条路仍带走整棵树
+      # （子进程、后台任务、子 shell、find -exec / xargs 的孙进程），且结束后不残留 flash-sh.exe。
+      # 0.1.6：测试拷一份 exe 到独有目录再跑、只数这份拷贝的进程，并全程开一个原路径诱饵进程，验证与别的 flash-sh 负载并发也不误判。
+      - name: flash-sh.exe 进程树收尾（Windows）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          $env:FLASH_SH_REQUIRE_BIN = '1'
+          node plugins/flash-sh/test/job-tree.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 进程树收尾回归失败"; exit 1 }
+
+      # 对照用：取 0.1.0 的 exe（541be29 的 vendor，sha256 e4951f47…）。下游报告的 0.1.0 管道 read 数字
+      # （10 万行 0.057 s）是用不数行的循环测的；read-bench 每项先计数，能看出 0.1.0 在 Windows 管道上读了多少行。
+      - name: 取 0.1.0 的 flash-sh.exe（只作 read 计时对照）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: bash
+        timeout-minutes: 3
+        continue-on-error: true
+        run: |
+          git fetch --no-tags --depth=1 origin 541be2912a391b70cf8e4590dcb6accd97ba5440
+          git cat-file blob 541be2912a391b70cf8e4590dcb6accd97ba5440:plugins/flash-sh/vendor/win32-x64/flash-sh.exe > "$RUNNER_TEMP/flash-sh-0.1.0.exe"
+          sha256sum "$RUNNER_TEMP/flash-sh-0.1.0.exe"
+
+      # 只计时、不判失败：同一个 exe 正常读法 vs FLASH_SH_READ_BYTES=1（强制逐字节 = 0.1.1 的管道读法）vs 0.1.0 vs Git Bash，
+      # 各 5 次取中位数；每项先跑一次计数版，行数不对标「行数BAD」。0.1.3：自建管道/文件的 read 延迟交还。
+      - name: flash-sh.exe 逐行 read 计时（Windows，只打印）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          $ref = Join-Path $env:RUNNER_TEMP 'flash-sh-0.1.0.exe'
+          $json = Join-Path $env:RUNNER_TEMP 'read-bench.json'
+          if (Test-Path $ref) { node plugins/flash-sh/test/read-bench.mjs $exe 5 --ref $ref --json $json } else { node plugins/flash-sh/test/read-bench.mjs $exe 5 --json $json }
+
+      # 0.1.6：read-bench 的机器可读结果（全部样本 + 中位数 + 行数是否正确 + exe 版本与 sha256），供与基线自动比对。
+      - name: 上传 read-bench JSON
+        if: runner.os == 'Windows' && !cancelled()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: read-bench-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/read-bench.json
+          if-no-files-found: ignore
+
       # 别名表必须与仓库内的合成配置自洽（canonical 真的被发行、别名行真的在）。
       - name: 别名表 × 合成配置
         shell: bash

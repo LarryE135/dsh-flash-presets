@@ -191,7 +191,7 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 - **The install never touches sessions**: `install.sh` / `install.ps1` and plugin startup do not scan or rewrite `sessions/`. As of 0.2.9 **no code in this package writes a session file at all** (the start-up self-heal `lib/compat-heal.js` is gone: it rewrote the header without invalidating DSH's projection cache, so it barely worked and left a stale lock behind). CI asserts that a session directory is byte-identical after an install and an uninstall.
 - **Desktop app / plugin card**: whether old sessions open depends on the alias layer -- the `flash-presets-alias` row in 0.2.9–0.3.2, a sub-feature of the `flash-presets` row from 0.3.4 (it still injects only `agentPresets`, so it runs on the desktop app without `webServer`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
 - **Script install (`install.sh` / `install.ps1`)**: this path has no alias layer. If the patch mentioned `flash-lean-ptc-v3-lite` before the upgrade, `merge-presets` keeps one extra compatibility row (`order: 99`, labelled "do not pick"), otherwise those sessions would be not-found. A profile that already carries the plugin card is refused (`exit 4`) — pass `--force` to stack them anyway.
-- **0.3.2 → 0.3.4: the plugin page shows 3 components instead of 6** (two presets + one "Flash lean presets" row). The `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` rows were merged into one `flash-presets` row; features and defaults are unchanged. Overrides you wrote against the old row ids (turning the delivery gate on, turning concurrency off, switching a row off on the plugin page) **still apply** after the upgrade: the plugin reads them back at startup and logs `[flash-presets] 沿用旧行 …`; DSH itself prints a harmless `entry "…" not found` for each. Rewrite them as in [Runtime switches](#runtime-switches) to silence it; `doctor` section 6 lists them.
+- **0.3.2 → 0.3.4: the plugin page shows 4 components instead of 6** (two presets + one "Flash lean presets" row + the Windows Bash tool fl-bash). The `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` rows were merged into one `flash-presets` row; features and defaults are unchanged. Overrides you wrote against the old row ids (turning the delivery gate on, turning concurrency off, switching a row off on the plugin page) **still apply** after the upgrade: the plugin reads them back at startup and logs `[flash-presets] 沿用旧行 …`; DSH itself prints a harmless `entry "…" not found` for each. Rewrite them as in [Runtime switches](#runtime-switches) to silence it; `doctor` section 6 lists them.
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
 - If the profile's `selectedDefault` points at `flash-lean-ptc-v3-lite`, set it to `flash-lean-ptc-v3` (the old value still resolves through the compatibility layer).
 
@@ -215,9 +215,32 @@ The same card also ships a delivery gate (the `delivery-gate` row up to 0.3.2, t
 - **Version note:** the delivery gate is not in 0.3.0 but **ships with npm from 0.3.1 onwards** (the tarball contains `lib/delivery-gate.js`, and `cordis.patch.yml` carries the row — `enabled: false` / `maxRounds: 2`, with the acceptance script picked per platform: `verify.ps1` first on Windows, `verify.sh` elsewhere). On 0.3.0 the only route is git: `dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`. npm 0.3.1, 0.3.2 (official) and the mis-published 0.3.3 all carry it, so there is **no need to wait for a future release**.
 
 
+## fl-bash, a Bash tool for Windows (its own component, off by default)
+
+On **Windows x64** it gives the model a Bash-compatible shell tool, `fl_bash` (a bundled single-file interpreter, `flash-sh.exe`; no Git Bash / WSL needed;
+it does not take the `bash` / `pwsh` / `run_code` names). On the plugin page it is **its own component, "fl-bash"**, not a feature under the "Flash lean presets" row.
+
+- **Where it comes from**: the implementation lives only in the separate package [`fl-bash`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) (called `dsh-flash-sh`, tool `flash_sh`, in 0.1.x).
+  This package lists it under `optionalDependencies`, and its `package.json` declares `os: ["win32"]`, `cpu: ["x64"]`: the plugin manager (pnpm) installs it on Windows x64 and
+  **skips it on macOS / Linux / Windows ARM64 without downloading the 7.9 MB exe and without an error**. On those platforms the fl-bash component still shows (running, not red); it just registers no tool.
+- **Turning it on**: `- id: fl-bash` with `config.enabled: true` in the profile patch, or the user environment variable `DSH_FL_BASH=1`
+  (not in `.env`; the old name `DSH_FLASH_SH` still works). The other fields (`approval`, `approvalMemory`, `timeoutMs`, `maxOutputBytes`, `binPath`, …) go in the same `config`; see the fl-bash README.
+  The preview forms (`config.flashSh` on the `flash-presets` row, row id `flash-sh`) keep working after the upgrade; the startup log suggests rewriting them.
+- **Safety**: `fl_bash` is not confined by the DSH file sandbox. The default `approval: sandboxed` asks you unless the session has full access (it also asks
+  when the session mode cannot be read, and refuses to run when the approval call fails). Within one session a kind of command is asked once; dangerous
+  commands (`rm -rf`, writes outside the workspace, `bash -c` / `eval` / inline code, …) are asked every time. The child process does not see environment
+  variables whose names contain `KEY` / `PASSWORD` / `SECRET` / `TOKEN` (and the like) or the words `_PAT` / `_AUTH`, nor any `DSH_*` / `AWS_*` / `GITHUB_*` /
+  `NPM_CONFIG_*`, nor variables whose value is a URL with a username and password (full rules in the fl-bash README). Writes are judged by their real path
+  (through symlinks), and anything the classifier cannot read is asked every time. An invalid config (e.g. `timeoutMs: 0`) leaves it off, with the reason logged. `approval: off` lets the model run anything on your machine
+  without confirmation; use it only in a throwaway environment.
+- **Startup log**: enabled on a non-Windows-x64 host it writes one line, `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`; when the
+  optional dependency is missing, one line `…加载不到 fl-bash…`. Nothing else is affected.
+- **Alongside a separately installed fl-bash**: the plugin page shows two rows (this package's `fl-bash`, the standalone `fl-bash-standalone`); with both enabled only one `fl_bash` is registered;
+  this package's row wins and the standalone row logs that it steps aside. Turn this one off and the standalone row takes over.
+
 ## Runtime switches
 
-From 0.3.4 the run_code speed-up, plan mode, legacy-session support and the delivery gate all hang off the bundle's single `flash-presets` row, so the plugin page shows one component for them. Each feature starts once the host services it needs are present; a missing service only holds back its own feature (on the desktop app without `webServer`, only plan mode waits). Switch them in the profile patch (`~/.dsh/profiles/<name>/cordis.patch.yml`):
+From 0.3.4 the run_code speed-up, plan mode, legacy-session support, and the delivery gate all hang off the bundle's single `flash-presets` row, so the plugin page shows one component for them (the Bash tool fl-bash is a separate row; see above). Each feature starts once the host services it needs are present; a missing service only holds back its own feature (on the desktop app without `webServer`, only plan mode waits). Switch them in the profile patch (`~/.dsh/profiles/<name>/cordis.patch.yml`):
 
 ```yaml
 - id: flash-presets
@@ -230,7 +253,7 @@ From 0.3.4 the run_code speed-up, plan mode, legacy-session support and the deli
 
 Write only the sections you change; the rest keep the bundle defaults. Environment variables win over this: `DSH_FLASH_PRESETS_CONCURRENCY=0`, `DSH_FLASH_PRESETS_ALIAS=0`, `DSH_DELIVERY_GATE=0/1`.
 
-Old form (up to 0.3.2) → new form: `flash-presets-core`'s `config.toolConcurrency` → `toolConcurrency`; `plan-mode-ui`'s `config` → `planMode`; `delivery-gate`'s `config` → `deliveryGate`; `disabled: true` on any old row → `enabled: false` in its section. The old form keeps working (when both are written, the new one wins).
+Old form (up to 0.3.2) → new form: `flash-presets-core`'s `config.toolConcurrency` → `toolConcurrency`; `plan-mode-ui`'s `config` → `planMode`; `delivery-gate`'s `config` → `deliveryGate`; `disabled: true` on any old row → `enabled: false` in its section. The old form keeps working (when both are written, the new one wins). The `flash-sh` row of the feat/flash-sh preview installer and `config.flashSh` → the `config` of `id: fl-bash` (also read back); the standalone fl-bash row `fl-bash-standalone` is not translated (it is still a component of its own).
 
 ## Getting the most out of it
 
