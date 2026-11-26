@@ -828,11 +828,13 @@ function runningAfterPlan(live) {
 // 工具「开始」的统一处理：tool/call 与 tool/ptc-dispatch-start 都走这里。
 // 以前 ptc 分支只处理结束事件、也没有 planSeen 探测，于是默认 PTC 预设下
 // callsAfterPlan 永远是 0，「计划已交付还在干 → 收尾别再催」的短路失效（本轮审计 P1）。
-function onToolStart(live, session, key, turn, name) {
+// countFlight=false：PTC 子调用的飞行状态只记在 pendingPtc（按 subCallId 配对），不进 pendingTools ——
+// 它的结束事件 tool/ptc-dispatch 只走 notePtcEnd，若开始时也 +1，计数就只加不减（0.3.4 审计 P1）。
+function onToolStart(live, session, key, turn, name, countFlight = true) {
   if (live === undefined) return;
   live.sawToolCall = true;
   live.lastToolStartAt = Date.now();
-  noteToolFlight(key, 1, turn);
+  if (countFlight) noteToolFlight(key, 1, turn);
   if (live.phase !== "planning") return;
   const seen = probePlanSeen(live, session);
   // 计划交付后它没有停步、继续调工具 → 已经在执行，收尾时不该再催一次
@@ -955,9 +957,11 @@ function nativeEnter(ctx, agent, key, tier) {
   const svc = planModeHandle(ctx);
   if (svc !== null) {
     try {
-      svc.set(agent, true);
+      const r = svc.set(agent, true);
       bridgeTier.set(key, tier);
-      markOwned(key);
+      // 只有真的由本插件打开（committed / queued，或旧宿主不返回结果）才记归属：noop = 早已开着，
+      // 多半是用户自己 /plan 开的，记下来会让「关闭」档把用户的计划模式也关掉（0.3.4 审计 P2-1）。
+      if (r !== "noop" && r !== "cancelled") markOwned(key);
       bridgeStats.service += 1;
       return true;
     } catch (error) {
@@ -972,13 +976,14 @@ function nativeEnter(ctx, agent, key, tier) {
   bridgeStats.command += 1;
   defer(() => {
     const pending = runPlanCommand(ctx, agent, "/plan");
-    if (pending === null) { bridgeStats.unavailable += 1; bridgeTier.delete(key); return; }
+    if (pending === null) { bridgeStats.unavailable += 1; bridgeTier.delete(key); unmarkOwned(key); return; }
     pending.then((outcome) => {
       bridgeStats.lastCommand = "/plan:" + outcome;
       if (outcome === "ok") return;
       bridgeStats.command = Math.max(0, bridgeStats.command - 1);
       bridgeStats.commandError = (bridgeStats.commandError || 0) + 1;
       if (bridgeTier.get(key) === tier) bridgeTier.delete(key);
+      unmarkOwned(key);   // /plan 没生效：不是本插件开的，之后用户自己 /plan 开的不能被「关闭」档收走
       console.error("[plan-mode-ui] /plan bridge not effective:", outcome);
     });
   });
@@ -1003,7 +1008,12 @@ function nativeLeave(ctx, agent, key) {
   bridgeTier.delete(key);
   if (agent === undefined) return;
   if (svc !== null) {
-    try { svc.set(agent, false); unmarkOwned(key); return; } catch (error) { console.error("[plan-mode-ui] native plan-mode leave failed:", error); }
+    try {
+      // queued = 回合内只是排队，真正退出要等下一步；归属留到 plan/mode active=false 事件再清，
+      // 否则进程在生效前退出就又回到 #45 的状态（0.3.4 审计 P3-3）。
+      if (svc.set(agent, false) !== "queued") unmarkOwned(key);
+      return;
+    } catch (error) { console.error("[plan-mode-ui] native plan-mode leave failed:", error); }
   }
   defer(() => {
     const pending = runPlanCommand(ctx, agent, "/plan off");
@@ -1590,7 +1600,7 @@ export default {
           // （dsh-tools 的 pipeline.start() 在 input.log 缺失时直接返回），唯一信号是
           // dsh-tool-executor-ptc 的 tool/ptc-dispatch-start（开始）与 tool/ptc-dispatch（结束）。
           // 「动手」判定放在开始事件，与 tool/call 完全同一条路径（本轮审计 P1/P2）。
-          onToolStart(live, session, key, evTurn, pd?.name !== undefined ? pd.name : event?.name);
+          onToolStart(live, session, key, evTurn, pd?.name !== undefined ? pd.name : event?.name, false);
         } else if (type === "tool/ptc-dispatch") {
           notePtcEnd(key, pd?.subCallId);
         } else if (type === "tool/result") {

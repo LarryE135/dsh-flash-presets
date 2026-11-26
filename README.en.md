@@ -52,7 +52,7 @@ Two more things come with the bundle:
 - The plugin marks `glob` and `grep` as safe to run concurrently, so several searches in the same turn can execute in parallel. A one-line self-check is printed at startup -- that is the line to read first when troubleshooting:
 
   ```
-  [tool-concurrency] v0.3.2 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
+  [tool-concurrency] v0.3.4 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
   ```
 
   - **Two states to keep apart**: npm 0.3.0 rode on the plan-mode row -- on a host without `webServer` (headless, some desktop setups) that row stayed `pending`, so the optimization never ran and never complained. Since 0.3.1 it is its own row, `flash-presets-core`, which takes effect as soon as the package is installed (0.3.1, 0.3.2 and the mis-published 0.3.3 all carry it, so nothing has to wait for a future release).
@@ -322,7 +322,7 @@ Changes since 0.3.2; see the 0.3.4 section of the [CHANGELOG](https://github.com
 - **New: fl-bash (a Bash tool for Windows x64, off by default)**: the implementation and `flash-sh.exe` (about 7.9 MB) ship inside this package, so you can turn it on in the plugin page right after installing from npm. The `fl_bash` tool registers only on Windows x64; elsewhere the row logs one line. Commands are approved by read / write / execute class, with 87 adversarial cases. The separate `fl-bash` package also exists; with both installed only one tool registers.
 - **Round-five audit fixes**: three-state plan detection, PTC in-flight counts paired by `subCallId`, word-boundary review guard that also closes the template-interpolation and regex-literal bypasses, `merge-presets` CRLF and indented-root fixes, `verify-yaml` no longer requires both presets in the managed block.
 - **Release and CI**: `publish-npm.sh` waits for every CI run to complete and checks the registry version order; the bundle-install matrix adds DSH `0.2.2-rc.3`.
-- **Package size**: with the exe bundled, the npm package grows from about 0.7 MB to about 8.7 MB unpacked, about 3.8 MB to download (gzip).
+- **Package size**: with the exe bundled, the npm package grows from about 0.7 MB to about 8.9 MB unpacked, about 3.8 MB to download (gzip).
 
 ### v0.3.2 (2026-11-17, previous official release)
 

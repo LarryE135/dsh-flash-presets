@@ -1,5 +1,5 @@
 # fl-bash —— 组合包补丁层（单独安装时的那一行；0.1.x 叫 dsh-flash-sh，行 id flash-sh-standalone）
-# 实例 id 是 fl-bash-standalone。dsh-flash-presets 也把本包作为可选依赖，在插件页上放了单独的组件行 id: fl-bash；
+# 实例 id 是 fl-bash-standalone。dsh-flash-presets 0.3.4 起随包自带同一份实现，在插件页上放了单独的组件行 id: fl-bash；
 # 工具名都叫 fl_bash，进程内协调器保证只注册一个：presets 的那一行优先，本行让位并写日志
 # （见 README「与 dsh-flash-presets 同时安装」）。
 # 默认关闭（enabled: false）—— 它会在本机执行命令，要用户显式打开：

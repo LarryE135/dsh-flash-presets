@@ -174,7 +174,9 @@ if (hasGit) {
     }
     let scanned = 0;
     for (const [sha, path] of paths) {
-      if (path) {
+      // native/ 下是 flash-sh 解释器的 Rust 源码与它自己的微基准（如 native/flash-sh/bench/bench.py），
+      // 不是评测资产；本地分支里有它会让 --all 历史扫描误报（0.3.4 审计 P2）。内容指纹检查照常执行。
+      if (path && !path.startsWith("native/")) {
         for (const re of NAME_PATTERNS) {
           if (re.test(path)) { problems.push("历史提交里出现过私有资产：" + path + "（即使已删除，仍可从历史恢复）"); break; }
         }

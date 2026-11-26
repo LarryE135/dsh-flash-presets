@@ -47,7 +47,9 @@ BADCMD="$(grep -hoE 'dsh-flash-presets[@#](v)?[0-9]+[.][0-9]+[.][0-9]+' scripts/
 
 # 版本序（第三轮全量审计 P2-2）：0.3.3 → 0.3.2 的倒挂当时只能靠临时 dist-tag 绕过，脚本自己
 # 发现不了。现在发之前直接问 registry：VER 必须严格大于已发布的最大版本，且不在已发布列表里。
-PUBLISHED="$(npm view "$PKG_VER" versions --json 2>/dev/null)"
+# 注意：npm view 的第一个参数是包名。0.3.4 审计 P1：这里曾写成 "$PKG_VER"（查的是名叫 0.3.4 的包），
+# E404 + set -e 让脚本在 npm publish 之前静默退出。
+PUBLISHED="$(npm view dsh-flash-presets versions --json 2>/dev/null || true)"
 if [ -z "$PUBLISHED" ]; then
   [ "${ALLOW_UNKNOWN_CI:-0}" = "1" ] || fail "npm view 拿不到 $PKG_VER 的已发布版本列表" "先确认网络/npm 登录，或 ALLOW_UNKNOWN_CI=1 自担风险跳过"
   echo "⚠ 拿不到已发布版本列表：已按 ALLOW_UNKNOWN_CI=1 跳过版本序检查"

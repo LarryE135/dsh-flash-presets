@@ -1,6 +1,6 @@
 # 第三方组件许可清单（vendor/win32-x64/flash-sh.exe）
 
-flash-sh.exe 由本仓库 native/flash-sh 的 Rust 源码静态编译而成，下表是 x86_64-pc-windows-gnu 目标下
+flash-sh.exe 由 flash-sh 的 Rust 源码（作者自研，源码暂未公开）静态编译而成，下表是 x86_64-pc-windows-gnu 目标下
 实际进入构建图的全部 crate（`cargo metadata --filter-platform x86_64-pc-windows-gnu`，仅 normal 依赖，225 个）。
 多许可（`A OR B`）的 crate 按其中任一许可使用；本包选择 MIT（有 MIT 选项时），否则 CC0-1.0 / Apache-2.0。
 各 crate 所选许可的**全文与版权声明**在同目录的 THIRD_PARTY_LICENSE_TEXTS.txt（由 Cargo 源码包里的 LICENSE 文件按全文去重生成）。
