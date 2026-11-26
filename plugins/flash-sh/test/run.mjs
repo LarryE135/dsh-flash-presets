@@ -21,6 +21,7 @@ if (process.env.FLASH_SH_TEST_BIN) {
   ok = run(process.execPath, [path.join(dir, "read-regress.mjs"), process.env.FLASH_SH_TEST_BIN]) && ok;
   ok = run(process.execPath, [path.join(dir, "version.mjs"), process.env.FLASH_SH_TEST_BIN]) && ok;
   ok = run(process.execPath, [path.join(dir, "job-tree.mjs"), process.env.FLASH_SH_TEST_BIN]) && ok;
+  ok = run(process.execPath, [path.join(dir, "standby-output.mjs"), process.env.FLASH_SH_TEST_BIN]) && ok;
 } else console.log("read 回归 / 进程树收尾：跳过（未设置 FLASH_SH_TEST_BIN）");
 if (process.env.DSH_REAL_NM) ok = run("bash", [path.join(dir, "real-dsh.sh")]) && ok;
 else console.log("real-dsh：跳过（未设置 DSH_REAL_NM）");
