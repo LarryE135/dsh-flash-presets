@@ -212,7 +212,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `fl_bash`（内置单文件解释器 `flash-sh.exe`，不需要 Git Bash / WSL；
 不占用 `bash` / `pwsh` / `run_code`）。它在插件页上是**单独的一个组件「fl-bash」**，不挂在「Flash 精简预设」那一行下面。
 
-- **随包发行**：实现（`lib/fl-bash.js`）和 `flash-sh.exe`（约 7.9 MB）都在本包里，**从 npm 装好 dsh-flash-presets 就能在插件页打开 fl-bash**，不用另装包。
+- **随包发行**：实现（`lib/fl-bash.js`）和 `flash-sh.exe`（约 1.7 MB）都在本包里，**从 npm 装好 dsh-flash-presets 就能在插件页打开 fl-bash**，不用另装包。
   源码只有一份，在 [`plugins/flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md)，发布前由 `scripts/sync-fl-bash.mjs` 逐字节同步进包（0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
   exe 在所有平台都会随包下载，但只在 Windows x64 上注册工具；macOS / Linux / Windows ARM64 上插件页仍显示 fl-bash 组件（正常运行、不是红行），只写一行说明。
 - **打开**：profile 补丁里写 `- id: fl-bash` / `config.enabled: true`，或设用户环境变量 `DSH_FL_BASH=1`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。
@@ -313,10 +313,10 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 相对 0.3.2 的变化，逐条见 [CHANGELOG](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/CHANGELOG.md) 的 0.3.4 一节。
 
 - **插件页从 6 个组件简并为 4 个**：两个预设 + 一行「Flash 精简预设」（原来的 core / 计划模式 / 别名层 / 交付门合成一行，各功能仍可在这一行的设置里单独开关）+ Windows Bash 工具 fl-bash。升级后旧行的覆盖会被自动认领，`doctor` 会提示残留。
-- **新增 fl-bash（Windows x64 的 Bash 工具，默认关）**：实现与 `flash-sh.exe`（约 7.9 MB）随本包发行，从 npm 装好就能在插件页打开；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 87 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
+- **新增 fl-bash（Windows x64 的 Bash 工具，默认关）**：实现与 `flash-sh.exe`（约 1.7 MB）随本包发行，从 npm 装好就能在插件页打开；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 129 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
 - **第五轮审计整改**：计划探测改三态（「计划刚落盘就动手」不再被判成没计划）、PTC 飞行计数按 `subCallId` 配对、评审守卫改词边界判定并堵住模板串插值与正则字面量两种绕过、`merge-presets` 修 CRLF 与缩进根序列、`verify-yaml` 不再强求托管块里两条预设都在。
 - **发版与 CI**：`publish-npm.sh` 要求 CI 全部完成再放行，并断言 registry 版本序；bundle-install 矩阵加入 DSH `0.2.2-rc.3`。
-- **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 8.9 MB，下载约 3.8 MB（gzip）。
+- **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 2.7 MB，下载约 1.1 MB（gzip）。
 
 ### v0.3.2（2026-11-17，上一版正式版）
 

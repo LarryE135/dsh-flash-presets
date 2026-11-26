@@ -220,7 +220,7 @@ The same card also ships a delivery gate (the `delivery-gate` row up to 0.3.2, t
 On **Windows x64** it gives the model a Bash-compatible shell tool, `fl_bash` (a bundled single-file interpreter, `flash-sh.exe`; no Git Bash / WSL needed;
 it does not take the `bash` / `pwsh` / `run_code` names). On the plugin page it is **its own component, "fl-bash"**, not a feature under the "Flash lean presets" row.
 
-- **Shipped in this package**: the implementation (`lib/fl-bash.js`) and `flash-sh.exe` (about 7.9 MB) are inside this package, so **after installing dsh-flash-presets from npm you can turn fl-bash on right away** — no second package.
+- **Shipped in this package**: the implementation (`lib/fl-bash.js`) and `flash-sh.exe` (about 1.7 MB) are inside this package, so **after installing dsh-flash-presets from npm you can turn fl-bash on right away** — no second package.
   The single source is [`plugins/flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md), copied byte for byte by `scripts/sync-fl-bash.mjs` before publishing (called `dsh-flash-sh`, tool `flash_sh`, in 0.1.x).
   The exe is downloaded on every platform but the tool registers only on Windows x64; on macOS / Linux / Windows ARM64 the fl-bash component still shows (running, not red) and logs one line.
 - **Turning it on**: `- id: fl-bash` with `config.enabled: true` in the profile patch, or the user environment variable `DSH_FL_BASH=1`
@@ -319,10 +319,10 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 Changes since 0.3.2; see the 0.3.4 section of the [CHANGELOG](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/CHANGELOG.md) for every item.
 
 - **The plugin page goes from 6 components to 4**: the two presets, one "Flash presets" row (core / plan mode / alias layer / delivery gate merged into it, each still switchable in that row's settings) and the Windows Bash tool fl-bash. Overrides on the old rows are picked up after upgrading; `doctor` flags leftovers.
-- **New: fl-bash (a Bash tool for Windows x64, off by default)**: the implementation and `flash-sh.exe` (about 7.9 MB) ship inside this package, so you can turn it on in the plugin page right after installing from npm. The `fl_bash` tool registers only on Windows x64; elsewhere the row logs one line. Commands are approved by read / write / execute class, with 87 adversarial cases. The separate `fl-bash` package also exists; with both installed only one tool registers.
+- **New: fl-bash (a Bash tool for Windows x64, off by default)**: the implementation and `flash-sh.exe` (about 1.7 MB) ship inside this package, so you can turn it on in the plugin page right after installing from npm. The `fl_bash` tool registers only on Windows x64; elsewhere the row logs one line. Commands are approved by read / write / execute class, with 129 adversarial cases. The separate `fl-bash` package also exists; with both installed only one tool registers.
 - **Round-five audit fixes**: three-state plan detection, PTC in-flight counts paired by `subCallId`, word-boundary review guard that also closes the template-interpolation and regex-literal bypasses, `merge-presets` CRLF and indented-root fixes, `verify-yaml` no longer requires both presets in the managed block.
 - **Release and CI**: `publish-npm.sh` waits for every CI run to complete and checks the registry version order; the bundle-install matrix adds DSH `0.2.2-rc.3`.
-- **Package size**: with the exe bundled, the npm package grows from about 0.7 MB to about 8.9 MB unpacked, about 3.8 MB to download (gzip).
+- **Package size**: with the exe bundled, the npm package grows from about 0.7 MB to about 2.7 MB unpacked, about 1.1 MB to download (gzip).
 
 ### v0.3.2 (2026-11-17, previous official release)
 
