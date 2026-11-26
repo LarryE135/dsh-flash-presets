@@ -16,9 +16,9 @@
 
 整个包以 DSH 组合包（`dsh.bundle`）交付：向 profile 插入预设行，不改宿主源码。**有三项是运行时对整个 profile 生效的**：常驻 PTC 运行时（补丁里的 `ptc-runtime` 覆盖，作用到该 profile 的**所有**预设，要关只能移除这张插件卡）、`glob` / `grep` 的只读并发标记（`DSH_FLASH_PRESETS_CONCURRENCY=0` 关闭）、旧 preset id 的解析（`DSH_FLASH_PRESETS_ALIAS=0` 关闭）。
 
-> 当前版本：v0.3.2（2026-11-17 追认为正式版 —— npm 的 `latest` dist-tag 指向它，npm 侧一律以 `npm view dsh-flash-presets version` 为准）· 误发版本 v0.3.3（npm 上仍可安装、已 `deprecate`，**不是正式版**；它的包**比 0.3.2 少第四轮 6 项修复**，别当等价替代 —— 仓库 `package.json` 现在写的就是 0.3.2）· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
+> 当前版本：v0.3.4（npm 侧一律以 `npm view dsh-flash-presets version` 为准）· 上一版正式版 v0.3.2 · 误发版本 v0.3.3（npm 上仍可安装、已 `deprecate`，**不是正式版**，别当等价替代））· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），实测 0.2.1-rc.5 与 0.2.2-rc.1
 >
-> 正式版：tag `v0.3.2` + npm 0.3.2 + GitHub Release 同日落地（用 `npm view dsh-flash-presets version` 复核；若还显示 0.3.1，说明镜像/缓存未刷，可用 `#v0.3.2` 装同一份代码）。上一版正式版是 0.3.1。**0.3.3 是误发版本**：原计划按 0.3.2 发布，`package.json` 被写成 0.3.3 且已 `npm publish` —— 现在的处置是把 0.3.2 追认为正式版，0.3.3 在 npm 上 `deprecate`（仍可安装，但不是正式版）。所以**装包务必写死版本号**：`^0.3` 这类范围仍可能解析到 0.3.3。0.3.2 收口两轮外部审计、第三轮自查与第四轮审计的修复：宿主事件形态、改档位丢自动批准、评审守卫、交付门挂起与 Windows 支持、面板 Host 白名单、发布脚本互锁、安装器认领边界 —— 其中 `run_code` 优化随安装即生效。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> 正式版：tag `v0.3.4` + npm 0.3.4 + GitHub Release（用 `npm view dsh-flash-presets version` 复核；若还显示 0.3.2，说明镜像/缓存未刷或 pnpm 的 24 小时冷却未过，可用 `#v0.3.4` 装同一份代码）。上一版正式版是 0.3.2。**0.3.3 是误发版本**（npm 上已 `deprecate`，仍可安装，但不是正式版，比 0.3.2 少第四轮 6 项修复），所以**装包务必写死版本号**：`^0.3` 这类范围仍可能解析到 0.3.3。0.3.4 把插件页上的组件从 6 个简并为 4 个、随包带上 Windows Bash 工具 fl-bash（默认关），并收口第五轮审计。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -120,25 +120,25 @@ balance 只保留引擎替代不了的三条：守住语言与范围、不写密
 
 ```console
 # npm 上按版本号装（锁死版本，别留 ^0.3 这类范围）
-dsh plugin --profile web add dsh-flash-presets@0.3.2
+dsh plugin --profile web add dsh-flash-presets@0.3.4
 # 不想走 npm 时，装同一个 tag
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.4
 ```
 
-> 想跟仓库最新（含尚未发版的提交）就把 `#v0.3.2` 换成 `#main`。
+> 想跟仓库最新（含尚未发版的提交）就把 `#v0.3.4` 换成 `#main`。
 
 `--profile` 通常取 `web` 或 `desktop`（`headless` 下预设不激活、`acp` 未验证，见[已知限制](#已知限制)）。在 GUI 的「插件 → 添加插件」里填包名或 GitHub 地址，效果相同。
 
 预设直接决定 agent 的行为，需要可复现时请写死版本号。用 npm 包名且不带版本号时，管理器写入的是 caret 范围，之后任何一次 pnpm 操作都可能把它升到 0.3.x 的最新版；`github:` 安装写的是 git 引用（`#v<版本>`），不会自己漂移。
 
-> 版本号怎么填：**正式版是 0.3.2**（`…@0.3.2` 或 `github:…#v0.3.2`）。上面示例钉的就是正式版 0.3.2。npm 上还有个仍可安装的**误发版 0.3.3**（已 `deprecate`，且比 0.3.2 少第四轮 6 项修复）—— 别装它。**写死版本号**：`^0.3` 这类范围会随 registry 漂移；pnpm 11 默认的 `minimumReleaseAge` 冷却还会让发布不足 24h 的版本装不到（裸装 / `@latest` 会静默退到上一版 0.3.1）。
+> 版本号怎么填：**正式版是 0.3.4**（`…@0.3.4` 或 `github:…#v0.3.4`）。上面示例钉的就是正式版 0.3.4。npm 上还有个仍可安装的**误发版 0.3.3**（已 `deprecate`，且比 0.3.2 少第四轮 6 项修复）—— 别装它。**写死版本号**：`^0.3` 这类范围会随 registry 漂移；pnpm 11 默认的 `minimumReleaseAge` 冷却还会让发布不足 24h 的版本装不到（裸装 / `@latest` 会静默退到上一版 0.3.2）。
 
 ### 离线或用脚本安装
 
 从 [Release](https://github.com/LarryE135/dsh-flash-presets/releases) 下载附件解压，或克隆对应的 tag：
 
 ```bash
-git clone --depth 1 -b v0.3.2 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.3.4 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows：scripts\install.ps1 -Profile web
 ```
@@ -181,7 +181,7 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - **预设 id 不再变动**：13 条规则版是 `flash-lean-ptc-v3`，3 条规则版是 `flash-lean-ptc-v3-balance`。0.2.7–0.2.8 曾把前者改成 `flash-lean-ptc-v3-lite`，0.2.9 起改回并不再改名 —— DSH 把 preset id 写进会话日志，改 id 等于让旧会话打不开。规则文本可以演进，标识符保持不变。
 - 旧会话照常打开，而且**不被改写**：0.2.7–0.2.8 的 `flash-lean-ptc-v3-lite` 交给运行时兼容层映射到 `flash-lean-ptc-v3`（0.3.2 起 v3 的规则 7 措辞有调整，两者不再逐字相同，首次命中会在启动日志里提示）；更早的 `flash-lean`、`flash-lean-ptc` 也由兼容层解析。`flash-lean-ptc-v1` / `-v2` 也映射到 `flash-lean-ptc-v3`（0.2.8 时期就是这么映射的，0.2.9 不收回这条兼容）；它们的规则与 v3 不同，首次命中会在启动日志里打一条警告，要原规则的人在 profile 补丁里加自己的行 —— 本机就是这样保留 `v2` 的。自建 id 可用 `DSH_FLASH_PRESETS_ALIAS_EXTRA` 追加。兼容层只在解析失败时介入，也不改写任何会话文件。映射表见 [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json)，原理见[预设 id 契约与升级](docs/预设-id-契约与升级.md)。
 - **安装流程不碰会话**：`install.sh` / `install.ps1` 与插件启动都不扫描、不改写 `sessions/`。0.2.9 起**本包没有任何代码会写会话文件**（启动自愈 `lib/compat-heal.js` 已删除：它改 header 却不失效 DSH 的投影缓存，实际基本无效，还留下不释放的锁）。CI 里有断言：装一次、卸一次，`sessions/` 的校验和不变。
-- **桌面端 / 插件卡**：旧会话能不能打开，全看别名层在不在 —— 0.2.9–0.3.2 是组合包里的 `flash-presets-alias` 行，0.3.4 起是 `flash-presets` 行下的子功能（同样只 inject `agentPresets`，桌面端缺 `webServer` 也照常运行）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
+- **桌面端 / 插件卡**：旧会话能不能打开，全看别名层在不在 —— 0.2.9–0.3.2 是组合包里的 `flash-presets-alias` 行，0.3.4 起是 `flash-presets` 行下的子功能（同样只 inject `agentPresets`，桌面端缺 `webServer` 也照常运行）。0.2.9 之前的插件卡没有它，请重装：`dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.4`。`node scripts/doctor.mjs --profile desktop` 会直接告诉你有没有。
 - **脚本安装（`install.sh` / `install.ps1`）**：这条路没有别名层。如果升级前补丁里有 `flash-lean-ptc-v3-lite`，`merge-presets` 会额外保留一行兼容行（`order: 99`，标「勿选」），否则那些会话会 not-found。装过插件卡的 profile 会被脚本直接拒绝（`exit 4`），要叠加得显式 `--force`。
 - **脚本路径升级会移除旧卡**：托管块是整块替换的，0.2.5 时代的三卡（`flash-lean-ptc-v1` / `-v2` / `-v3`）升级后只剩 `flash-lean-ptc-v3` 与 `-balance`。这条路径**没有旧 id 兜底**（别名层只随插件卡发行），引用 `-v1` / `-v2` 的旧会话升级后会 `agent-preset/not-found`。升级脚本会打印警告；需要旧会话继续可打开，请改装插件卡（`dsh plugin --profile <名称> add dsh-flash-presets`），它带兼容层。
 - 装过独立包 `dsh-plan-mode-ui` 的，先 `dsh plugin remove dsh-plan-mode-ui`，否则计划模式会被注入两次。
@@ -308,7 +308,17 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 
 ## 版本历史
 
-### v0.3.2（2026-11-17，当前正式版）
+### v0.3.4
+
+相对 0.3.2 的变化，逐条见 [CHANGELOG](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/CHANGELOG.md) 的 0.3.4 一节。
+
+- **插件页从 6 个组件简并为 4 个**：两个预设 + 一行「Flash 精简预设」（原来的 core / 计划模式 / 别名层 / 交付门合成一行，各功能仍可在这一行的设置里单独开关）+ Windows Bash 工具 fl-bash。升级后旧行的覆盖会被自动认领，`doctor` 会提示残留。
+- **新增 fl-bash（Windows x64 的 Bash 工具，默认关）**：实现与 `flash-sh.exe`（约 7.9 MB）随本包发行，从 npm 装好就能在插件页打开；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 87 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
+- **第五轮审计整改**：计划探测改三态（「计划刚落盘就动手」不再被判成没计划）、PTC 飞行计数按 `subCallId` 配对、评审守卫改词边界判定并堵住模板串插值与正则字面量两种绕过、`merge-presets` 修 CRLF 与缩进根序列、`verify-yaml` 不再强求托管块里两条预设都在。
+- **发版与 CI**：`publish-npm.sh` 要求 CI 全部完成再放行，并断言 registry 版本序；bundle-install 矩阵加入 DSH `0.2.2-rc.3`。
+- **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 8.7 MB，下载约 3.8 MB（gzip）。
+
+### v0.3.2（2026-11-17，上一版正式版）
 
 发布：npm 上的 0.3.2（`…@0.3.2` —— 以 `npm view dsh-flash-presets version` 为准，`latest` 指向它）、GitHub Release `v0.3.2`、tag `v0.3.2`（= `ea8c3d8`）。上一版正式版是 0.3.1。
 

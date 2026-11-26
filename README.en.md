@@ -16,9 +16,9 @@ The idea is simple: compact the context earlier, keep only the head and tail of 
 
 Everything ships as a DSH bundle (`dsh.bundle`). It inserts preset rows into a profile and doesn't touch the host source. **Three things do apply to the whole profile at runtime**: the resident PTC runtime (the `ptc-runtime` override in the patch, which affects **every** preset in that profile — the only way to switch it off is to remove this plugin card), the `glob` / `grep` concurrency marks (`DSH_FLASH_PRESETS_CONCURRENCY=0` disables them), and legacy preset-id resolution (`DSH_FLASH_PRESETS_ALIAS=0` disables that).
 
-> Current version: 0.3.2 (declared the official release on 2026-11-17 — npm's `latest` dist-tag points at it; for npm, always trust `npm view dsh-flash-presets version`) · mis-published version 0.3.3 (still installable from npm, `deprecated`, **not an official release**; it ships **six round-four fixes fewer** than 0.3.2 — `package.json` now says 0.3.2) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
+> Current version: 0.3.4 (for npm, always trust `npm view dsh-flash-presets version`) · previous official release 0.3.2 · mis-published version 0.3.3 (still installable from npm, `deprecated`, **not an official release**; do not treat it as equivalent) · presets v3 / v3 balance · plan mode plan-mode v1 (1.0.0) · requires DSH `>=0.2.1-rc.5 <0.2.3-0` (an `engines` gate: installs are refused outside it, and at load time an out-of-range DSH skips this plugin — `dsh plugin allow-version` can override at your own risk; the script install doesn't go through this gate), tested on 0.2.1-rc.5 and 0.2.2-rc.1
 >
-> Official release: tag `v0.3.2` + npm 0.3.2 + GitHub Release, all on the same day (check with `npm view dsh-flash-presets version`; if a mirror still shows 0.3.1, `#v0.3.2` installs the same code). 0.3.1 was the previous official release. **0.3.3 was published by mistake**: the plan was to release 0.3.2, but `package.json` was written as 0.3.3 and `npm publish` went out with it — so 0.3.2 is now treated as the official release and 0.3.3 is `deprecate`d on npm (still installable, not official). Pin the version: a `^0.3` range can still resolve to 0.3.3. 0.3.2 closes out two external audits, the round-three self-audit and round four: host event shape, auto-approve being dropped on tier change, the review guard, delivery-gate hangs and Windows support, the panel Host allowlist, the publish-script interlocks, and installer adoption boundaries — and the `run_code` optimisation takes effect on install. **Do not install 0.2.5** — it cannot create sessions on DSH 0.2.2-rc.1 (#19).
+> Official release: tag `v0.3.4` + npm 0.3.4 + GitHub Release (check with `npm view dsh-flash-presets version`; if a mirror still shows 0.3.2, its cache or pnpm's 24-hour cooldown has not caught up, and `#v0.3.4` installs the same code). 0.3.2 was the previous official release. **0.3.3 was published by mistake** (`deprecate`d on npm, still installable, not official, six round-four fixes short of 0.3.2), so **pin the version**: a `^0.3` range can still resolve to 0.3.3. 0.3.4 trims the plugin page from 6 components to 4, ships the Windows Bash tool fl-bash inside the package (off by default), and closes out the round-five audit. **Do not install 0.2.5** — it cannot create sessions on DSH 0.2.2-rc.1 (#19).
 
 ## Who it's for, and who it isn't
 
@@ -127,23 +127,23 @@ The plugin manager installs the whole plugin card: both presets, the plan-mode c
 
 ```console
 # from npm, pinned to a version (never leave a `^0.3` range)
-dsh plugin --profile web add dsh-flash-presets@0.3.2
+dsh plugin --profile web add dsh-flash-presets@0.3.4
 # or the same release as a tag, if you'd rather not use npm
-dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.2
+dsh plugin --profile web add github:LarryE135/dsh-flash-presets#v0.3.4
 ```
 
 `--profile` is normally `web` or `desktop` (presets don't activate under `headless`, and `acp` is untested — see [Known limitations](#known-limitations)). Entering the package name or GitHub address under Plugins → Add plugin in the GUI does the same thing.
 
 Presets directly shape agent behavior, so pin a version when you need reproducible results. With a bare npm name the manager records a caret range, and any later pnpm operation may move you to the newest 0.3.x; a `github:` install records a git ref (`#v<version>`) instead and won't drift.
 
-> Which number to fill in: **the official release is 0.3.2** (`…@0.3.2` or `github:…#v0.3.2`). The example above pins the official 0.3.2. npm also still carries a mis-published 0.3.3 (`deprecated`, and six round-four fixes short) — do not use it. **Pin the exact version**: `^0.3` ranges drift with the registry, and pnpm 11's default `minimumReleaseAge` cooldown hides releases younger than 24h (a bare install / `@latest` silently falls back to 0.3.1).
+> Which number to fill in: **the official release is 0.3.4** (`…@0.3.4` or `github:…#v0.3.4`). The example above pins the official 0.3.4. npm also still carries a mis-published 0.3.3 (`deprecated`, and six round-four fixes short) — do not use it. **Pin the exact version**: `^0.3` ranges drift with the registry, and pnpm 11's default `minimumReleaseAge` cooldown hides releases younger than 24h (a bare install / `@latest` silently falls back to 0.3.2).
 
 ### Offline, or with the install script
 
 Download and unpack the archive from [Releases](https://github.com/LarryE135/dsh-flash-presets/releases), or clone the tag:
 
 ```bash
-git clone --depth 1 -b v0.3.2 https://github.com/LarryE135/dsh-flash-presets.git
+git clone --depth 1 -b v0.3.4 https://github.com/LarryE135/dsh-flash-presets.git
 cd dsh-flash-presets
 bash scripts/install.sh --profile web                  # Windows: scripts\install.ps1 -Profile web
 ```
@@ -189,7 +189,7 @@ pnpm leaves one line for this package in the profile's `pnpm-workspace.yaml`, an
 - **Preset ids no longer change.** The 13-rule preset is `flash-lean-ptc-v3`; the 3-rule preset is `flash-lean-ptc-v3-balance`. 0.2.7–0.2.8 renamed the first one to `flash-lean-ptc-v3-lite`; 0.2.9 reverts that and will not rename ids again — DSH persists the preset id inside the session log, so renaming it is what makes old sessions fail to open. Rule text may evolve; identifiers stay put.
 - Old sessions still open, and none of them get rewritten: `flash-lean-ptc-v3-lite` (0.2.6–0.2.8) has identical rules and is aliased to `flash-lean-ptc-v3`; older `flash-lean` / `flash-lean-ptc` are aliased too, and `flash-lean-ptc-v1` / `-v2` are aliased as well (0.2.8 already aliased them and 0.2.9 keeps that promise); their rules differ from v3, so the first hit logs a warning — add a row to your profile patch if you want the old rules, which is what this machine does for `v2`. Ids used only in local experiments can be added through `DSH_FLASH_PRESETS_ALIAS_EXTRA`. The layer steps in only when resolution fails and never rewrites a session file. The mapping is in [`presets/legacy-preset-map.json`](presets/legacy-preset-map.json); the design is described in [preset id contract and upgrades](docs/预设-id-契约与升级.md) (Chinese).
 - **The install never touches sessions**: `install.sh` / `install.ps1` and plugin startup do not scan or rewrite `sessions/`. As of 0.2.9 **no code in this package writes a session file at all** (the start-up self-heal `lib/compat-heal.js` is gone: it rewrote the header without invalidating DSH's projection cache, so it barely worked and left a stale lock behind). CI asserts that a session directory is byte-identical after an install and an uninstall.
-- **Desktop app / plugin card**: whether old sessions open depends on the alias layer -- the `flash-presets-alias` row in 0.2.9–0.3.2, a sub-feature of the `flash-presets` row from 0.3.4 (it still injects only `agentPresets`, so it runs on the desktop app without `webServer`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.2`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
+- **Desktop app / plugin card**: whether old sessions open depends on the alias layer -- the `flash-presets-alias` row in 0.2.9–0.3.2, a sub-feature of the `flash-presets` row from 0.3.4 (it still injects only `agentPresets`, so it runs on the desktop app without `webServer`). Cards older than 0.2.9 lack it — reinstall with `dsh plugin --profile desktop add github:LarryE135/dsh-flash-presets#v0.3.4`. `node scripts/doctor.mjs --profile desktop` tells you whether the row is there.
 - **Script install (`install.sh` / `install.ps1`)**: this path has no alias layer. If the patch mentioned `flash-lean-ptc-v3-lite` before the upgrade, `merge-presets` keeps one extra compatibility row (`order: 99`, labelled "do not pick"), otherwise those sessions would be not-found. A profile that already carries the plugin card is refused (`exit 4`) — pass `--force` to stack them anyway.
 - **0.3.2 → 0.3.4: the plugin page shows 4 components instead of 6** (two presets + one "Flash lean presets" row + the Windows Bash tool fl-bash). The `flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate` rows were merged into one `flash-presets` row; features and defaults are unchanged. Overrides you wrote against the old row ids (turning the delivery gate on, turning concurrency off, switching a row off on the plugin page) **still apply** after the upgrade: the plugin reads them back at startup and logs `[flash-presets] 沿用旧行 …`; DSH itself prints a harmless `entry "…" not found` for each. Rewrite them as in [Runtime switches](#runtime-switches) to silence it; `doctor` section 6 lists them.
 - If you installed the standalone `dsh-plan-mode-ui` package, run `dsh plugin remove dsh-plan-mode-ui` first, or plan mode will be injected twice.
@@ -314,7 +314,17 @@ node scripts/verify-session-compat.mjs   # whether old sessions still open after
 
 ## Version history
 
-### v0.3.2 (2026-11-17, current official release)
+### v0.3.4
+
+Changes since 0.3.2; see the 0.3.4 section of the [CHANGELOG](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/CHANGELOG.md) for every item.
+
+- **The plugin page goes from 6 components to 4**: the two presets, one "Flash presets" row (core / plan mode / alias layer / delivery gate merged into it, each still switchable in that row's settings) and the Windows Bash tool fl-bash. Overrides on the old rows are picked up after upgrading; `doctor` flags leftovers.
+- **New: fl-bash (a Bash tool for Windows x64, off by default)**: the implementation and `flash-sh.exe` (about 7.9 MB) ship inside this package, so you can turn it on in the plugin page right after installing from npm. The `fl_bash` tool registers only on Windows x64; elsewhere the row logs one line. Commands are approved by read / write / execute class, with 87 adversarial cases. The separate `fl-bash` package also exists; with both installed only one tool registers.
+- **Round-five audit fixes**: three-state plan detection, PTC in-flight counts paired by `subCallId`, word-boundary review guard that also closes the template-interpolation and regex-literal bypasses, `merge-presets` CRLF and indented-root fixes, `verify-yaml` no longer requires both presets in the managed block.
+- **Release and CI**: `publish-npm.sh` waits for every CI run to complete and checks the registry version order; the bundle-install matrix adds DSH `0.2.2-rc.3`.
+- **Package size**: with the exe bundled, the npm package grows from about 0.7 MB to about 8.7 MB unpacked, about 3.8 MB to download (gzip).
+
+### v0.3.2 (2026-11-17, previous official release)
 
 Released: npm 0.3.2 (`…@0.3.2` — verify with `npm view dsh-flash-presets version`, whose `latest` tag points at it), GitHub Release `v0.3.2`, tag `v0.3.2` (= `ea8c3d8`). 0.3.1 was the previous official release.
 

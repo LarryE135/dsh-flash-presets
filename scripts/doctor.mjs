@@ -317,6 +317,23 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
   }
   if (/flashSh\s*:/.test(raw)) info('用户补丁里有 flashSh（预览版写法）：仍由 fl-bash 组件行读回生效；建议改写到 id: fl-bash 的 config 下');
 }
+// fl-bash 随包发行（0.3.4 起）：exe 是否完整（下载中断 / 杀软隔离时会缺或被截断）；旧的 dsh-flash-sh 0.1.x 同时作为组合包装着时提示
+if (fs.existsSync(path.join(pluginDir, 'lib', 'fl-bash.js'))) {
+  const exe = path.join(pluginDir, 'vendor', 'win32-x64', 'flash-sh.exe');
+  let want = null;
+  try { want = fs.readFileSync(exe + '.sha256', 'utf8').trim().split(/\s+/)[0]; } catch {}
+  if (!fs.existsSync(exe)) warn('fl-bash：包里缺 vendor/win32-x64/flash-sh.exe（被杀软隔离或安装不完整？）—— 打开 fl-bash 组件时不会注册工具；重装 ' + PLUGIN);
+  else {
+    let got = null;
+    try { got = (await import('node:crypto')).createHash('sha256').update(fs.readFileSync(exe)).digest('hex'); } catch {}
+    if (want && got && want !== got) warn('fl-bash：flash-sh.exe 的 sha256 与包里记录的不一致（' + got.slice(0, 12) + '… ≠ ' + want.slice(0, 12) + '…）—— 文件被改动或截断，重装 ' + PLUGIN);
+    else if (want && got) ok('fl-bash：随包的 flash-sh.exe 完整（sha256 ' + got.slice(0, 12) + '…）');
+  }
+  try {
+    const deps = Object.keys(JSON.parse(fs.readFileSync(path.join(path.dirname(path.dirname(pluginDir)), 'package.json'), 'utf8')).dependencies || {});
+    if (deps.includes('dsh-flash-sh')) warn('profile 里还装着旧的 dsh-flash-sh（0.1.x）：与本包的 fl-bash 同开时只注册一个工具，但可能留下旧名 flash_sh —— 建议在插件页删掉 dsh-flash-sh');
+  } catch {}
+}
 const stateFile = path.join(home, 'plan-mode-ui', 'state.json');
 if (fs.existsSync(stateFile)) {
   try {

@@ -167,11 +167,11 @@ check(flashRow.includes("name: 'dsh-flash-presets'") && flashRow.includes(expect
   {
     const crypto = await import("node:crypto");
     let same = true;
-    for (const [from, to] of [["lib/index.js", "lib/fl-bash.js"], ["vendor/win32-x64/flash-sh.exe", "vendor/win32-x64/flash-sh.exe"], ["vendor/win32-x64/flash-sh.exe.sha256", "vendor/win32-x64/flash-sh.exe.sha256"], ["locale/zh.json", "locale/fl-bash/zh.json"], ["locale/en.json", "locale/fl-bash/en.json"]]) {
+    for (const [from, to] of [["lib/index.js", "lib/fl-bash.js"], ["vendor/win32-x64/flash-sh.exe", "vendor/win32-x64/flash-sh.exe"], ["vendor/win32-x64/flash-sh.exe.sha256", "vendor/win32-x64/flash-sh.exe.sha256"], ["locale/zh.json", "locale/fl-bash/zh.json"], ["locale/en.json", "locale/fl-bash/en.json"], ["NOTICE", "vendor/win32-x64/NOTICE"], ["THIRD_PARTY_LICENSES.md", "vendor/win32-x64/THIRD_PARTY_LICENSES.md"], ["THIRD_PARTY_LICENSE_TEXTS.txt", "vendor/win32-x64/THIRD_PARTY_LICENSE_TEXTS.txt"]]) {
       const a = path.join(root, "plugins", "flash-sh", from), b = path.join(root, to);
       if (!fs.existsSync(b) || Buffer.compare(fs.readFileSync(a), fs.readFileSync(b)) !== 0) { same = false; check(false, to + " 与 plugins/flash-sh/" + from + " 一致"); }
     }
-    if (same) check(true, "lib/fl-bash.js、vendor/win32-x64/flash-sh.exe、locale/fl-bash/* 与 plugins/flash-sh 逐字节一致（单一来源）");
+    if (same) check(true, "lib/fl-bash.js、vendor/win32-x64/flash-sh.exe 及其第三方许可、locale/fl-bash/* 与 plugins/flash-sh 逐字节一致（单一来源）");
     const exe = fs.readFileSync(path.join(root, "vendor", "win32-x64", "flash-sh.exe"));
     const sha = crypto.createHash("sha256").update(exe).digest("hex");
     check(fs.readFileSync(path.join(root, "vendor", "win32-x64", "flash-sh.exe.sha256"), "utf8").trim() === sha + "  flash-sh.exe", "随包 exe 与 .sha256 一致", sha);
