@@ -1,9 +1,10 @@
 fl-bash (formerly dsh-flash-sh)
 Copyright (c) 2026 LarryE135
 
-本包（lib/、cordis.patch.yml、文档）以 MIT License 发布，见 LICENSE。
+fl-bash 的 JS 部分（lib/、cordis.patch.yml、文档）以 MIT License 发布，许可全文见所在 npm 包根目录的 LICENSE
+（单独的 fl-bash 包与随 dsh-flash-presets 发行时都在包根）。
 
-vendor/win32-x64/flash-sh.exe 是 flash-sh（本仓库 native/flash-sh，MIT）的 Windows x64 构建，
+vendor/win32-x64/flash-sh.exe 是 flash-sh（作者自研的 Rust 实现，MIT；源码暂未公开）的 Windows x64 构建，
 静态链接了以下第三方开源组件（完整清单与版本见 THIRD_PARTY_LICENSES.md）：
 
   - uutils coreutils（uu_cat、uu_ls、uu_sort 等 40 余个 applet 与 uucore）——MIT License

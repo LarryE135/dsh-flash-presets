@@ -52,7 +52,7 @@
 - 插件在运行时为 `glob` / `grep` 补上只读并发标记，同一轮里的多个搜索可以并行执行。启动日志里会打一行自检，排障只认它：
 
   ```
-  [tool-concurrency] v0.3.2 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
+  [tool-concurrency] v0.3.4 生效｜targets=glob,grep｜sweep=500ms｜witness=glob=true grep=true｜scopes=1
   ```
 
 逐项原理与源码行号见[技术文档 · 省 token 的四套机制](docs/技术文档-省token四机制.md)。
@@ -316,7 +316,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 - **新增 fl-bash（Windows x64 的 Bash 工具，默认关）**：实现与 `flash-sh.exe`（约 7.9 MB）随本包发行，从 npm 装好就能在插件页打开；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 87 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
 - **第五轮审计整改**：计划探测改三态（「计划刚落盘就动手」不再被判成没计划）、PTC 飞行计数按 `subCallId` 配对、评审守卫改词边界判定并堵住模板串插值与正则字面量两种绕过、`merge-presets` 修 CRLF 与缩进根序列、`verify-yaml` 不再强求托管块里两条预设都在。
 - **发版与 CI**：`publish-npm.sh` 要求 CI 全部完成再放行，并断言 registry 版本序；bundle-install 矩阵加入 DSH `0.2.2-rc.3`。
-- **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 8.7 MB，下载约 3.8 MB（gzip）。
+- **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 8.9 MB，下载约 3.8 MB（gzip）。
 
 ### v0.3.2（2026-11-17，上一版正式版）
 

@@ -14,7 +14,7 @@ async function boot(nativeActive) {
   const handlers = new Map();
   const sets = [];
   const native = { active: nativeActive };
-  const svc = { set(a, v) { sets.push(v); native.active = v; return "committed"; }, loggedActive() { return native.active; } };
+  const svc = { set(a, v) { if (v === native.active) return "noop"; sets.push(v); native.active = v; return "committed"; }, loggedActive() { return native.active; } };
   const proj = { stateOf: () => ({ active: native.active }) };
   const ctx = {
     get: (n) => (n === "planMode" ? svc : n === "sessionProjections" ? proj : undefined),
@@ -59,4 +59,20 @@ setTier("off");
   await new Promise((r) => setTimeout(r, 0));
   if (c.native.active !== true || c.sets.length !== 0) throw new Error("G3 不应退出用户手动开的计划模式");
   console.log("PASS G3 用户手动 /plan 不受关档影响");
+}
+// G4：light 档下用户自己先开了计划模式（插件 set 返回 noop）→ 不记归属；重启后切 off 也不动它
+setTier("light");
+{
+  const c = await boot(true);
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 1 } });
+  const saved = JSON.parse(readFileSync(join(home, "plan-mode-ui", "sessions.json"), "utf8"));
+  if (saved.bridged?.["id:goal-session"] !== undefined) throw new Error("G4 noop 不应记为插件归属");
+}
+setTier("off");
+{
+  const c = await boot(true);
+  c.fire("session/event", c.session, { type: "turn/start", data: { turn: 2 } });
+  await new Promise((r) => setTimeout(r, 0));
+  if (c.native.active !== true || c.sets.length !== 0) throw new Error("G4 用户先开的计划模式被关档收走（sets=" + JSON.stringify(c.sets) + "）");
+  console.log("PASS G4 noop 不记归属，用户先开的计划模式不受关档影响");
 }
