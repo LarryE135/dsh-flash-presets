@@ -9,7 +9,7 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 两种装法，二选一即可（都装也没关系，见「与 dsh-flash-presets 同时安装」）：
 
-- **随 dsh-flash-presets（推荐；需要 presets ≥ 0.3.4，尚未发布）**：presets 自带本包的实现与 exe（从这里逐字节同步），从 npm 装好 presets
+- **随 dsh-flash-presets（推荐；需要 presets ≥ 0.3.4）**：presets 自带本包的实现与 exe（从这里逐字节同步），从 npm 装好 presets
   就能在插件页打开**单独的组件 fl-bash**（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
 - **单独安装**：本包自己是一个组合包（一行 `fl-bash-standalone`，插件页标题 fl-bash），见下面「安装」。
 
@@ -269,7 +269,7 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ## 与 dsh-flash-presets 同时安装
 
-dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）自带本包的实现与 exe，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。装了 presets 就不必再单独装本包；两种装法也可以并存：
+dsh-flash-presets（需要 presets ≥ 0.3.4）自带本包的实现与 exe，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。装了 presets 就不必再单独装本包；两种装法也可以并存：
 
 - 插件页上是两行：presets 带来的 `fl-bash`，以及单独装的本包那一行 `fl-bash-standalone`（标题都是 fl-bash）；
 - 工具名都叫 `fl_bash`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
