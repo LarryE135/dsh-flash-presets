@@ -58,11 +58,10 @@ if (inRepo) {
     ok(a.meta.title === "fl-bash" && JSON.stringify(a) === JSON.stringify(b), "插件页标题 fl-bash，两种装法的 locale/" + lang + ".json 相同");
   }
   const presetsPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-  const range = presetsPkg.optionalDependencies?.["fl-bash"];
-  ok(typeof range === "string", "dsh-flash-presets 把 fl-bash 声明为 optionalDependencies", range);
+  ok(!presetsPkg.optionalDependencies?.["fl-bash"] && presetsPkg.files.includes("vendor/"), "dsh-flash-presets 随包带 fl-bash（files 含 vendor/，不依赖单独的 fl-bash 包）");
+  ok(fs.existsSync(path.join(repoRoot, "lib", "fl-bash.js")) && Buffer.compare(fs.readFileSync(path.join(repoRoot, "lib", "fl-bash.js")), fs.readFileSync(path.join(pluginDir, "lib", "index.js"))) === 0, "dsh-flash-presets 的 lib/fl-bash.js 与本包 lib/index.js 逐字节一致（单一来源，scripts/sync-fl-bash.mjs）");
   const planPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "plugins", "plan-mode-ui", "package.json"), "utf8"));
   ok(JSON.stringify(pkg.engines) === JSON.stringify(planPkg.engines), "engines 与 plan-mode-ui 一致", JSON.stringify(pkg.engines));
-  ok(!fs.existsSync(path.join(repoRoot, "lib", "flash-sh.js")), "dsh-flash-presets 的 lib/ 里没有 flash-sh.js 副本（单一来源）");
   const rowSrc = fs.readFileSync(path.join(repoRoot, "lib", "fl-bash-row.js"), "utf8");
   ok(rowSrc.includes("Symbol.for('dsh-flash-sh/presets-intent@1')") && src.includes('Symbol.for("dsh-flash-sh/presets-intent@1")'), "presets 的 fl-bash-row.js 与本包用同一个意向 Symbol（dsh-flash-sh/presets-intent@1）");
 }

@@ -9,11 +9,11 @@
     3. flash-sh.exe 能否执行 -c "echo ok"；
     4. profile 补丁（以及 DSH home 级补丁）里 fl-bash-standalone 的 enabled 最终是什么；
     5. 环境变量 DSH_FLASH_SH（当前进程 / 用户 / 系统）以及 .env 里有没有误写；
-    6. 是否装了 dsh-flash-presets（它在插件页上放了单独的 fl-bash 组件行，fl-bash 作为它的可选依赖装进来）
+    6. 是否装了 dsh-flash-presets（0.3.4 起自带 fl-bash，插件页上是单独的 fl-bash 组件行）
        以及两边是否同时启用（同一时刻只注册一个，presets 优先）；
     7. DSH 日志里最近的 [fl-bash] 行（若能找到；0.1.x 是 [flash-sh]）。
   三种装法都认：插件页 / dsh plugin add 装的独立组合包；手动放进 node_modules + 补丁里手写 insert 行；
-  作为 dsh-flash-presets 的可选依赖装进来（不是组合包，没有 fl-bash-standalone 行，由 presets 的 fl-bash 组件行使用）。
+  随 dsh-flash-presets 安装（0.3.4 起 presets 自带实现与 exe，插件页上是单独的 fl-bash 组件行）。
   兼容 Windows PowerShell 5.1 与 PowerShell 7。
 
 .PARAMETER Profile
@@ -185,6 +185,8 @@ $pkgDir = Join-Path (Join-Path $profileDir 'node_modules') $PackageName
 $pkgJson = Read-TextFile (Join-Path $pkgDir 'package.json')
 $presetsDir = Join-Path (Join-Path $profileDir 'node_modules') 'dsh-flash-presets'
 $presetsInstalled = Test-Path -LiteralPath $presetsDir -PathType Container
+# dsh-flash-presets（0.3.4 起）自带 fl-bash：lib/fl-bash.js + vendor\win32-x64\flash-sh.exe，不再依赖单独的 fl-bash 包
+$presetsBundled = $presetsInstalled -and (Test-Path -LiteralPath (Join-Path (Join-Path $presetsDir 'lib') 'fl-bash.js') -PathType Leaf)
 $viaManager = $false     # profile package.json 直接依赖（插件页 / dsh plugin add）
 $bundleActive = $false   # 被选为组合包（dsh.profile.bundles）—— 只有这时本包 cordis.patch.yml 的 insert 行才生效
 $presetsBundle = $false
@@ -205,16 +207,18 @@ if ($null -ne $profilePkgText) {
     elseif ($viaManager) { Write-Warn2 '已安装但没有被选为组合包（插件页里把 fl-bash 打开）' }
   } catch { Write-Warn2 ('无法解析 ' + (Join-Path $profileDir 'package.json')) }
 }
-# 装法：bundle（插件管理器）/ manual（手动放置 + 手写 insert 行）/ presets（dsh-flash-presets 的可选依赖）
+# 装法：bundle（插件管理器）/ manual（手动放置 + 手写 insert 行）；随 dsh-flash-presets 自带时见 $presetsBundled
 $installMode = 'none'
 if ($null -ne $pkgJson) {
   if ($viaManager) { $installMode = 'bundle' }
   elseif ($presetsInstalled) { $installMode = 'presets-or-manual' }
   else { $installMode = 'manual' }
-  $how = switch ($installMode) { 'bundle' { '（插件管理器安装）' } 'manual' { '（手动放置，pnpm 未登记）' } default { '（不是直接依赖：dsh-flash-presets 的可选依赖，或手动放置）' } }
+  $how = switch ($installMode) { 'bundle' { '（插件管理器安装）' } 'manual' { '（手动放置，pnpm 未登记）' } default { '（不是直接依赖：手动放置）' } }
   try { $v = ($pkgJson | ConvertFrom-Json).version; Write-Ok ('插件包在 profile 里：' + $PackageName + '@' + $v + $how) } catch { Write-Ok ('插件包目录存在：' + $pkgDir) }
+} elseif ($presetsBundled) {
+  Write-Ok 'fl-bash 随 dsh-flash-presets 安装（包内自带实现与 flash-sh.exe，不需要单独的 fl-bash 包）'
 } elseif ($presetsInstalled) {
-  Write-Bad ('profile 里没有 ' + $PackageName + '：dsh-flash-presets 的 fl-bash 组件需要它（它是可选依赖，只在 Windows x64 上安装；在插件页重装 dsh-flash-presets，或单独安装 fl-bash）')
+  Write-Bad '装的 dsh-flash-presets 版本不带 fl-bash（0.3.4 起才有）：升级 dsh-flash-presets，或单独安装 fl-bash'
 } else {
   Write-Bad ('profile 里没有插件包：' + $pkgDir)
 }
@@ -222,6 +226,7 @@ if ($null -ne $pkgJson) {
 if ([string]::IsNullOrEmpty($BinPath)) {
   if ($env:DSH_FL_BASH_BIN) { $BinPath = $env:DSH_FL_BASH_BIN; Write-Info ('使用 DSH_FL_BASH_BIN：' + $BinPath) }
   elseif ($env:DSH_FLASH_SH_BIN) { $BinPath = $env:DSH_FLASH_SH_BIN; Write-Info ('使用 DSH_FLASH_SH_BIN（旧名）：' + $BinPath) }
+  elseif (($null -eq $pkgJson) -and $presetsBundled) { $BinPath = Join-Path $presetsDir 'vendor\win32-x64\flash-sh.exe' }
   else { $BinPath = Join-Path $pkgDir 'vendor\win32-x64\flash-sh.exe' }
 }
 if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
@@ -274,7 +279,7 @@ if ($bundleActive) {
     Write-Info ('组合包补丁：' + $r.Kind + ' 行，enabled=' + $r.Enabled)
   }
 } elseif ($null -ne $bundlePatch) {
-  Write-Info '本包不是已选中的组合包：包内 cordis.patch.yml 不生效（手动安装靠 profile 补丁里手写的 insert 行；作为 dsh-flash-presets 的可选依赖时没有这一行）'
+  Write-Info '本包不是已选中的组合包：包内 cordis.patch.yml 不生效（手动安装靠 profile 补丁里手写的 insert 行；随 dsh-flash-presets 安装时用的是 presets 的 fl-bash 行）'
 }
 $layers = @(
   @{ Label = 'profile 补丁'; Path = (Join-Path $profileDir 'cordis.patch.yml') },
@@ -375,8 +380,8 @@ if ($presetsInstalled) {
     $presetsOn = $presetsBundle -and (-not $pDisabledRow) -and (($envEffective -eq '1') -or (($envEffective -ne '0') -and ($pEnabled -eq 'true')))
     Write-Info ('fl-bash 组件 enabled=' + $pEnabled + $(if ($envEffective -eq '1') { '（环境变量为 1 也会打开它）' } else { '' }))
     if ($presetsOn) {
-      if ($null -ne $pkgJson) { Write-Ok '综合：fl-bash 组件会加载 fl-bash 并注册 fl_bash（还需 Windows x64）' }
-      else { Write-Bad '综合：fl-bash 组件已启用，但 profile 里没有 fl-bash 包（可选依赖没装上），会跳过' }
+      if ($presetsBundled) { Write-Ok '综合：fl-bash 组件会注册 fl_bash（用 dsh-flash-presets 自带的 flash-sh.exe；还需 Windows x64）' }
+      else { Write-Bad '综合：fl-bash 组件已启用，但 dsh-flash-presets 包里没有 lib/fl-bash.js（安装不完整？重装 dsh-flash-presets）' }
     } else {
       Write-Info '综合：fl-bash 组件未启用'
     }

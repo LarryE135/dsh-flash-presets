@@ -212,9 +212,9 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `fl_bash`（内置单文件解释器 `flash-sh.exe`，不需要 Git Bash / WSL；
 不占用 `bash` / `pwsh` / `run_code`）。它在插件页上是**单独的一个组件「fl-bash」**，不挂在「Flash 精简预设」那一行下面。
 
-- **从哪来**：实现在独立包 [`fl-bash`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) 里（单一来源，本包不带副本；0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
-  本包把它声明为 `optionalDependencies`，它的 `package.json` 写了 `os: ["win32"]`、`cpu: ["x64"]`：Windows x64 上插件管理器（pnpm）会顺带装上；
-  **macOS / Linux / Windows ARM64 上直接跳过，不下载 7.9 MB 的 exe，也不报错**。这些平台上插件页仍显示 fl-bash 组件（正常运行、不是红行），只是不注册工具。
+- **随包发行**：实现（`lib/fl-bash.js`）和 `flash-sh.exe`（约 7.9 MB）都在本包里，**从 npm 装好 dsh-flash-presets 就能在插件页打开 fl-bash**，不用另装包。
+  源码只有一份，在 [`plugins/flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md)，发布前由 `scripts/sync-fl-bash.mjs` 逐字节同步进包（0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
+  exe 在所有平台都会随包下载，但只在 Windows x64 上注册工具；macOS / Linux / Windows ARM64 上插件页仍显示 fl-bash 组件（正常运行、不是红行），只写一行说明。
 - **打开**：profile 补丁里写 `- id: fl-bash` / `config.enabled: true`，或设用户环境变量 `DSH_FL_BASH=1`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。
   其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在这一行的 `config` 里，含义见 fl-bash 的 README。
   预览版的旧写法（`flash-presets` 行的 `config.flashSh`、行 id `flash-sh`）升级后仍然生效，启动日志会提示改写。
@@ -222,9 +222,9 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
   同一会话里同一类命令批准一次后不再问，`rm -rf`、写到工作区外（按真实路径判断）、`bash -c` / `eval` / 内联代码、改 `PATH` 等危险命令每次都问，
   看不懂的写法也每次都问。子进程拿不到名字含 `KEY` / `PASSWORD` / `SECRET` / `TOKEN` 等字样或 `_PAT` / `_AUTH` 的环境变量、`DSH_*` / `AWS_*` / `GITHUB_*` /
   `NPM_CONFIG_*`，以及值里带账号密码的 URL（完整规则见 fl-bash 的 README）。配置不合法（如 `timeoutMs: 0`）时不启用，日志写明原因。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
-- **启动日志**：非 Windows x64 上启用时只写一行 `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`；可选依赖没装上时写一行
-  `…加载不到 fl-bash…`，其余功能都不受影响。
-- **和单独安装的 fl-bash 并存**：插件页上是两行（本包的 `fl-bash`、独立包的 `fl-bash-standalone`），两边都启用时只注册一个 `fl_bash`，本包这一行优先，独立包那一行写日志跳过；本包这一行关掉后它自动接管。
+- **启动日志**：非 Windows x64 上启用时只写一行 `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`；实现文件缺失时写一行
+  `…加载不到 ./fl-bash.js…`（安装不完整），其余功能都不受影响。
+- **和单独安装的 fl-bash 包并存**（一般用不到）：插件页上是两行（本包的 `fl-bash`、独立包的 `fl-bash-standalone`），两边都启用时只注册一个 `fl_bash`，本包这一行优先，独立包那一行写日志跳过；本包这一行关掉后它自动接管。
 
 ## 运行时组件开关
 

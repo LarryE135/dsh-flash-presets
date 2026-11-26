@@ -9,8 +9,8 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 两种装法，二选一即可（都装也没关系，见「与 dsh-flash-presets 同时安装」）：
 
-- **随 dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）**：presets 把本包声明为可选依赖，Windows x64 上随 presets 一起装上，在插件页上
-  作为**单独的组件 fl-bash** 出现（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
+- **随 dsh-flash-presets（推荐；需要 presets ≥ 0.3.4，尚未发布）**：presets 自带本包的实现与 exe（从这里逐字节同步），从 npm 装好 presets
+  就能在插件页打开**单独的组件 fl-bash**（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
 - **单独安装**：本包自己是一个组合包（一行 `fl-bash-standalone`，插件页标题 fl-bash），见下面「安装」。
 
 - 工具名 `fl_bash`，**不占用** `bash` / `pwsh` / `run_code`。
@@ -90,7 +90,7 @@ profile 补丁会**整体替换**这一行的 `config`（DSH 的 patch 语义）
 `binPath` 写成空字符串等于没写（用内置 exe）。用环境变量 `DSH_FL_BASH_BIN` 换了 exe 时启动日志会写一行说明；
 `binPath` 指向**非内置** exe 时启动日志打一条 warn 并附上它的 sha256，便于核对来源。
 
-随 dsh-flash-presets 装时，这些字段写在 presets 带来的 `- id: fl-bash` 那一行的 `config` 下（例如 `config: { enabled: true, approval: sandboxed }`），含义相同。
+随 dsh-flash-presets 用时，这些字段写在 presets 的 `- id: fl-bash` 那一行的 `config` 下（插件页上也能直接改）（例如 `config: { enabled: true, approval: sandboxed }`），含义相同。
 
 ### 安全提示与审批
 
@@ -273,7 +273,7 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ## 与 dsh-flash-presets 同时安装
 
-dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）把本包当作可选依赖，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。两种装法可以并存：
+dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）自带本包的实现与 exe，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。装了 presets 就不必再单独装本包；两种装法也可以并存：
 
 - 插件页上是两行：presets 带来的 `fl-bash`，以及单独装的本包那一行 `fl-bash-standalone`（标题都是 fl-bash）；
 - 工具名都叫 `fl_bash`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
@@ -287,6 +287,13 @@ dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）把本包当作可
   本包这一行让位时会打一条 warn，列出哪些设置**没有生效**。
 - presets 不会把 profile 补丁里 `- id: fl-bash-standalone` 的覆盖换算过去（那是本包自己的一行，只要本包还装着就仍然有效）；
   卸载本包、改用 presets 时，请把它改写到 `- id: fl-bash` 的 `config` 下。
+
+## 从 dsh-flash-sh（0.1.x）升级
+
+- 插件页里先删掉旧的 `dsh-flash-sh`，再升级 dsh-flash-presets（它自带 fl-bash），或单独添加 `fl-bash`。两者同时装着时也只会注册一个工具，
+  但哪一个生效取决于加载顺序：可能留下的是旧名 `flash_sh` 而不是 `fl_bash`。
+- profile 补丁里的 `- id: flash-sh-standalone` 改成 `- id: fl-bash-standalone`；环境变量可以继续用 `DSH_FLASH_SH`，建议改成 `DSH_FL_BASH`。
+- 旧会话的历史里模型调用的是 `flash_sh`；继续这些会话时模型看到的工具已经是 `fl_bash`，一般会自己改用新名字。
 
 ## 卸载
 

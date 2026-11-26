@@ -220,9 +220,9 @@ The same card also ships a delivery gate (the `delivery-gate` row up to 0.3.2, t
 On **Windows x64** it gives the model a Bash-compatible shell tool, `fl_bash` (a bundled single-file interpreter, `flash-sh.exe`; no Git Bash / WSL needed;
 it does not take the `bash` / `pwsh` / `run_code` names). On the plugin page it is **its own component, "fl-bash"**, not a feature under the "Flash lean presets" row.
 
-- **Where it comes from**: the implementation lives only in the separate package [`fl-bash`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) (called `dsh-flash-sh`, tool `flash_sh`, in 0.1.x).
-  This package lists it under `optionalDependencies`, and its `package.json` declares `os: ["win32"]`, `cpu: ["x64"]`: the plugin manager (pnpm) installs it on Windows x64 and
-  **skips it on macOS / Linux / Windows ARM64 without downloading the 7.9 MB exe and without an error**. On those platforms the fl-bash component still shows (running, not red); it just registers no tool.
+- **Shipped in this package**: the implementation (`lib/fl-bash.js`) and `flash-sh.exe` (about 7.9 MB) are inside this package, so **after installing dsh-flash-presets from npm you can turn fl-bash on right away** — no second package.
+  The single source is [`plugins/flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md), copied byte for byte by `scripts/sync-fl-bash.mjs` before publishing (called `dsh-flash-sh`, tool `flash_sh`, in 0.1.x).
+  The exe is downloaded on every platform but the tool registers only on Windows x64; on macOS / Linux / Windows ARM64 the fl-bash component still shows (running, not red) and logs one line.
 - **Turning it on**: `- id: fl-bash` with `config.enabled: true` in the profile patch, or the user environment variable `DSH_FL_BASH=1`
   (not in `.env`; the old name `DSH_FLASH_SH` still works). The other fields (`approval`, `approvalMemory`, `timeoutMs`, `maxOutputBytes`, `binPath`, …) go in the same `config`; see the fl-bash README.
   The preview forms (`config.flashSh` on the `flash-presets` row, row id `flash-sh`) keep working after the upgrade; the startup log suggests rewriting them.
@@ -234,8 +234,8 @@ it does not take the `bash` / `pwsh` / `run_code` names). On the plugin page it 
   (through symlinks), and anything the classifier cannot read is asked every time. An invalid config (e.g. `timeoutMs: 0`) leaves it off, with the reason logged. `approval: off` lets the model run anything on your machine
   without confirmation; use it only in a throwaway environment.
 - **Startup log**: enabled on a non-Windows-x64 host it writes one line, `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`; when the
-  optional dependency is missing, one line `…加载不到 fl-bash…`. Nothing else is affected.
-- **Alongside a separately installed fl-bash**: the plugin page shows two rows (this package's `fl-bash`, the standalone `fl-bash-standalone`); with both enabled only one `fl_bash` is registered;
+  implementation file is missing (broken install), one line `…加载不到 ./fl-bash.js…`. Nothing else is affected.
+- **Alongside a separately installed fl-bash package** (rarely needed): the plugin page shows two rows (this package's `fl-bash`, the standalone `fl-bash-standalone`); with both enabled only one `fl_bash` is registered;
   this package's row wins and the standalone row logs that it steps aside. Turn this one off and the standalone row takes over.
 
 ## Runtime switches

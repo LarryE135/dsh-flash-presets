@@ -78,9 +78,9 @@ const BUNDLE_ROW = [
   '          maxRounds: 2',
 ].join('\n');
 
-// Bash 工具 fl-bash：插件页上单独的一个组件（不挂在 flash-presets 行下）。行的模块是本包的子路径
-// dsh-flash-presets/fl-bash（lib/fl-bash-row.js），它再动态 import 可选依赖 fl-bash：任何平台都能加载，
-// 平台不对 / 依赖没装上只写一行 info，不会变成红行。默认值必须与 lib/fl-bash-row.js 的 ROW_DEFAULTS 一致。
+// Bash 工具 fl-bash：插件页上单独的一个组件（不挂在 flash-presets 行下），实现与 exe 随本包发行。
+// 行的模块是本包子路径 dsh-flash-presets/fl-bash（lib/fl-bash-row.js）：任何平台都能加载，只在 Windows x64 上注册工具，
+// 其他平台只写一行 info，不会变成红行。默认值必须与 lib/fl-bash-row.js 的 ROW_DEFAULTS 一致。
 const FL_BASH_ROW = [
   '',
   '',
@@ -88,7 +88,7 @@ const FL_BASH_ROW = [
   '# 不需要 Git Bash / WSL / MSYS2。默认关闭（enabled: false）—— 它在本机执行命令，要用户显式打开：',
   '#   在插件页打开它的设置，或在 profile 的 cordis.patch.yml 里写 `- id: fl-bash` + `config: { enabled: true }`，',
   '#   或设置用户环境变量 DSH_FL_BASH=1（旧名 DSH_FLASH_SH 仍认）。配置项见 fl-bash 的 README。',
-  '# 实现由可选依赖 fl-bash 提供（os/cpu 限定，其他平台不安装、不下载 exe）。',
+  '# 实现与 flash-sh.exe（约 7.9 MB）随本包发行，从 npm 装好就能打开；只在 Windows x64 上注册工具。',
   '- insert:',
   '    - id: fl-bash',
   "      name: 'dsh-flash-presets/fl-bash'",
