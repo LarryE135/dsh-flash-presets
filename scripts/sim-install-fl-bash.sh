@@ -3,15 +3,14 @@
 # `dsh plugin add` 装上本仓库打出来的 dsh-flash-presets，看 Bash 工具 fl-bash 在插件页（pluginInventory）上
 # 是不是**单独的一个组件**，以及工具 fl_bash 只注册一次。
 #
-#   A. 真实的非 Windows 宿主：fl-bash 原包（os:[win32] cpu:[x64]）作为可选依赖 → pnpm 跳过它；
-#      插件页上仍有 fl-bash 这一行（标题 fl-bash，正常运行，不是红行），工具不注册。
-#   B. 模拟 Windows：可选依赖换成去掉 os/cpu/platforms 的测试变体，profile 补丁打开 id: fl-bash，
-#      DSH_FL_BASH_ANY_PLATFORM=1 + DSH_FL_BASH_BIN=Linux 版解释器 → fl_bash 注册 1 次、能执行。
-#   C. 在 B 的 profile 里再单独装一份 fl-bash（变体）并打开它的 fl-bash-standalone 行
-#      → 插件页两行（fl-bash / fl-bash-standalone），fl_bash 仍只有 1 个，归 presets 那一行。
+#   A. 真实的非 Windows 宿主，原样装 npm pack 出来的 presets：包里自带 fl-bash 实现与 flash-sh.exe（不另装包）；
+#      插件页上有单独的 fl-bash 一行（标题 fl-bash，正常运行，不是红行），默认关，工具不注册。
+#   B. 同一个包，profile 补丁打开 id: fl-bash，模拟 Windows（DSH_FL_BASH_ANY_PLATFORM=1 + DSH_FL_BASH_BIN=Linux 版解释器）
+#      → fl_bash 注册 1 次、经真实管线执行；--dump-config-schema 里这一行带设置项。
+#   C. 在 B 的 profile 里再单独装一份 fl-bash（去掉 os/cpu/platforms 的测试变体）并打开它的 fl-bash-standalone 行
+#      → 插件页两行 fl-bash，fl_bash 仍只有 1 个，归 presets 那一行。
 #
-# 为什么要改可选依赖的写法：fl-bash 还没发 npm，pnpm 解析不到 ^0.1.6；这里把打好的 presets 包里
-# optionalDependencies.fl-bash 改成 file:<绝对路径 tgz> 再装。除此之外包内容与 npm pack 的结果相同。
+# presets 包与用户从 npm 拿到的内容相同（npm pack，含 prepack 同步）；只有 C 里的独立包是测试变体。
 #
 # 用法：DSH_REAL_NM=/path/to/node_modules FLASH_SH_TEST_BIN=/path/flash-sh(Linux 构建) bash scripts/sim-install-fl-bash.sh
 # 可选：DSH_REAL_NODE=/path/to/node  SIM_WORK=工作目录（默认 mktemp）
@@ -39,14 +38,9 @@ const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json"));delet
 VTGZ=$(ls "$W"/var/fl-bash-*.tgz | head -1); [ -f "$VTGZ" ]; ok $? "fl-bash 测试变体（去掉 os/cpu/platforms）"
 (cd "$REPO" && npm pack --pack-destination "$W/pack" -q >/dev/null 2>"$W/pack-presets.err")
 PTGZ=$(ls "$W"/pack/dsh-flash-presets-*.tgz | head -1); [ -f "$PTGZ" ]; ok $? "npm pack dsh-flash-presets → $(basename "$PTGZ")"
-mkpresets() { # $1 输出名  $2 fl-bash tgz
-  rm -rf "$W/pre/x"; mkdir -p "$W/pre/x"
-  (cd "$W/pre/x" && tar xzf "$PTGZ" && cd package && node -e '
-const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json"));p.optionalDependencies={"fl-bash":"file:"+process.argv[1]};fs.writeFileSync("package.json",JSON.stringify(p,null,2))' "$2" \
-   && npm pack --ignore-scripts -q >/dev/null 2>&1 && mv dsh-flash-presets-*.tgz "$W/pre/$1.tgz")
-  echo "$W/pre/$1.tgz"
-}
-PRE_REAL=$(mkpresets real "$FTGZ"); PRE_VAR=$(mkpresets var "$VTGZ")
+tar tzf "$PTGZ" | grep -qx "package/vendor/win32-x64/flash-sh.exe" && tar tzf "$PTGZ" | grep -qx "package/lib/fl-bash.js"; ok $? "presets 包里自带 lib/fl-bash.js 与 vendor/win32-x64/flash-sh.exe"
+tar xzOf "$PTGZ" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));process.exit(!p.optionalDependencies&&!p.os&&!p.cpu?0:1)'; ok $? "presets 不依赖单独的 fl-bash 包、不限平台"
+echo "    presets 包大小：$(stat -c %s "$PTGZ") 字节（gzip）"
 tar xzOf "$PTGZ" package/cordis.patch.yml | grep -A3 '^    - id: fl-bash$' | grep -q "name: 'dsh-flash-presets/fl-bash'"; ok $? "包内组合补丁有单独的 fl-bash 组件行"
 
 summ() { # $1 probe.json
@@ -66,9 +60,11 @@ boot() { # $1 profile  $2 输出
 }
 
 # ── A. 真实非 Windows 宿主 ──
-echo "A. 真实 $(uname -s)-$(uname -m) 宿主，fl-bash 原包作为可选依赖"
-timeout 115 dsh plugin --profile a add "$PRE_REAL" > "$W/addA.log" 2>&1; ok $? "dsh plugin add dsh-flash-presets"
-[ -z "$(find "$W/home/.dsh/profiles/a/node_modules" -path "*fl-bash/package.json" 2>/dev/null | head -1)" ]; ok $? "pnpm 按 os/cpu 跳过了可选依赖 fl-bash（没装、没下载 exe）"
+echo "A. 真实 $(uname -s)-$(uname -m) 宿主，原样安装 presets（默认关）"
+timeout 115 dsh plugin --profile a add "$PTGZ" > "$W/addA.log" 2>&1; ok $? "dsh plugin add dsh-flash-presets"
+PDIR=$(node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "$W/home/.dsh/profiles/a/node_modules/dsh-flash-presets")
+[ -f "$PDIR/vendor/win32-x64/flash-sh.exe" ] && [ -f "$PDIR/lib/fl-bash.js" ]; ok $? "装好的 presets 里有 flash-sh.exe 与 lib/fl-bash.js"
+[ -z "$(find "$W/home/.dsh/profiles/a/node_modules" -path "*/fl-bash/package.json" 2>/dev/null | head -1)" ]; ok $? "profile 里没有另装 fl-bash 包"
 timeout 110 dsh plugin --profile a add "$PLUG/test/probe" > "$W/addA2.log" 2>&1; ok $? "探针组合包 add"
 timeout 90 dsh --profile a --dump-config > "$W/dumpA.txt" 2> "$W/dumpA.err"; ok $? "dump-config"
 grep -q "^- id: fl-bash$" "$W/dumpA.txt" && grep -q "^- id: flash-presets$" "$W/dumpA.txt"; ok $? "dump：flash-presets 与 fl-bash 是两行"
@@ -80,16 +76,22 @@ row "$W/probeA.json" dsh-flash-presets | grep -q '"zh":"Flash 精简预设"'; ok
 node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(r.flBashCount===0&&!r.legacyToolPresent?0:1)' "$W/probeA.json"; ok $? "默认关：fl_bash 不注册，也没有旧名 flash_sh"
 
 # ── B. 模拟 Windows（变体 + 开发模式） ──
-echo "B. 模拟 Windows：fl-bash 变体作为可选依赖，profile 补丁打开 id: fl-bash"
-timeout 115 dsh plugin --profile b add "$PRE_VAR" > "$W/addB.log" 2>&1; ok $? "dsh plugin add dsh-flash-presets（可选依赖 = 变体）"
-[ -n "$(find "$W/home/.dsh/profiles/b/node_modules" -path "*fl-bash/package.json" 2>/dev/null | head -1)" ]; ok $? "可选依赖 fl-bash 装上了"
-grep -q '"fl-bash"' "$W/home/.dsh/profiles/b/package.json"; r=$?; [ $r -ne 0 ]; ok $? "profile 的直接依赖里没有 fl-bash（它只是 presets 的可选依赖，不单独占一个组合包）"
+echo "B. 同一个包，profile 补丁打开 id: fl-bash，模拟 Windows"
+timeout 115 dsh plugin --profile b add "$PTGZ" > "$W/addB.log" 2>&1; ok $? "dsh plugin add dsh-flash-presets"
 timeout 110 dsh plugin --profile b add "$PLUG/test/probe" > "$W/addB2.log" 2>&1; ok $? "探针组合包 add"
 printf -- '- id: fl-bash\n  config:\n    enabled: true\n    approval: "off"\n' > "$W/home/.dsh/profiles/b/cordis.patch.yml"
 DSH_FL_BASH_ANY_PLATFORM=1 DSH_FL_BASH_BIN="$BIN" boot b "$W/probeB.json"; ok $? "宿主启动"
 summ "$W/probeB.json"
 row "$W/probeB.json" dsh-flash-presets/fl-bash | grep -q '"zh":"fl-bash"'; ok $? "插件页：fl-bash 单独一行"
 node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(r.flBashCount===1&&r.execOk===true&&!r.legacyToolPresent?0:1)' "$W/probeB.json"; ok $? "fl_bash 注册 1 次，经真实管线执行 → probe-42"
+
+timeout 110 dsh --profile b --dump-config-schema > "$W/schemaB.json" 2> "$W/schemaB.err"
+node -e '
+const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+const e=s["x-cordis"].entries.find(e=>e.id==="fl-bash");
+if(!e||e.status!=="schema")process.exit(1);
+const str=JSON.stringify(s.$defs[e.configRef.split("/").pop()]);
+process.exit(/"approval"/.test(str)&&/"timeoutMs"/.test(str)?0:1)' "$W/schemaB.json"; ok $? "插件页设置项：fl-bash 行带 Config schema（approval / timeoutMs 等，来自 fl-bash 包）"
 
 # ── C. 再单独装一份 fl-bash ──
 echo "C. 同一 profile 再单独装 fl-bash（变体）并打开 fl-bash-standalone"
