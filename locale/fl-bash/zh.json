@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "fl-bash",
+    "description": "Windows x64 上的 Bash 兼容 shell 工具 fl_bash：内置单文件解释器，不需要 Git Bash / WSL / MSYS2。默认关闭，打开后才会在本机执行命令。"
+  }
+}

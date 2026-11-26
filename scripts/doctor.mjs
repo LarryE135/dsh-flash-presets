@@ -284,7 +284,7 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
 // 「entry not found」就丢弃；插件会在运行时读回并换算（lib/row-overrides.js），这里静态地再报一遍，
 // 让人知道它们还在起作用、该怎么改写。旧插件卡（仍有 4 行）不报。
 {
-  const OLD = { 'flash-presets-core': 'toolConcurrency', 'plan-mode-ui': 'planMode', 'flash-presets-alias': 'alias', 'delivery-gate': 'deliveryGate', 'flash-sh': 'flashSh' };
+  const OLD = { 'flash-presets-core': 'toolConcurrency', 'plan-mode-ui': 'planMode', 'flash-presets-alias': 'alias', 'delivery-gate': 'deliveryGate', 'flash-sh': 'fl-bash 行（id: fl-bash 的 config）' };
   let installedSingle = false;
   try { installedSingle = /\n\s*- id: flash-presets\n/.test(fs.readFileSync(path.join(pluginDir, 'cordis.patch.yml'), 'utf8')); } catch {}
   const hits = [];
@@ -304,13 +304,18 @@ if (fs.existsSync(path.join(pluginDir, 'package.json'))) {
       '；disabled: true 改成对应段的 enabled: false（flash-presets-core 的 config.toolConcurrency 原样搬到 toolConcurrency）。');
   }
 }
-// flash_sh（0.3.4）：单独安装的 dsh-flash-sh 有自己的一行 flash-sh-standalone，覆盖不换算到 flashSh；
-// 只提示一句：卸了独立包、改用本包的 flashSh 时要改写。
-if (/^- id: flash-sh-standalone\s*$/m.test(raw)) {
-  const standaloneInstalled = fs.existsSync(path.join(path.dirname(pluginDir), 'dsh-flash-sh', 'cordis.patch.yml')) &&
-    (() => { try { return Object.keys(JSON.parse(fs.readFileSync(path.join(path.dirname(path.dirname(pluginDir)), 'package.json'), 'utf8')).dependencies || {}).includes('dsh-flash-sh'); } catch { return false; } })();
-  if (standaloneInstalled) info('用户补丁里有 flash-sh-standalone 的覆盖：属于单独安装的 dsh-flash-sh 那一行（与本包的 flashSh 并存时只注册一个，flashSh 优先）');
-  else warn('用户补丁里有 flash-sh-standalone 的覆盖，但 dsh-flash-sh 没有作为独立组合包安装：这条覆盖不起作用；改用本包时写到 id: flash-presets 的 config.flashSh 下');
+// fl-bash：单独安装的 fl-bash 有自己的一行 fl-bash-standalone（0.1.x 的 dsh-flash-sh 是 flash-sh-standalone），覆盖不换算到本包的 fl-bash 行；
+// flash-presets 行的 config.flashSh（预览版写法）仍会被 fl-bash 行读回，提示改写。
+{
+  for (const sid of ['fl-bash-standalone', 'flash-sh-standalone']) {
+    if (!new RegExp('^- id: ' + sid + '\\s*$', 'm').test(raw)) continue;
+    const pkgName = sid === 'fl-bash-standalone' ? 'fl-bash' : 'dsh-flash-sh';
+    const standaloneInstalled = fs.existsSync(path.join(path.dirname(pluginDir), pkgName, 'cordis.patch.yml')) &&
+      (() => { try { return Object.keys(JSON.parse(fs.readFileSync(path.join(path.dirname(path.dirname(pluginDir)), 'package.json'), 'utf8')).dependencies || {}).includes(pkgName); } catch { return false; } })();
+    if (standaloneInstalled) info('用户补丁里有 ' + sid + ' 的覆盖：属于单独安装的 ' + pkgName + ' 那一行（与本包的 fl-bash 行并存时只注册一个 fl_bash，本包那一行优先）');
+    else warn('用户补丁里有 ' + sid + ' 的覆盖，但 ' + pkgName + ' 没有作为独立组合包安装：这条覆盖不起作用；改用本包时写到 id: fl-bash 的 config 下');
+  }
+  if (/flashSh\s*:/.test(raw)) info('用户补丁里有 flashSh（预览版写法）：仍由 fl-bash 组件行读回生效；建议改写到 id: fl-bash 的 config 下');
 }
 const stateFile = path.join(home, 'plan-mode-ui', 'state.json');
 if (fs.existsSync(stateFile)) {

@@ -1,7 +1,7 @@
 // 用法：APPROVAL_PROBE_OUT=/path/out.json dsh --profile <p> --patch <插入本文件为一行的补丁>（profile 里 flash-presets.config.flashSh 或 flash-sh-standalone 已启用、approval=sandboxed）；
 // 跑完写报告并退出进程。第二轮审计（2026-11-24）在 DSH 0.2.2-rc.1 上实走过，结果见审计报告。
 // 审批闸实走（第二轮审计 T7）：真实 DSH 宿主里建一个真实会话，会话权限 workspace-write，打开一个回合，
-// 经 ctx.tools.execute 调 flash_sh（approval=sandboxed）。本插件在 DSH 的 approval/request 瀑布上挂一个应答者，
+// 经 ctx.tools.execute 调 fl_bash（approval=sandboxed）。本插件在 DSH 的 approval/request 瀑布上挂一个应答者，
 // 扮演「测试客户端」：记录收到的审批请求并按脚本应答（拒绝 / 允许一次）。网页端的远程应答者（dsh-api-remotes）
 // 走同一个瀑布；本探针不经 WebSocket 传输层。
 import fs from 'node:fs';
@@ -14,11 +14,11 @@ export function apply(ctx) {
   if (!OUT) return;
   const report = { steps: [], asked: [] };
   const script = [];
-  // 「测试客户端」：只应答 flash_sh 的审批，其余交给下一个应答者
+  // 「测试客户端」：只应答 fl_bash 的审批，其余交给下一个应答者
   ctx.on('dispose', () => console.info('[approval-probe] probe context disposed'));
   // prepend：排在网页端远程应答者（dsh-api-remotes，没有连上的客户端时它直接答 unavailable）前面；global：不受会话作用域过滤
   ctx.on('approval/request', (req, next) => {
-    if (!req || req.toolName !== 'flash_sh') return next();
+    if (!req || req.toolName !== 'fl_bash') return next();
     const answer = script.shift() ?? 'rejected';
     report.asked.push({ callId: req.callId, answer, reason: String(req.reason ?? '').slice(0, 400) });
     return Promise.resolve(answer);
@@ -38,13 +38,13 @@ export function apply(ctx) {
       report.mode = ctx.sandboxPolicy.resolve({ session }).mode;
       report.approvalPolicy = ctx.approval.effectivePolicy ? ctx.approval.effectivePolicy(session) : 'n/a';
       const tools = root.get('tools');
-      report.registered = tools.get('flash_sh') !== undefined;
+      report.registered = tools.get('fl_bash') !== undefined;
       session.append('turn/start', { turn: 1 });
       let n = 0;
       const call = async (command, answer) => {
         if (answer !== undefined) script.push(answer);
         const before = report.asked.length;
-        const res = await tools.execute({ calls: [{ type: 'tool-call', id: 'ap-' + ++n, name: 'flash_sh', arguments: JSON.stringify({ command }) }], signal: new AbortController().signal, agent });
+        const res = await tools.execute({ calls: [{ type: 'tool-call', id: 'ap-' + ++n, name: 'fl_bash', arguments: JSON.stringify({ command }) }], signal: new AbortController().signal, agent });
         const text = JSON.stringify(res);
         const step = { command, scripted: answer ?? null, asked: report.asked.length - before, result: text.slice(0, 600) };
         report.steps.push(step);

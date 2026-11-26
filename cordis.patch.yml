@@ -376,13 +376,11 @@
 - id: ptc-runtime
   config:
     executionMode: persistent-in-memory
-# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门、flash_sh（Windows Bash 工具），
+# 运行时功能（一行）：run_code 优化 A、计划模式宿主、历史 preset id 兼容、交付门，
 # 都挂在这一行下面，各自按需要的宿主服务启动，缺哪个服务只影响对应功能。0.3.2 及以前它们是 4 行
 # （flash-presets-core / plan-mode-ui / flash-presets-alias / delivery-gate），按旧 id 写的覆盖仍会被读回生效。
-# 环境变量优先于这里：DSH_FLASH_PRESETS_CONCURRENCY=0、DSH_FLASH_PRESETS_ALIAS=0、DSH_DELIVERY_GATE=0/1、DSH_FLASH_SH=0/1。
+# 环境变量优先于这里：DSH_FLASH_PRESETS_CONCURRENCY=0、DSH_FLASH_PRESETS_ALIAS=0、DSH_DELIVERY_GATE=0/1。
 # 交付门默认关闭（deliveryGate.enabled: false）—— 它会执行工作区里的验收脚本，要用户显式打开。
-# flash_sh 默认关闭（flashSh.enabled: false）—— 它在本机执行命令；只在 Windows x64 上可用，
-# 由可选依赖 dsh-flash-sh 提供（os/cpu 限定，其他平台不安装、不下载），配置项见 dsh-flash-sh 的 README。
 - insert:
     - id: flash-presets
       name: 'dsh-flash-presets'
@@ -396,8 +394,18 @@
         deliveryGate:
           enabled: false
           maxRounds: 2
-        flashSh:
-          enabled: false
+
+# Bash 工具（单独一个组件）：fl-bash —— Windows x64 上的 Bash 兼容 shell 工具 fl_bash，内置单文件解释器，
+# 不需要 Git Bash / WSL / MSYS2。默认关闭（enabled: false）—— 它在本机执行命令，要用户显式打开：
+#   在插件页打开它的设置，或在 profile 的 cordis.patch.yml 里写 `- id: fl-bash` + `config: { enabled: true }`，
+#   或设置用户环境变量 DSH_FL_BASH=1（旧名 DSH_FLASH_SH 仍认）。配置项见 fl-bash 的 README。
+# 实现由可选依赖 fl-bash 提供（os/cpu 限定，其他平台不安装、不下载 exe）。
+- insert:
+    - id: fl-bash
+      name: 'dsh-flash-presets/fl-bash'
+      config:
+        enabled: false
+
 # 技能目录里每条描述的截断长度（默认整段；60 足够表达用途）。
 - id: tool-skill
   config:

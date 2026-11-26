@@ -22,14 +22,14 @@ console.log("unit 自检" + (inRepo ? "（仓库内）" : "（独立包内，跳
 
 // ── 包结构 ──────────────────────────────────────────────────────────────
 const pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, "package.json"), "utf8"));
-ok(pkg.name === "dsh-flash-sh" && /^0\.1\.\d+$/.test(pkg.version), "包名/版本 dsh-flash-sh@0.1.x", pkg.version);
+ok(pkg.name === "fl-bash" && /^0\.1\.\d+$/.test(pkg.version), "包名/版本 fl-bash@0.1.x", pkg.version);
 ok(pkg.dsh?.bundle?.patch === "./cordis.patch.yml", "dsh.bundle.patch");
 ok(JSON.stringify(pkg.dsh?.bundle?.platforms) === '["win32"]', "dsh.bundle.platforms = [win32]（DSH 启动器按 process.platform 准入）");
 ok(JSON.stringify(pkg.os) === '["win32"]' && JSON.stringify(pkg.cpu) === '["x64"]', "npm os/cpu = win32/x64（作为 presets 的可选依赖时，非 Windows x64 上 pnpm/npm 跳过、不下载 exe）");
 ok(pkg.dependencies === undefined || Object.keys(pkg.dependencies).length === 0, "无运行时依赖（不依赖 zod）");
 ok(pkg.peerDependenciesMeta?.["@deepseek-ai/schemastery"]?.optional === true, "schemastery 是可选 peer");
 ok(pkg.scripts?.prepare === undefined && pkg.scripts?.postinstall === undefined && pkg.scripts?.install === undefined, "无 install/prepare 脚本（不触发 pnpm allowBuilds）");
-for (const f of ["lib", "vendor", "cordis.patch.yml", "README.md", "LICENSE", "NOTICE", "test", "scripts/check-flash-sh.ps1"]) ok(pkg.files.includes(f) && fs.existsSync(path.join(pluginDir, f)), "files 含且存在：" + f);
+for (const f of ["lib", "locale", "vendor", "cordis.patch.yml", "README.md", "LICENSE", "NOTICE", "test", "scripts/check-flash-sh.ps1"]) ok(pkg.files.includes(f) && fs.existsSync(path.join(pluginDir, f)), "files 含且存在：" + f);
 // scripts 里引用的每个本地文件都在 files 里（npm pack 之后自洽）
 for (const [k, v] of Object.entries(pkg.scripts ?? {})) {
   const refs = [...String(v).matchAll(/(?:^|\s)((?:test|scripts|lib)\/[\w./-]+)/g)].map((m) => m[1]);
@@ -42,23 +42,29 @@ ok(!/from\s+["']zod["']/.test(src) && !/import\(["']zod["']\)/.test(src), "lib �
 const patch = fs.readFileSync(path.join(pluginDir, "cordis.patch.yml"), "utf8");
 const row = patch.match(/- insert:\n\s+- id: ([\w-]+)\n\s+name: '([^']+)'\n\s+config:\n\s+enabled: (\w+)/);
 ok(row !== null, "补丁有 insert 行");
-ok(row && row[1] === "flash-sh-standalone", "实例 id = flash-sh-standalone", row && row[1]);
+ok(row && row[1] === "fl-bash-standalone", "实例 id = fl-bash-standalone", row && row[1]);
 ok(row && row[2] === pkg.name, "name = 包名");
 ok(row && row[3] === "false", "默认 enabled: false");
 ok(!/!!js/.test(patch), "补丁不含 !!js");
 if (inRepo) {
   const presetsPatch = fs.readFileSync(path.join(repoRoot, "cordis.patch.yml"), "utf8");
   const presetIds = [...presetsPatch.matchAll(/^\s+- id: ([\w-]+)/gm)].map((m) => m[1]);
-  ok(!presetIds.includes("flash-sh-standalone") && !presetIds.includes("flash-sh"), "dsh-flash-presets 补丁里没有 flash-sh / flash-sh-standalone 行（flash_sh 是 flash-presets 行下的子功能）");
-  ok(/flashSh:\n\s+enabled: false/.test(presetsPatch), "dsh-flash-presets 的 flash-presets 行带 flashSh.enabled: false");
+  ok(!presetIds.includes("fl-bash-standalone") && !presetIds.includes("flash-sh") && !presetIds.includes("flash-sh-standalone"), "dsh-flash-presets 补丁里没有独立包的行 id（不会与单独安装的 fl-bash 撞 id）");
+  ok(/- id: fl-bash\n\s+name: 'dsh-flash-presets\/fl-bash'\n\s+config:\n\s+enabled: false/.test(presetsPatch), "dsh-flash-presets 补丁有单独的组件行 id: fl-bash（name dsh-flash-presets/fl-bash，默认 enabled: false）");
+  ok(!/flashSh:/.test(presetsPatch), "flash-presets 行下不再有 flashSh 子功能");
+  for (const lang of ["zh", "en"]) {
+    const a = JSON.parse(fs.readFileSync(path.join(pluginDir, "locale", lang + ".json"), "utf8"));
+    const b = JSON.parse(fs.readFileSync(path.join(repoRoot, "locale", "fl-bash", lang + ".json"), "utf8"));
+    ok(a.meta.title === "fl-bash" && JSON.stringify(a) === JSON.stringify(b), "插件页标题 fl-bash，两种装法的 locale/" + lang + ".json 相同");
+  }
   const presetsPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-  const range = presetsPkg.optionalDependencies?.["dsh-flash-sh"];
-  ok(typeof range === "string", "dsh-flash-presets 把 dsh-flash-sh 声明为 optionalDependencies", range);
+  const range = presetsPkg.optionalDependencies?.["fl-bash"];
+  ok(typeof range === "string", "dsh-flash-presets 把 fl-bash 声明为 optionalDependencies", range);
   const planPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "plugins", "plan-mode-ui", "package.json"), "utf8"));
   ok(JSON.stringify(pkg.engines) === JSON.stringify(planPkg.engines), "engines 与 plan-mode-ui 一致", JSON.stringify(pkg.engines));
   ok(!fs.existsSync(path.join(repoRoot, "lib", "flash-sh.js")), "dsh-flash-presets 的 lib/ 里没有 flash-sh.js 副本（单一来源）");
-  const bundleSrc = fs.readFileSync(path.join(repoRoot, "lib", "bundle.js"), "utf8");
-  ok(bundleSrc.includes("Symbol.for('dsh-flash-sh/presets-intent@1')") && src.includes('Symbol.for("dsh-flash-sh/presets-intent@1")'), "presets 的 bundle.js 与本包用同一个意向 Symbol（dsh-flash-sh/presets-intent@1）");
+  const rowSrc = fs.readFileSync(path.join(repoRoot, "lib", "fl-bash-row.js"), "utf8");
+  ok(rowSrc.includes("Symbol.for('dsh-flash-sh/presets-intent@1')") && src.includes('Symbol.for("dsh-flash-sh/presets-intent@1")'), "presets 的 fl-bash-row.js 与本包用同一个意向 Symbol（dsh-flash-sh/presets-intent@1）");
 }
 
 // ── vendor exe 与 sha256 ────────────────────────────────────────────────
@@ -253,7 +259,7 @@ ok(mod.needsApproval("read-only", "read-only") === true && mod.needsApproval("re
 
   let r = await run("ls", A, cfg, mem);
   ok(asked.length === 1 && r.asked === true && r.remembered === "ls", "第一次 ls：弹审批，批准后记住");
-  ok(/Approving also allows commands of the same kind \(ls\)/.test(asked[0].reason) && asked[0].toolName === "flash_sh", "审批理由写明会话内记忆的范围", asked[0].reason);
+  ok(/Approving also allows commands of the same kind \(ls\)/.test(asked[0].reason) && asked[0].toolName === "fl_bash", "审批理由写明会话内记忆的范围", asked[0].reason);
   r = await run("ls -la", A, cfg, mem);
   ok(asked.length === 1 && r.asked === false, "同会话同类命令：不再问");
   r = await run("ls | head", A, cfg, mem);
@@ -524,7 +530,7 @@ if (process.platform !== "win32") {
   const base = { enabled: true, allowNonWindows: true, binPath: bin };
   const presetsPlugin = mod.createPlugin({ owner: "dsh-flash-presets" });
   const standalonePlugin = mod.default;
-  ok(standalonePlugin.name === "dsh-flash-sh" && typeof presetsPlugin.apply === "function" && presetsPlugin.Config === mod.Config, "createPlugin 返回完整插件对象（name / inject / Config / apply）");
+  ok(standalonePlugin.name === "fl-bash" && typeof presetsPlugin.apply === "function" && presetsPlugin.Config === mod.Config, "createPlugin 返回完整插件对象（name / inject / Config / apply）");
   const saved = { ...process.env };
   delete process.env.DSH_FLASH_SH;
   delete process.env.DSH_FLASH_SH_BIN;
@@ -537,12 +543,12 @@ if (process.platform !== "win32") {
     if (order === "standalone-first") { standalonePlugin.apply(cS, base); presetsPlugin.apply(cP, base); }
     else { presetsPlugin.apply(cP, base); standalonePlugin.apply(cS, base); }
     const snap = mod.claimsSnapshot().filter((x) => x.active);
-    ok(reg.tools.size === 1 && snap.length === 1 && snap[0].owner === "dsh-flash-presets", order + "：只注册一个 flash_sh，归 presets 子功能", JSON.stringify(mod.claimsSnapshot()) + " " + logs.join(" | "));
-    ok(logs.some((l) => /provided by dsh-flash-presets.*dsh-flash-sh（flash-sh-standalone 行） skips registering it/.test(l)), order + "：独立行写日志说明让位", logs.join(" | "));
+    ok(reg.tools.size === 1 && snap.length === 1 && snap[0].owner === "dsh-flash-presets", order + "：只注册一个 fl_bash，归 presets 子功能", JSON.stringify(mod.claimsSnapshot()) + " " + logs.join(" | "));
+    ok(logs.some((l) => /provided by dsh-flash-presets.*fl-bash（单独安装，fl-bash-standalone 行） skips registering it/.test(l)), order + "：独立行写日志说明让位", logs.join(" | "));
     ok(reg.calls === 1 && !logs.some((l) => /handed over/.test(l)), order + "：启动期间 register 只被调用 1 次（独立行不先注册再交出，没有双注册窗口）", "calls=" + reg.calls + " " + logs.join(" | "));
     cP.dispose();
     const after = mod.claimsSnapshot();
-    ok(reg.tools.size === 1 && after.length === 1 && after[0].owner === "dsh-flash-sh" && after[0].active, order + "：presets 那边卸载后独立行接管", JSON.stringify(after));
+    ok(reg.tools.size === 1 && after.length === 1 && after[0].owner === "fl-bash" && after[0].active, order + "：presets 那边卸载后独立行接管", JSON.stringify(after));
     cS.dispose();
     ok(reg.tools.size === 0 && mod.claimsSnapshot().length === 0, order + "：都卸载后注册表干净");
   }
@@ -564,7 +570,7 @@ if (process.platform !== "win32") {
     ok(reg.calls === 1 && mod.claimsSnapshot().find((x) => x.active)?.owner === "dsh-flash-presets", "presets 子功能到来：只注册它一次");
     ok(logs.some((l) => /Its settings differ and are NOT in effect: approval \("sandboxed" here vs "off"\)/.test(l)), "两边配置矛盾：独立行让位时 warn 写明哪些字段不生效", logs.filter((l) => /differ/.test(l)).join(" | "));
     cP.dispose();
-    ok(reg.tools.size === 1 && mod.claimsSnapshot().find((x) => x.active)?.owner === "dsh-flash-sh", "presets 卸载后独立行接管");
+    ok(reg.tools.size === 1 && mod.claimsSnapshot().find((x) => x.active)?.owner === "fl-bash", "presets 卸载后独立行接管");
     cS.dispose();
   }
   {
@@ -586,16 +592,16 @@ if (process.platform !== "win32") {
     const reg = mkRegistry();
     const logs = [];
     const cS = mkCtx(reg, logs);
-    cS.fiber = { entry: { parent: { data: [{ id: "flash-sh-standalone", name: "dsh-flash-sh" }, { id: "other", name: "x" }] } } };
+    cS.fiber = { entry: { parent: { data: [{ id: "fl-bash-standalone", name: "fl-bash" }, { id: "other", name: "x" }] } } };
     standalonePlugin.apply(cS, base);
-    ok(reg.calls === 1 && !logs.some((l) => /waiting/.test(l)), "加载器配置里没有 flash-presets 行 → 独立行立即注册");
+    ok(reg.calls === 1 && !logs.some((l) => /waiting/.test(l)), "加载器配置里没有 presets 的 fl-bash 行 → 独立行立即注册");
     cS.dispose();
     const cS2 = mkCtx(reg, logs);
-    cS2.fiber = { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets", disabled: true }] } } };
+    cS2.fiber = { entry: { parent: { data: [{ id: "fl-bash", name: "dsh-flash-presets/fl-bash", disabled: true }] } } };
     standalonePlugin.apply(cS2, base);
     ok(reg.tools.size === 1, "flash-presets 行被整行关掉（disabled: true）→ 独立行立即注册");
     cS2.dispose();
-    ok(mod.presetsRowHint({ fiber: { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets" }] } } } }) === "present" && mod.presetsRowHint({}) === "unknown", "presetsRowHint：present / unknown");
+    ok(mod.presetsRowHint({ fiber: { entry: { parent: { data: [{ id: "fl-bash", name: "dsh-flash-presets/fl-bash" }] } } } }) === "present" && mod.presetsRowHint({}) === "unknown", "presetsRowHint：present / unknown");
   }
   {
     // 什么都不知道：短等后注册；知道 flash-presets 行存在但它一直不表态：长等后注册（warn）
@@ -609,7 +615,7 @@ if (process.platform !== "win32") {
     ok(reg.calls === 1 && logs.some((l) => /did not report within 150 ms/.test(l)), "短等（150 ms）后独立行注册", logs.join(" | "));
     cS.dispose();
     const cS2 = mkCtx(reg, logs);
-    cS2.fiber = { entry: { parent: { data: [{ id: "flash-presets", name: "dsh-flash-presets" }] } } };
+    cS2.fiber = { entry: { parent: { data: [{ id: "fl-bash", name: "dsh-flash-presets/fl-bash" }] } } };
     standalonePlugin.apply(cS2, base);
     await new Promise((r) => setTimeout(r, 250));
     ok(reg.tools.size === 0, "flash-presets 行存在：短时限过了仍在等");
@@ -637,21 +643,21 @@ if (process.platform !== "win32") {
     presetsPlugin.apply(cP, base);
     ok(under.tools.size === 1 && mod.claimsSnapshot().filter((x) => x.active).map((x) => x.owner).join() === "dsh-flash-presets" && logs.some((l) => /no 'layers' field/.test(l)), "没有 layers：仍只注册一个，presets 优先，并记日志", JSON.stringify(mod.claimsSnapshot()));
     cP.dispose();
-    ok(under.tools.size === 1 && mod.claimsSnapshot()[0]?.owner === "dsh-flash-sh", "没有 layers：presets 卸载后独立行接管");
+    ok(under.tools.size === 1 && mod.claimsSnapshot()[0]?.owner === "fl-bash", "没有 layers：presets 卸载后独立行接管");
     cS.dispose();
   }
   mod._setDeferTimings({ long: 15000, short: 3000 });
   resetIntent();
-  // 第三方已注册 flash_sh：不抢，等它消失
+  // 第三方已注册 fl_bash：不抢，等它消失
   {
     const reg = mkRegistry();
     const logs = [];
-    const foreignDispose = reg.register({ name: "flash_sh", description: "third-party" });
+    const foreignDispose = reg.register({ name: "fl_bash", description: "third-party" });
     const cP = mkCtx(reg, logs);
     presetsPlugin.apply(cP, base);
-    ok(reg.tools.get("flash_sh").description === "third-party" && logs.some((l) => /already registered by another plugin/.test(l)), "第三方已有 flash_sh → 不覆盖，记日志");
+    ok(reg.tools.get("fl_bash").description === "third-party" && logs.some((l) => /already registered by another plugin/.test(l)), "第三方已有 fl_bash → 不覆盖，记日志");
     foreignDispose();
-    ok(reg.tools.get("flash_sh")?.description === mod.DESCRIPTION && logs.some((l) => /took over/.test(l)), "第三方注销后接管");
+    ok(reg.tools.get("fl_bash")?.description === mod.DESCRIPTION && logs.some((l) => /took over/.test(l)), "第三方注销后接管");
     cP.dispose();
   }
   // 自定义 exe：warn + sha256；环境变量换 exe：info
@@ -662,7 +668,7 @@ if (process.platform !== "win32") {
     mod.setPresetsIntent("none");
     const c1 = mkCtx(reg, logs);
     standalonePlugin.apply(c1, { enabled: true, allowNonWindows: true });
-    ok(logs.some((l) => /binPath taken from the environment variable DSH_FLASH_SH_BIN/.test(l)), "环境变量换 exe：日志提示");
+    ok(logs.some((l) => /binPath taken from the environment variable DSH_FL_BASH_BIN \/ DSH_FLASH_SH_BIN/.test(l)), "环境变量换 exe：日志提示");
     ok(logs.some((l) => /non-bundled flash-sh executable: .* sha256=[0-9a-f]{64}/.test(l)), "非内置 exe：warn 并打印 sha256", logs.join(" | "));
     c1.dispose();
     delete process.env.DSH_FLASH_SH_BIN;
@@ -673,7 +679,9 @@ if (process.platform !== "win32") {
 
 // ── 工具定义 ────────────────────────────────────────────────────────────
 const def = mod.toolDefinition({}, mod.resolveConfig({ enabled: true }, env({})), "/nonexistent");
-ok(def.name === "flash_sh", "工具名 flash_sh（不占 bash/pwsh/run_code）");
+ok(def.name === "fl_bash", "工具名 fl_bash（不占 bash/pwsh/run_code）");
+ok(mod.resolveConfig({}, { DSH_FL_BASH: "1", DSH_FLASH_SH: "0" }).enabled === true && mod.resolveConfig({}, { DSH_FLASH_SH: "1" }).enabled === true, "新环境变量 DSH_FL_BASH 优先，旧名 DSH_FLASH_SH 仍认");
+ok(mod.resolveConfig({}, { DSH_FL_BASH_BIN: "/n", DSH_FLASH_SH_BIN: "/o" }).binPath === "/n", "DSH_FL_BASH_BIN 优先于旧名");
 ok(def.parameters.additionalProperties === false && def.parameters.required.includes("command"), "参数 schema：command 必填、无多余字段");
 ok(def.timeoutMs === 610000, "宿主侧协作上限 = maxTimeoutMs + 10s");
 const types = [];

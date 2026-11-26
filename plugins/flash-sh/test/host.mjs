@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 最小宿主自测：用仓库 node_modules 里真实的 @deepseek-ai/cordis + dsh-system-prompt + dsh-tools（与 DSH 同版本的包）
 // 搭一个 cordis Context，把本插件当普通插件挂上（等价于补丁行 insert 之后 Loader 做的 ctx.plugin(mod, config)），
-// 再走 dsh-tools 的真实执行管线（tools.execute）调用 flash_sh。
+// 再走 dsh-tools 的真实执行管线（tools.execute）调用 fl_bash。
 //
 // 需要一个当前平台可运行的 flash-sh：FLASH_SH_TEST_BIN=/path/to/flash-sh（Linux 版用 native/flash-sh/build.sh 编）。
 // 非 Windows 上靠 DSH_FLASH_SH_ANY_PLATFORM=1 + binPath 进入开发模式。
@@ -64,7 +64,7 @@ for (const level of ["info", "warn", "error"]) {
   const orig = console[level].bind(console);
   console[level] = (...args) => {
     const line = args.map(String).join(" ");
-    if (line.includes("[flash-sh]")) logs.push(line);
+    if (line.includes("[fl-bash]")) logs.push(line);
     else orig(...args);
   };
 }
@@ -76,7 +76,7 @@ async function newHost() {
   ctx.logger.exporter({
     export(message) {
       const line = cordis.Logger.format({ colors: false }, message);
-      if (line.includes("[flash-sh]")) logs.push(line);
+      if (line.includes("[fl-bash]")) logs.push(line);
     },
   });
   ctx.plugin(SystemPrompt);
@@ -124,8 +124,8 @@ let callN = 0;
 async function call(ctx, args, signal) {
   const callId = "c" + ++callN;
   signal ??= new AbortController().signal;
-  if (typeof ctx.tools.setExecutor !== "function") return ctx.tools.execute({ callId, name: "flash_sh", arguments: args, signal });
-  const batch = await ctx.tools.execute({ calls: [{ id: callId, name: "flash_sh", arguments: JSON.stringify(args) }], signal });
+  if (typeof ctx.tools.setExecutor !== "function") return ctx.tools.execute({ callId, name: "fl_bash", arguments: args, signal });
+  const batch = await ctx.tools.execute({ calls: [{ id: callId, name: "fl_bash", arguments: JSON.stringify(args) }], signal });
   return batch.results.find((r) => r.callId === callId)?.result;
 }
 const valueOf = (res) => res && (res.value ?? res.structured ?? res.output ?? res.result);
@@ -137,14 +137,14 @@ const valueOf = (res) => res && (res.value ?? res.structured ?? res.output ?? re
   const fiber = ctx.plugin(mod, { binPath: bin });
   await fiber;
   await tick();
-  ok(ctx.tools.get("flash_sh") === undefined, "默认 enabled:false → 不注册");
+  ok(ctx.tools.get("fl_bash") === undefined, "默认 enabled:false → 不注册");
   ok(sawLog(/not registered: disabled/), "日志说明未注册原因", logs.join(" | "));
   // 配置校验：错误类型被 cordis 拒绝（Config["~standard"].validate 生效）
   let rejected = false;
   try {
     const f = ctx.plugin(mod, { enabled: "yes", binPath: bin });
     await f;
-    rejected = ctx.tools.get("flash_sh") === undefined;
+    rejected = ctx.tools.get("fl_bash") === undefined;
   } catch (error) {
     rejected = true;
   }
@@ -158,23 +158,23 @@ logs.length = 0;
 const fiber = ctx.plugin(mod, { enabled: true, binPath: bin, maxOutputBytes: 4096, approval: "off" });
 await fiber;
 await tick();
-ok(ctx.tools.get("flash_sh") !== undefined, "enabled:true + ANY_PLATFORM + binPath → 已注册");
-ok(sawLog(/\[flash-sh\] flash_sh registered \(/), "日志含 \"[flash-sh] flash_sh registered\"", logs.join(" | "));
+ok(ctx.tools.get("fl_bash") !== undefined, "enabled:true + ANY_PLATFORM + binPath → 已注册");
+ok(sawLog(/\[fl-bash\] fl_bash registered \(/), "日志含 \"[fl-bash] fl_bash registered\"", logs.join(" | "));
 const schemas = ctx.tools.schemas();
-ok(schemas.some((s) => s.name === "flash_sh"), "出现在模型可见 schema（native 模式）");
+ok(schemas.some((s) => s.name === "fl_bash"), "出现在模型可见 schema（native 模式）");
 // PTC：SDK 投影里也有它（run_code 程序内可调）
 // ≤0.2.1 有 tools.sdkSchemas()；0.2.2 起 SDK 由 PTC executor 从定义生成，没有这个方法 → 改查定义本身带对象型输出 schema
 // （PTC executor 生成返回类型所需的就是它）。
 if (typeof ctx.tools.sdkSchemas === "function") {
   try {
     const sdk = ctx.tools.sdkSchemas();
-    ok(sdk.some((s) => s.name === "flash_sh" && s.output && s.output.type === "object"), "出现在 PTC SDK 投影（sdkSchemas），带输出 schema");
+    ok(sdk.some((s) => s.name === "fl_bash" && s.output && s.output.type === "object"), "出现在 PTC SDK 投影（sdkSchemas），带输出 schema");
   } catch (error) {
     ok(false, "sdkSchemas()", error.message);
   }
 } else {
-  const defs = typeof ctx.tools.definitions === "function" ? ctx.tools.definitions() : [ctx.tools.get("flash_sh")];
-  const def = defs.find((d) => d && d.name === "flash_sh");
+  const defs = typeof ctx.tools.definitions === "function" ? ctx.tools.definitions() : [ctx.tools.get("fl_bash")];
+  const def = defs.find((d) => d && d.name === "fl_bash");
   const out = def && def.output && (def.output.schema ?? def.output);
   ok(out && out.type === "object", "定义带对象型输出 schema（本宿主没有 sdkSchemas，PTC SDK 由 executor 生成）", JSON.stringify(def && def.output));
   console.log("  · executor：" + executorSource);
@@ -230,7 +230,7 @@ delete process.env.DSH_HOST_TEST;
 res = await call(ctx, { command: "echo hi", bogus: 1 });
 ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON.stringify(res)), "未知参数被拒", JSON.stringify(res).slice(0, 300));
 
-// ── 3. 审批闸：flash_sh 不受沙箱约束，会话不是「完全访问」时请求审批；同会话同类命令记住 ─────────────
+// ── 3. 审批闸：fl_bash 不受沙箱约束，会话不是「完全访问」时请求审批；同会话同类命令记住 ─────────────
 {
   let asked = 0;
   let answer = "rejected";
@@ -240,7 +240,7 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
     ctx: {
       get(name) {
         if (name === "sandboxPolicy") return mode === undefined ? undefined : { resolve: () => ({ mode }) };
-        if (name === "approval") return { request: async (req) => { asked += 1; if (answer === "throw") throw new Error("boom"); return req.toolName === "flash_sh" ? answer : "unavailable"; } };
+        if (name === "approval") return { request: async (req) => { asked += 1; if (answer === "throw") throw new Error("boom"); return req.toolName === "fl_bash" ? answer : "unavailable"; } };
         if (name === "workingDirectory") return { ensure: async () => tmp };
         return undefined;
       },
@@ -275,7 +275,7 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
   ok(asked === 6 && r.stdout === "ww\n", "approval=read-only：工作区可写会话不弹审批");
 }
 
-// ── 4. 撞名：另一个插件已注册 flash_sh → 本插件跳过；对方消失后接管 ────────────
+// ── 4. 撞名：另一个插件已注册 fl_bash → 本插件跳过；对方消失后接管 ────────────
 {
   const host = await newHost();
   logs.length = 0;
@@ -284,7 +284,7 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
     inject: ["tools"],
     apply(c) {
       c.tools.register({
-        name: "flash_sh",
+        name: "fl_bash",
         description: "other",
         parameters: { type: "object", properties: {}, additionalProperties: false },
         output: { schema: { type: "object", properties: {}, additionalProperties: false }, render: () => [{ type: "text", text: "other" }] },
@@ -297,15 +297,15 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
   const mine = host.plugin(mod, { enabled: true, binPath: bin });
   await mine;
   await tick();
-  ok(host.tools.get("flash_sh")?.description === "other", "已有 flash_sh → 不覆盖、不抛错");
+  ok(host.tools.get("fl_bash")?.description === "other", "已有 fl_bash → 不覆盖、不抛错");
   ok(sawLog(/already registered by another plugin/), "日志记录跳过", logs.join(" | "));
   await otherFiber.dispose();
   await tick(50);
-  ok(host.tools.get("flash_sh")?.description === mod.DESCRIPTION, "对方注销后本插件接管 flash_sh");
+  ok(host.tools.get("fl_bash")?.description === mod.DESCRIPTION, "对方注销后本插件接管 fl_bash");
   ok(sawLog(/took over/), "日志记录接管", logs.join(" | "));
 }
 
-// ── 5. 与 dsh-flash-presets 的 flashSh 子功能同时启用：只有一个 flash_sh（归 presets），两边都不报错 ───────
+// ── 5. 与 dsh-flash-presets 的 fl-bash 组件行同时启用：只有一个 fl_bash（归 presets），两边都不报错 ───────
 {
   const presetsPlugin = mod.createPlugin({ owner: "dsh-flash-presets" });
   for (const order of ["presets-first", "standalone-first"]) {
@@ -328,15 +328,15 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
       await load("p", presetsPlugin, { enabled: true, binPath: bin, approval: "off" });
     }
     await tick();
-    const n = host.tools.schemas().filter((s) => s.name === "flash_sh").length;
+    const n = host.tools.schemas().filter((s) => s.name === "fl_bash").length;
     const active = mod.claimsSnapshot(host.tools).filter((c) => c.active).map((c) => c.owner);
-    ok(n === 1 && errors === 0 && active.length === 1 && active[0] === "dsh-flash-presets", "同时启用（" + order + "）：flash_sh 恰好 1 个、归 presets、无插件失败", "n=" + n + " errors=" + errors + " active=" + active + " " + logs.join(" | "));
+    ok(n === 1 && errors === 0 && active.length === 1 && active[0] === "dsh-flash-presets", "同时启用（" + order + "）：fl_bash 恰好 1 个、归 presets、无插件失败", "n=" + n + " errors=" + errors + " active=" + active + " " + logs.join(" | "));
     ok(sawLog(/skips registering it/), "（" + order + "）独立行记日志让位", logs.join(" | "));
-    ok(!sawLog(/handed over/) && !logs.some((l) => /\[flash-sh\] flash_sh registered/.test(l)), "（" + order + "）独立行从未注册过（没有「先注册再交出」的双注册窗口）", logs.join(" | "));
+    ok(!sawLog(/handed over/) && !logs.some((l) => /\[fl-bash\] fl_bash registered/.test(l)), "（" + order + "）独立行从未注册过（没有「先注册再交出」的双注册窗口）", logs.join(" | "));
     await fibers.p.dispose();
     await tick(50);
     const res2 = await call(host, { command: "echo after-handover", workdir: tmp });
-    ok(host.tools.schemas().filter((s) => s.name === "flash_sh").length === 1 && JSON.stringify(res2).includes("after-handover"), "（" + order + "）presets 卸载后独立行接管并能执行", JSON.stringify(res2).slice(0, 300));
+    ok(host.tools.schemas().filter((s) => s.name === "fl_bash").length === 1 && JSON.stringify(res2).includes("after-handover"), "（" + order + "）presets 卸载后独立行接管并能执行", JSON.stringify(res2).slice(0, 300));
     await fibers.s.dispose();
     await tick(20);
   }
@@ -351,14 +351,14 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
   const s = host.plugin(mod, { enabled: true, binPath: bin, approval: "off" });
   await s;
   await tick(200);
-  ok(host.tools.get("flash_sh") === undefined && sawLog(/waiting up to 1500 ms/), "未知情况：独立行先等，不注册", logs.join(" | "));
+  ok(host.tools.get("fl_bash") === undefined && sawLog(/waiting up to 1500 ms/), "未知情况：独立行先等，不注册", logs.join(" | "));
   const p = host.plugin(mod.createPlugin({ owner: "dsh-flash-presets" }), { enabled: true, binPath: bin, approval: "off" });
   await p;
   await tick();
-  ok(host.tools.schemas().filter((x) => x.name === "flash_sh").length === 1 && !sawLog(/handed over/) && mod.claimsSnapshot(host.tools).find((c) => c.active)?.owner === "dsh-flash-presets", "presets 在时限内到来：只注册它，独立行没注册过");
+  ok(host.tools.schemas().filter((x) => x.name === "fl_bash").length === 1 && !sawLog(/handed over/) && mod.claimsSnapshot(host.tools).find((c) => c.active)?.owner === "dsh-flash-presets", "presets 在时限内到来：只注册它，独立行没注册过");
   await p.dispose();
   await tick(50);
-  ok(host.tools.get("flash_sh") !== undefined, "presets 卸载 → 独立行接管");
+  ok(host.tools.get("fl_bash") !== undefined, "presets 卸载 → 独立行接管");
   await s.dispose();
   // 只有独立行：时限一过就注册
   logs.length = 0;
@@ -366,7 +366,7 @@ ok(res.isError === true || /unknown argument|not a declared property/i.test(JSON
   const s2 = host.plugin(mod, { enabled: true, binPath: bin, approval: "off" });
   await s2;
   await tick(1800);
-  ok(host.tools.get("flash_sh") !== undefined && sawLog(/did not report within 1500 ms/), "只有独立行：时限一过就注册", logs.join(" | "));
+  ok(host.tools.get("fl_bash") !== undefined && sawLog(/did not report within 1500 ms/), "只有独立行：时限一过就注册", logs.join(" | "));
   await s2.dispose();
   mod._setDeferTimings({ short: 3000 });
   mod.setPresetsIntent("none");

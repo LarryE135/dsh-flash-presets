@@ -1,7 +1,7 @@
 {
-  "name": "dsh-flash-sh",
+  "name": "fl-bash",
   "version": "0.1.6",
-  "description": "flash-sh for DeepSeek Harness: an optional Bash-compatible shell tool (flash_sh) for Windows x64 hosts, backed by a bundled single-file Rust interpreter (no Git Bash / WSL / MSYS2). Off by default. Usable standalone or as the flashSh feature of dsh-flash-presets.",
+  "description": "fl-bash for DeepSeek Harness: an optional Bash-compatible shell tool (fl_bash) for Windows x64 hosts, backed by a bundled single-file Rust interpreter (flash-sh; no Git Bash / WSL / MSYS2). Off by default. Shows up as its own component, whether installed standalone or through dsh-flash-presets. Formerly dsh-flash-sh.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -9,7 +9,7 @@
     "bash",
     "shell",
     "windows",
-    "flash-sh"
+    "fl-bash"
   ],
   "license": "MIT",
   "author": "LarryE135 (https://github.com/LarryE135)",
@@ -19,13 +19,15 @@
     ".": {
       "default": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
     "test": "node test/run.mjs"
   },
   "files": [
     "lib",
+    "locale",
     "vendor",
     "scripts/check-flash-sh.ps1",
     "test",

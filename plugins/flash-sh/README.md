@@ -1,23 +1,25 @@
-# dsh-flash-sh
+# fl-bash
 
-给 DeepSeek Harness（DSH）Windows 桌面端加一个可选的 **Bash 兼容 shell 工具 `flash_sh`**。
+> 0.1.x 的包名是 `dsh-flash-sh`、工具名 `flash_sh`、行 id `flash-sh-standalone`、环境变量 `DSH_FLASH_SH*`。现在统一叫 fl-bash：包名 `fl-bash`、工具名 `fl_bash`、行 id `fl-bash-standalone`、环境变量 `DSH_FL_BASH*`（旧环境变量名仍认，旧 spill 目录也照常清理）。底层解释器仍是 `flash-sh.exe`。
+
+给 DeepSeek Harness（DSH）Windows 桌面端加一个可选的 **Bash 兼容 shell 工具 `fl_bash`**。
 
 Windows 版 DSH 的预设里只有 pwsh，模型却最熟 Bash。本插件自带 `flash-sh.exe`（Rust 写的单文件 Bash 兼容解释器，
 coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU 版的差异见下文「内置命令的已知差异」），**不依赖 Git Bash / WSL / MSYS2**。
 
 两种装法，二选一即可（都装也没关系，见「与 dsh-flash-presets 同时安装」）：
 
-- **随 dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）**：presets 把本包声明为可选依赖，Windows x64 上随 presets 一起装上，在插件页
-  「Flash 精简预设」那一行下面作为 `flashSh` 子功能出现（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
-- **单独安装**：本包自己是一个组合包（一行 `flash-sh-standalone`），见下面「安装」。
+- **随 dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）**：presets 把本包声明为可选依赖，Windows x64 上随 presets 一起装上，在插件页上
+  作为**单独的组件 fl-bash** 出现（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
+- **单独安装**：本包自己是一个组合包（一行 `fl-bash-standalone`，插件页标题 fl-bash），见下面「安装」。
 
-- 工具名 `flash_sh`，**不占用** `bash` / `pwsh` / `run_code`。
+- 工具名 `fl_bash`，**不占用** `bash` / `pwsh` / `run_code`。
 - **默认关闭**：它会在你的电脑上执行命令，必须你显式打开。
 - **只在 Windows x64 上激活**：`package.json` 声明 `os: ["win32"]`、`cpu: ["x64"]`，组合包声明 `dsh.bundle.platforms: ["win32"]`，
   运行时还要求 `process.arch === 'x64'`（桌面端插件跑在 Electron 进程里，arch 是该 Electron 构建的架构）。
-  实测（Linux 宿主、pnpm 11.22.0）：`dsh plugin add dsh-flash-sh` 时 **pnpm 仍会把包装进 profile**（并不按 `os` / `cpu` 跳过或拒绝），
+  实测（Linux 宿主、pnpm 11.22.0）：`dsh plugin add fl-bash` 时 **pnpm 仍会把包装进 profile**（并不按 `os` / `cpu` 跳过或拒绝），
   随后 DSH 在组合包激活阶段以 `Bundle supports Host platforms win32` 拒绝激活，最终不会激活、不注册任何工具；
-  装错了平台用 `dsh plugin --profile <p> remove dsh-flash-sh` 清理即可。
+  装错了平台用 `dsh plugin --profile <p> remove fl-bash` 清理即可。
 - 包内无运行时依赖、无安装脚本（不会触发 pnpm 的 `allowBuilds` 拦截）。
 
 版本要求：DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines.dsh`，与 dsh-flash-presets 相同）。
@@ -26,25 +28,25 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `dsh-flash-sh-0.1.6.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\dsh-flash-sh-0.1.6.tgz`。
+1. 把 `fl-bash-0.1.6.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\fl-bash-0.1.6.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\dsh-flash-sh-0.1.6.tgz` 或 `file:C:\...\dsh-flash-sh-0.1.6.tgz` 都行）。
+   `C:\...\fl-bash-0.1.6.tgz` 或 `file:C:\...\fl-bash-0.1.6.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\dsh-flash-sh-0.1.6.tgz`。
+> `dsh plugin --profile web add C:\...\fl-bash-0.1.6.tgz`。
 
 ### 手动安装（插件页不可用时）
 
 1. 完全退出桌面端。
 2. 把 tgz 解压（里面是 `package/` 目录），把 `package` 整个复制成
-   `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-flash-sh`（设置了 `DSH_HOME` 时用 `%DSH_HOME%\profiles\desktop\...`）。
+   `%USERPROFILE%\.dsh\profiles\desktop\node_modules\fl-bash`（设置了 `DSH_HOME` 时用 `%DSH_HOME%\profiles\desktop\...`）。
 3. 在 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` 末尾加：
    ```yaml
    - insert:
-       - id: flash-sh-standalone
-         name: 'dsh-flash-sh'
+       - id: fl-bash-standalone
+         name: 'fl-bash'
          config:
            enabled: true
    ```
@@ -55,12 +57,12 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ## 启用
 
-二选一（优先级：环境变量 `DSH_FLASH_SH` ＞ 补丁里的 `enabled` ＞ 默认关）：
+二选一（优先级：环境变量 `DSH_FL_BASH`（旧名 `DSH_FLASH_SH` 仍认）＞ 补丁里的 `enabled` ＞ 默认关）：
 
 **A. 改 profile 补丁（推荐）** —— 在 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` 末尾追加：
 
 ```yaml
-- id: flash-sh-standalone
+- id: fl-bash-standalone
   config:
     enabled: true
 ```
@@ -68,31 +70,31 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 profile 补丁会**整体替换**这一行的 `config`（DSH 的 patch 语义），要保留别的字段（如 `timeoutMs`）就一起写上。改完重启桌面端。
 桌面端设置页里的插件清单是只读的，没有能改插件 config 的表单；插件页的开关只改整行的 `disabled`，不改 `enabled`。
 
-**B. 用户环境变量** —— PowerShell 执行 `setx DSH_FLASH_SH 1`，然后**完全退出**桌面端（含托盘）再从开始菜单启动。
-不要把 `DSH_FLASH_SH` 写进 `.env`：DSH 启动器拒绝 `.env` 里出现任何 `DSH_*` 变量（会直接启动失败）。
-`DSH_FLASH_SH=0` 可以强制关闭。
+**B. 用户环境变量** —— PowerShell 执行 `setx DSH_FL_BASH 1`，然后**完全退出**桌面端（含托盘）再从开始菜单启动。
+不要把 `DSH_FL_BASH` 写进 `.env`：DSH 启动器拒绝 `.env` 里出现任何 `DSH_*` 变量（会直接启动失败）。
+`DSH_FL_BASH=0` 可以强制关闭。
 
 ## 配置项
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
 | `enabled` | `false` | 总开关 |
-| `binPath` | 包内 `vendor/win32-x64/flash-sh.exe` | 换用别的 flash-sh 可执行文件（也可用环境变量 `DSH_FLASH_SH_BIN`） |
+| `binPath` | 包内 `vendor/win32-x64/flash-sh.exe` | 换用别的 flash-sh 可执行文件（也可用环境变量 `DSH_FL_BASH_BIN`） |
 | `timeoutMs` | `120000` | 单次调用默认超时；到点整棵进程树被杀，退出码 124 |
 | `maxTimeoutMs` | `600000` | 模型可请求的最大超时 |
 | `maxOutputBytes` | `30000` | stdout / stderr 各自回传上限：保留开头和结尾各一半（按 UTF-8 字符边界），中间写明省略了多少字节；完整输出写到临时文件并回传路径 |
 | `approval` | `sandboxed` | 何时请求你审批：`sandboxed`＝会话权限不是「完全访问」时（默认）；`read-only`＝只在会话为只读时；`off`＝从不（风险见下文） |
 | `approvalMemory` | `session` | `session`＝同一会话里同一类命令批准一次后不再问（危险命令除外）；`off`＝每次都问 |
-| `allowNonWindows` | `false` | 仅供开发验证：非 Windows x64 也注册（需配 `binPath`；或 `DSH_FLASH_SH_ANY_PLATFORM=1`） |
+| `allowNonWindows` | `false` | 仅供开发验证：非 Windows x64 也注册（需配 `binPath`；或 `DSH_FL_BASH_ANY_PLATFORM=1`） |
 
-`binPath` 写成空字符串等于没写（用内置 exe）。用环境变量 `DSH_FLASH_SH_BIN` 换了 exe 时启动日志会写一行说明；
+`binPath` 写成空字符串等于没写（用内置 exe）。用环境变量 `DSH_FL_BASH_BIN` 换了 exe 时启动日志会写一行说明；
 `binPath` 指向**非内置** exe 时启动日志打一条 warn 并附上它的 sha256，便于核对来源。
 
-作为 dsh-flash-presets 的子功能时，这些字段写在 `flash-presets` 那一行的 `config.flashSh` 下（例如 `flashSh: { enabled: true, approval: sandboxed }`），含义相同。
+随 dsh-flash-presets 装时，这些字段写在 presets 带来的 `- id: fl-bash` 那一行的 `config` 下（例如 `config: { enabled: true, approval: sandboxed }`），含义相同。
 
 ### 安全提示与审批
 
-`flash_sh` 是一个普通子进程，**不受 DSH 文件沙箱约束**（DSH 的 bash / pwsh 在「工作区可写」下是被沙箱包住的，flash_sh 不是）。
+`fl_bash` 是一个普通子进程，**不受 DSH 文件沙箱约束**（DSH 的 bash / pwsh 在「工作区可写」下是被沙箱包住的，fl_bash 不是）。
 DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升级，以及个别工具自己要求的场合），所以本插件自己做审批闸：
 
 - **失败即关闭**：`approval` 不是 `off` 时，读不到会话权限模式也按「需要审批」处理；审批被拒绝 / 取消、审批策略为「从不」、
@@ -118,8 +120,8 @@ DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升�
   以 `_PAT` / `_AUTH` 为词（`GITHUB_PAT`、`NPM_CONFIG__AUTH`、`SSH_AUTH_SOCK`；不误伤 `NODE_PATH` 这类 `*_PATH` 与 `GIT_AUTHOR_*`）、
   前缀为 `DSH_` / `AWS_` / `GITHUB_` / `GH_` / `NPM_CONFIG_` / `YARN_NPM_` / `AZURE_DEVOPS_` 的变量，以及**值**是带账号密码的 URL（`postgres://u:p@h`、
   `http://user:pw@proxy`）的变量，都不传给 flash-sh；`PATH`、`HOME`、`USERPROFILE`、`TEMP`、不带账号密码的代理等照常保留。
-  影响：flash_sh 里的 `npm` 读不到 `NPM_CONFIG_*`（改读 `.npmrc`），`git` 走 ssh-agent 会失败（`SSH_AUTH_SOCK` 被去掉）。需要凭据的命令请让它自己读配置文件。
-- **大输出**：内存里只留头尾；完整输出流式写到临时目录下 `dsh-flash-sh-spill-*`（`mkdtemp` 新建、0700；文件名是 128 位随机数，`O_EXCL` 0600 新建），
+  影响：fl_bash 里的 `npm` 读不到 `NPM_CONFIG_*`（改读 `.npmrc`），`git` 走 ssh-agent 会失败（`SSH_AUTH_SOCK` 被去掉）。需要凭据的命令请让它自己读配置文件。
+- **大输出**：内存里只留头尾；完整输出流式写到临时目录下 `fl-bash-spill-*`（`mkdtemp` 新建、0700；文件名是 128 位随机数，`O_EXCL` 0600 新建），
   单个 DSH 进程累计上限 64 MB，超过就停写并在结果里注明。启动时清理 24 小时以前的残留目录：只删名字对、是真目录（不跟符号链接 / 联接点）、
   POSIX 上属主是自己、且里面只有 spill 日志文件的目录，逐个删文件再删空目录，不做递归删除。
 - **超时**：exe 的 `--timeout` 到点会杀掉整棵进程树、以 124 退出并在 stderr 写 `flash-sh: timed out after Ns, process tree killed`；
@@ -133,7 +135,7 @@ DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升�
 包括删除文件、改写工作区外的文件、联网上传、读取你能读到的任何文件。只建议在一次性的虚拟机 / 容器里，或你完全信任当前任务时使用；
 启动日志会为此打一条 warn。想少弹审批，优先用默认的会话内记忆，或把会话切到「完全访问」（那是 DSH 自己的、看得见的开关）。
 
-精简·PTC 预设下 flash_sh 在 `run_code` 程序里被调用，**等你批准的时间也算在 `run_code` 的截止时间里**（默认约 120 秒），超时会被当作取消。
+精简·PTC 预设下 fl_bash 在 `run_code` 程序里被调用，**等你批准的时间也算在 `run_code` 的截止时间里**（默认约 120 秒），超时会被当作取消。
 
 ## 内置命令的已知差异
 
@@ -251,8 +253,8 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
   `mktemp: 拒绝访问`）。这是 Windows 的强制完整性控制，与 flash-sh 无关——把 exe 放回 profile 的 `node_modules` 下或任意普通目录即可。
   `test/read-regress.mjs` 0.1.4 起会先探测可写性，不可写时明确提示并跳过相关用例，不再报成失败。
 - **杀毒软件拦截**：自检第 3 项报「无法执行」或执行很慢，多半是杀软在隔离 / 扫描 `flash-sh.exe`。核对 `check-flash-sh.ps1` 第 2 项的
-  sha256 与发布值一致后，把 `…\node_modules\dsh-flash-sh\vendor\win32-x64\` 加入排除项。
-- **溢出文件**：输出超过上限时完整输出写到 `%TEMP%\dsh-flash-sh-spill-*`。0.1.4 起 DSH 正常退出时删除本次的目录；进程被强杀没来得及删的，
+  sha256 与发布值一致后，把 `…\node_modules\fl-bash\vendor\win32-x64\` 加入排除项。
+- **溢出文件**：输出超过上限时完整输出写到 `%TEMP%\fl-bash-spill-*`。0.1.4 起 DSH 正常退出时删除本次的目录；进程被强杀没来得及删的，
   下次启动时清理 24 小时以前的（只删本插件前缀、只装着溢出日志的目录）。
 
 ### 其他
@@ -262,36 +264,36 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 ## 验证
 
 1. 运行随包的 `check-flash-sh.ps1`（只读自检）。
-2. 插件启动时通过 DSH 的日志通道（cordis logger）写一行：`[flash-sh] flash_sh registered (…\vendor\win32-x64\flash-sh.exe)`；
-   未注册时写 `[flash-sh] flash_sh not registered: <原因>`。桌面端把这些日志写到哪里，DSH 的 npm 包里查不到（桌面壳不在其中），
+2. 插件启动时通过 DSH 的日志通道（cordis logger）写一行：`[fl-bash] fl_bash registered (…\vendor\win32-x64\flash-sh.exe)`；
+   未注册时写 `[fl-bash] fl_bash not registered: <原因>`。桌面端把这些日志写到哪里，DSH 的 npm 包里查不到（桌面壳不在其中），
    所以最可靠的确认方式是第 3 步。
-3. 在对话里让模型调用，例如："用 flash_sh 执行 `echo $((6*7)); uname -s`，把原始输出贴给我"。
-4. 精简·PTC 预设（lean-v3，`run_code` 是唯一可直接调用的工具）下，模型会在 `run_code` 程序里调用 `flash_sh`，这是正常的；
+3. 在对话里让模型调用，例如："用 fl_bash 执行 `echo $((6*7)); uname -s`，把原始输出贴给我"。
+4. 精简·PTC 预设（lean-v3，`run_code` 是唯一可直接调用的工具）下，模型会在 `run_code` 程序里调用 `fl_bash`，这是正常的；
    跑长命令时要让模型给 `run_code` 传足够大的 `timeoutMs`（`run_code` 的截止时间包含其中的嵌套调用）。
 
 ## 与 dsh-flash-presets 同时安装
 
-dsh-flash-presets 0.3.4 起（需要 presets ≥ 0.3.4，尚未发布）把本包当作可选依赖，在 `flash-presets` 一行下作为 `flashSh` 子功能挂上（默认关）。两种装法可以并存：
+dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）把本包当作可选依赖，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。两种装法可以并存：
 
-- 插件页上，presets 那边**不新增组件**，仍然只有「Flash 精简预设」一行；单独装的本包是另一行 `flash-sh-standalone`；
-- 工具名都叫 `flash_sh`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
-  （presets 的 `flash-presets` 行一开始 apply 就会表态；DSH 的加载器配置里看不到 `flash-presets` 行、或它被整行关掉时不等；
+- 插件页上是两行：presets 带来的 `fl-bash`，以及单独装的本包那一行 `fl-bash-standalone`（标题都是 fl-bash）；
+- 工具名都叫 `fl_bash`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
+  （presets 的 `fl-bash` 行一开始 apply 就会表态；DSH 的加载器配置里看不到它、或它被整行关掉时不等；
   看得到它但它一直不表态时最多等 15 秒，什么都判断不了时等 3 秒），所以不会出现「本行先注册、presets 随后接管」的双注册窗口。
-  两边都启用时 **presets 的 flashSh 优先**，本包这一行跳过并写日志
-  `flash_sh is provided by dsh-flash-presets（…flashSh 子功能）; dsh-flash-sh（flash-sh-standalone 行） skips registering it`；
-  presets 那边被关掉或卸载后，本行自动接管。若是别的插件（第三方）先注册了 `flash_sh`，两边都不抢，等它注销后再补上。
-- 注意环境变量 `DSH_FLASH_SH=1` 会同时打开两边（两者用同一个开关）；建议只保留一处启用。
-- 两边的配置各管各的：生效的是 presets 那边 `config.flashSh` 的设置；两边的 `approval` / `approvalMemory` / 超时 / 输出上限 / `binPath` 不一致时，
+  两边都启用时 **presets 那一行优先**，本包这一行跳过并写日志
+  `fl_bash is provided by dsh-flash-presets（fl-bash 组件行）; fl-bash（单独安装，fl-bash-standalone 行） skips registering it`；
+  presets 那边被关掉或卸载后，本行自动接管。若是别的插件（第三方）先注册了 `fl_bash`，两边都不抢，等它注销后再补上。
+- 注意环境变量 `DSH_FL_BASH=1`（或旧名 `DSH_FLASH_SH=1`）会同时打开两边；建议只保留一处启用。
+- 两边的配置各管各的：生效的是 presets 那边 `id: fl-bash` 的设置；两边的 `approval` / `approvalMemory` / 超时 / 输出上限 / `binPath` 不一致时，
   本包这一行让位时会打一条 warn，列出哪些设置**没有生效**。
-- 0.3.4 的 presets 不会把 profile 补丁里 `- id: flash-sh-standalone` 的覆盖换算过去（那是本包自己的一行，只要本包还装着就仍然有效）；
-  卸载本包、改用 presets 时，请把它改写到 `- id: flash-presets` 的 `config.flashSh` 下（presets 启动日志会提示）。
+- presets 不会把 profile 补丁里 `- id: fl-bash-standalone` 的覆盖换算过去（那是本包自己的一行，只要本包还装着就仍然有效）；
+  卸载本包、改用 presets 时，请把它改写到 `- id: fl-bash` 的 `config` 下。
 
 ## 卸载
 
-- 插件页里删除 `dsh-flash-sh`（或 `dsh plugin --profile <p> remove dsh-flash-sh`），重启。
-- 手动安装的：删 `profiles\desktop\node_modules\dsh-flash-sh` 目录和补丁里的 insert 行。
-- 别忘了删掉 profile 补丁里的 `- id: flash-sh-standalone` 覆盖行（行不存在时 DSH 只打一条 "entry not found" 警告），
-  以及 `setx DSH_FLASH_SH ""` 设过的环境变量（`reg delete HKCU\Environment /v DSH_FLASH_SH /f`）。
+- 插件页里删除 `fl-bash`（或 `dsh plugin --profile <p> remove fl-bash`），重启。
+- 手动安装的：删 `profiles\desktop\node_modules\fl-bash` 目录和补丁里的 insert 行。
+- 别忘了删掉 profile 补丁里的 `- id: fl-bash-standalone` 覆盖行（行不存在时 DSH 只打一条 "entry not found" 警告），
+  以及 `setx DSH_FL_BASH ""` 设过的环境变量（`reg delete HKCU\Environment /v DSH_FL_BASH /f`）。
 - pnpm 可能在 profile 的 `pnpm-workspace.yaml` 留一行记录，不影响配置合成。
 
 ## 开发

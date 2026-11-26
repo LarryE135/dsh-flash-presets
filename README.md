@@ -207,41 +207,24 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 注意：出厂配置把这行写成 `enabled: false`，插件 schema 的默认值也是**关**（0.3.1 是 `true`，0.3.2 改回 `false` —— 0.3.1 那一版会让普通对话也被验收门追着跑）。0.3.1 的代码只认 `DSH_DELIVERY_GATE=0`，设 `1` 打不开；从 0.3.2 起 `=1` 才真正生效。
 - **版本提示**：交付门 0.3.0 里没有，**0.3.1 起随 npm 发布**（包内含 `lib/delivery-gate.js`，`cordis.patch.yml` 里也有这一行：`enabled: false` / `maxRounds: 2`，脚本按平台选 —— Windows 先 `verify.ps1`、其余先 `verify.sh`）。0.3.0 想用只能从 git 装（`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`）；npm 上的 0.3.1、0.3.2（正式版）与 0.3.3（误发版）都带这一行，**不需要再等下一版**。
 
-## Windows 上的 Bash 工具 flash_sh（可选组件，默认关闭）
+## Windows 上的 Bash 工具 fl-bash（单独的组件，默认关闭）
 
-0.3.4 起，同一行里还有 `flashSh` 段：在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `flash_sh`（单文件 Rust 解释器 `flash-sh.exe`，
-不需要 Git Bash / WSL；不占用 `bash` / `pwsh` / `run_code`）。
+在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `fl_bash`（内置单文件解释器 `flash-sh.exe`，不需要 Git Bash / WSL；
+不占用 `bash` / `pwsh` / `run_code`）。它在插件页上是**单独的一个组件「fl-bash」**，不挂在「Flash 精简预设」那一行下面。
 
-- **从哪来**：实现在独立包 [`dsh-flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) 里（单一来源，本包不再带副本）。本包把它声明为 `optionalDependencies`，
-  它的 `package.json` 写了 `os: ["win32"]`、`cpu: ["x64"]`：Windows x64 上插件管理器（pnpm）会顺带装上；**macOS / Linux / Windows ARM64 上直接跳过，
-  不下载 7.9 MB 的 exe，也不报错**，插件页也不会多出组件。
-- **打开**：profile 补丁里写 `- id: flash-presets` / `config.flashSh.enabled: true`，或设用户环境变量 `DSH_FLASH_SH=1`（不能写进 `.env`）。
-  其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在 `flashSh` 段里，含义见 dsh-flash-sh 的 README。
-- **安全**：`flash_sh` 不受 DSH 文件沙箱约束。默认 `approval: sandboxed` —— 会话不是「完全访问」时要你审批（读不到会话模式也要审批，审批出错就不执行）；
+- **从哪来**：实现在独立包 [`fl-bash`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md) 里（单一来源，本包不带副本；0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
+  本包把它声明为 `optionalDependencies`，它的 `package.json` 写了 `os: ["win32"]`、`cpu: ["x64"]`：Windows x64 上插件管理器（pnpm）会顺带装上；
+  **macOS / Linux / Windows ARM64 上直接跳过，不下载 7.9 MB 的 exe，也不报错**。这些平台上插件页仍显示 fl-bash 组件（正常运行、不是红行），只是不注册工具。
+- **打开**：profile 补丁里写 `- id: fl-bash` / `config.enabled: true`，或设用户环境变量 `DSH_FL_BASH=1`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。
+  其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在这一行的 `config` 里，含义见 fl-bash 的 README。
+  预览版的旧写法（`flash-presets` 行的 `config.flashSh`、行 id `flash-sh`）升级后仍然生效，启动日志会提示改写。
+- **安全**：`fl_bash` 不受 DSH 文件沙箱约束。默认 `approval: sandboxed` —— 会话不是「完全访问」时要你审批（读不到会话模式也要审批，审批出错就不执行）；
   同一会话里同一类命令批准一次后不再问，`rm -rf`、写到工作区外（按真实路径判断）、`bash -c` / `eval` / 内联代码、改 `PATH` 等危险命令每次都问，
   看不懂的写法也每次都问。子进程拿不到名字含 `KEY` / `PASSWORD` / `SECRET` / `TOKEN` 等字样或 `_PAT` / `_AUTH` 的环境变量、`DSH_*` / `AWS_*` / `GITHUB_*` /
-  `NPM_CONFIG_*`，以及值里带账号密码的 URL（完整规则见 dsh-flash-sh 的 README）。`flashSh` 的配置不合法（如 `timeoutMs: 0`）时不启用，日志写明原因。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
-- **启动日志**：非 Windows x64 上启用时只写一行 `[flash-presets] flashSh 已启用，但 flash_sh 只在 Windows x64 上可用…`；可选依赖没装上时写一行
-  `…加载不到 dsh-flash-sh…`，其余功能都不受影响。
-- **和单独安装的 dsh-flash-sh 并存**：两边都启用时只注册一个 `flash_sh`，本行优先，独立包那一行写日志跳过；本行关掉后它自动接管。
-
-## 运行时组件开关
-
-0.3.4 起，`run_code` 优化、计划模式、旧会话兼容、交付门、flash_sh 都挂在组合包的 `flash-presets` 一行下面，插件页上只占一个组件。每个功能按自己需要的宿主服务启动，缺哪个服务只影响对应功能（桌面端没有 `webServer` 时只有计划模式不启动）。单独开关写在 profile 补丁（`~/.dsh/profiles/<名称>/cordis.patch.yml`）里：
-
-```yaml
-- id: flash-presets
-  config:
-    toolConcurrency: { enabled: true }   # run_code 优化 A（glob/grep 只读并发）
-    alias:           { enabled: true }   # 历史 preset id 兼容（关掉后旧会话可能打不开）
-    planMode:        { enabled: true }   # 计划模式宿主；todoSync / lagTurns / compositionCheck 也写在这一段
-    deliveryGate:    { enabled: true }   # 交付门（默认 false）；maxRounds / scripts / timeoutMs 也写在这一段
-    flashSh:         { enabled: true }   # Windows x64 的 Bash 工具 flash_sh（默认 false）；approval / timeoutMs 等也写在这一段
-```
-
-只写你要改的段即可，没写的段用组合包默认值。环境变量优先于这里：`DSH_FLASH_PRESETS_CONCURRENCY=0`、`DSH_FLASH_PRESETS_ALIAS=0`、`DSH_DELIVERY_GATE=0/1`、`DSH_FLASH_SH=0/1`。
-
-0.3.2 及以前的旧写法与新写法的对应：`flash-presets-core` 的 `config.toolConcurrency` → `toolConcurrency`；`plan-mode-ui` 的 `config` → `planMode`；`delivery-gate` 的 `config` → `deliveryGate`；任一旧行的 `disabled: true` → 对应段的 `enabled: false`。旧写法不改也生效（同一项新旧都写时以新写法为准）。feat/flash-sh 预览安装包里的 `flash-sh` 行 → `flashSh`（同样会被换算）；单独安装的 dsh-flash-sh 自己那一行 `flash-sh-standalone` 不换算（它仍是一行独立组件）。
+  `NPM_CONFIG_*`，以及值里带账号密码的 URL（完整规则见 fl-bash 的 README）。配置不合法（如 `timeoutMs: 0`）时不启用，日志写明原因。`approval: off` 等于让模型不经确认地在你电脑上执行任意命令，只建议在一次性环境里用。
+- **启动日志**：非 Windows x64 上启用时只写一行 `[fl-bash] fl-bash 已启用，但 fl_bash 只在 Windows x64 上可用…`；可选依赖没装上时写一行
+  `…加载不到 fl-bash…`，其余功能都不受影响。
+- **和单独安装的 fl-bash 并存**：插件页上是两行（本包的 `fl-bash`、独立包的 `fl-bash-standalone`），两边都启用时只注册一个 `fl_bash`，本包这一行优先，独立包那一行写日志跳过；本包这一行关掉后它自动接管。
 
 ## 注意事项
 

@@ -26,7 +26,7 @@ if (fs.existsSync(vendor)) {
   const ps1 = fs.readFileSync(path.join(pkgDir, "scripts", "check-flash-sh.ps1"), "utf8");
   const m = ps1.match(/\$ExpectedSha256 = '([0-9a-f]{64})'/);
   ok(m && m[1] === sha, "check-flash-sh.ps1 的 $ExpectedSha256 与 vendor exe 一致", m ? m[1] : "(没找到)");
-  const vers = [...ps1.matchAll(/dsh-flash-sh (\d+\.\d+\.\d+) 发布的 exe|与 (\d+\.\d+\.\d+) 发布的 exe/g)].map((x) => x[1] || x[2]);
+  const vers = [...ps1.matchAll(/(?:fl-bash|dsh-flash-sh) (\d+\.\d+\.\d+) 发布的 exe|与 (\d+\.\d+\.\d+) 发布的 exe/g)].map((x) => x[1] || x[2]);
   ok(vers.length > 0 && vers.every((v) => v === pkg.version), "check-flash-sh.ps1 提示里的版本号 = " + pkg.version, vers.join(","));
 }
 const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 30000 });

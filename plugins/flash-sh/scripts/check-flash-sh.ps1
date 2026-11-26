@@ -1,19 +1,19 @@
 ﻿<#
 .SYNOPSIS
-  flash-sh（dsh-flash-sh 插件）在 Windows 上的只读自检。不修改任何文件、注册表或环境变量。
+  fl-bash 插件（底层解释器 flash-sh.exe）在 Windows 上的只读自检。不修改任何文件、注册表或环境变量。
 
 .DESCRIPTION
   检查：
     1. 系统是不是 Windows x64（ARM64 会单独提示）；
     2. 插件包是否在 profile 里、flash-sh.exe 是否存在、sha256 是否与包内 .sha256 / 发布值一致；
     3. flash-sh.exe 能否执行 -c "echo ok"；
-    4. profile 补丁（以及 DSH home 级补丁）里 flash-sh-standalone 的 enabled 最终是什么；
+    4. profile 补丁（以及 DSH home 级补丁）里 fl-bash-standalone 的 enabled 最终是什么；
     5. 环境变量 DSH_FLASH_SH（当前进程 / 用户 / 系统）以及 .env 里有没有误写；
-    6. 是否装了 dsh-flash-presets（0.3.4 起 flash_sh 是它 flash-presets 行下的 flashSh 子功能，dsh-flash-sh 作为它的可选依赖装进来）
+    6. 是否装了 dsh-flash-presets（它在插件页上放了单独的 fl-bash 组件行，fl-bash 作为它的可选依赖装进来）
        以及两边是否同时启用（同一时刻只注册一个，presets 优先）；
-    7. DSH 日志里最近的 [flash-sh] 行（若能找到）。
+    7. DSH 日志里最近的 [fl-bash] 行（若能找到；0.1.x 是 [flash-sh]）。
   三种装法都认：插件页 / dsh plugin add 装的独立组合包；手动放进 node_modules + 补丁里手写 insert 行；
-  作为 dsh-flash-presets 的可选依赖装进来（不是组合包，没有 flash-sh-standalone 行，由 flash-presets 行的 flashSh 子功能使用）。
+  作为 dsh-flash-presets 的可选依赖装进来（不是组合包，没有 fl-bash-standalone 行，由 presets 的 fl-bash 组件行使用）。
   兼容 Windows PowerShell 5.1 与 PowerShell 7。
 
 .PARAMETER Profile
@@ -41,8 +41,8 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $ExpectedSha256 = '2f876038cb5d9705dc1c480c6b5915ea3996c8f1afb78b0e15d45cb3decc08cf'
-$RowId = 'flash-sh-standalone'
-$PackageName = 'dsh-flash-sh'
+$RowId = 'fl-bash-standalone'
+$PackageName = 'fl-bash'
 
 $script:Fails = 0
 $script:Warns = 0
@@ -152,7 +152,7 @@ Write-Host 'flash-sh 自检（只读）' -ForegroundColor Cyan
 Write-Section '1. 平台'
 $onWindows = ($env:OS -eq 'Windows_NT')
 if (-not $onWindows) {
-  Write-Bad '不是 Windows：flash_sh 只在 Windows x64 上注册'
+  Write-Bad '不是 Windows：fl_bash 只在 Windows x64 上注册'
 } else {
   $osArch = $null
   try { $osArch = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture } catch { }
@@ -165,7 +165,7 @@ if (-not $onWindows) {
   } elseif (($procArch -eq 'AMD64') -or ($wow -eq 'AMD64')) {
     Write-Ok 'Windows x64'
   } else {
-    Write-Bad ('不是 x64 Windows（' + $procArch + '）：flash_sh 不会注册')
+    Write-Bad ('不是 x64 Windows（' + $procArch + '）：fl_bash 不会注册')
   }
 }
 
@@ -201,8 +201,8 @@ if ($null -ne $profilePkgText) {
     if ($profilePkg.PSObject.Properties.Name -contains 'dsh' -and $null -ne $profilePkg.dsh -and $profilePkg.dsh.PSObject.Properties.Name -contains 'profile' -and $null -ne $profilePkg.dsh.profile) { $bundles = @($profilePkg.dsh.profile.bundles) }
     $bundleActive = ($bundles -contains $PackageName)
     $presetsBundle = ($bundles -contains 'dsh-flash-presets')
-    if ($bundleActive) { Write-Ok '已作为组合包启用（dsh.profile.bundles 含 dsh-flash-sh）' }
-    elseif ($viaManager) { Write-Warn2 '已安装但没有被选为组合包（插件页里把 dsh-flash-sh 打开）' }
+    if ($bundleActive) { Write-Ok '已作为组合包启用（dsh.profile.bundles 含 fl-bash）' }
+    elseif ($viaManager) { Write-Warn2 '已安装但没有被选为组合包（插件页里把 fl-bash 打开）' }
   } catch { Write-Warn2 ('无法解析 ' + (Join-Path $profileDir 'package.json')) }
 }
 # 装法：bundle（插件管理器）/ manual（手动放置 + 手写 insert 行）/ presets（dsh-flash-presets 的可选依赖）
@@ -214,13 +214,14 @@ if ($null -ne $pkgJson) {
   $how = switch ($installMode) { 'bundle' { '（插件管理器安装）' } 'manual' { '（手动放置，pnpm 未登记）' } default { '（不是直接依赖：dsh-flash-presets 的可选依赖，或手动放置）' } }
   try { $v = ($pkgJson | ConvertFrom-Json).version; Write-Ok ('插件包在 profile 里：' + $PackageName + '@' + $v + $how) } catch { Write-Ok ('插件包目录存在：' + $pkgDir) }
 } elseif ($presetsInstalled) {
-  Write-Bad ('profile 里没有 ' + $PackageName + '：dsh-flash-presets 的 flashSh 子功能需要它（它是可选依赖，只在 Windows x64 上安装；在插件页重装 dsh-flash-presets，或单独安装 dsh-flash-sh）')
+  Write-Bad ('profile 里没有 ' + $PackageName + '：dsh-flash-presets 的 fl-bash 组件需要它（它是可选依赖，只在 Windows x64 上安装；在插件页重装 dsh-flash-presets，或单独安装 fl-bash）')
 } else {
   Write-Bad ('profile 里没有插件包：' + $pkgDir)
 }
 
 if ([string]::IsNullOrEmpty($BinPath)) {
-  if ($env:DSH_FLASH_SH_BIN) { $BinPath = $env:DSH_FLASH_SH_BIN; Write-Info ('使用 DSH_FLASH_SH_BIN：' + $BinPath) }
+  if ($env:DSH_FL_BASH_BIN) { $BinPath = $env:DSH_FL_BASH_BIN; Write-Info ('使用 DSH_FL_BASH_BIN：' + $BinPath) }
+  elseif ($env:DSH_FLASH_SH_BIN) { $BinPath = $env:DSH_FLASH_SH_BIN; Write-Info ('使用 DSH_FLASH_SH_BIN（旧名）：' + $BinPath) }
   else { $BinPath = Join-Path $pkgDir 'vendor\win32-x64\flash-sh.exe' }
 }
 if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
@@ -236,7 +237,7 @@ if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
     } else {
       Write-Warn2 '没找到 flash-sh.exe.sha256'
     }
-    if ($hash -eq $ExpectedSha256) { Write-Ok '与 dsh-flash-sh 0.1.6 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.6 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
+    if ($hash -eq $ExpectedSha256) { Write-Ok '与 fl-bash 0.1.6 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.6 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
   }
 
   # ── 3. 执行 ────────────────────────────────────────────────────────────────
@@ -297,100 +298,113 @@ foreach ($layer in $layers) {
 $standaloneRow = ($insertCount -ge 1)
 if ($insertCount -gt 1) { Write-Bad ('出现 ' + $insertCount + ' 处 insert ' + $RowId + '：插件管理器安装与手动 insert 行重复，删掉手动那行') }
 if ($insertCount -eq 0) {
-  if ($presetsInstalled -and -not $viaManager) { Write-Info ('没有 ' + $RowId + ' 行：按 dsh-flash-presets 的 flashSh 子功能检查（见第 6 节）') }
-  elseif ($viaManager -and -not $bundleActive) { Write-Bad ('没有 ' + $RowId + ' 行：dsh-flash-sh 已安装但没有被选为组合包') }
+  if ($presetsInstalled -and -not $viaManager) { Write-Info ('没有 ' + $RowId + ' 行：按 dsh-flash-presets 的 fl-bash 组件检查（见第 6 节）') }
+  elseif ($viaManager -and -not $bundleActive) { Write-Bad ('没有 ' + $RowId + ' 行：fl-bash 已安装但没有被选为组合包') }
   else { Write-Bad ('没有任何层插入 ' + $RowId + ' 行（插件未安装 / 未选中，或手动安装漏了 insert 行）') }
 }
 if ($rowDisabled) { Write-Bad '该行被 disabled: true 关掉了（插件页里打开它）' }
 if ($standaloneRow) {
-  if ($enabledFinal -eq 'true') { Write-Ok '补丁层最终 enabled: true' } else { Write-Warn2 ('补丁层最终 enabled: ' + $enabledFinal + '（除非环境变量 DSH_FLASH_SH=1，否则不会注册）') }
+  if ($enabledFinal -eq 'true') { Write-Ok '补丁层最终 enabled: true' } else { Write-Warn2 ('补丁层最终 enabled: ' + $enabledFinal + '（除非环境变量 DSH_FL_BASH=1，否则不会注册）') }
 }
 
 # ── 5. 环境变量 ───────────────────────────────────────────────────────────────
-Write-Section '5. 环境变量 DSH_FLASH_SH'
-$envProc = $env:DSH_FLASH_SH
-$envUser = [Environment]::GetEnvironmentVariable('DSH_FLASH_SH', 'User')
-$envMachine = [Environment]::GetEnvironmentVariable('DSH_FLASH_SH', 'Machine')
-Write-Info ('当前进程=' + $envProc + '  用户=' + $envUser + '  系统=' + $envMachine)
+Write-Section '5. 环境变量 DSH_FL_BASH（旧名 DSH_FLASH_SH 仍认）'
+$envName = 'DSH_FL_BASH'
+$envProc = $env:DSH_FL_BASH
+$envUser = [Environment]::GetEnvironmentVariable('DSH_FL_BASH', 'User')
+$envMachine = [Environment]::GetEnvironmentVariable('DSH_FL_BASH', 'Machine')
+if ([string]::IsNullOrEmpty($envProc) -and [string]::IsNullOrEmpty($envUser) -and [string]::IsNullOrEmpty($envMachine)) {
+  $envName = 'DSH_FLASH_SH'
+  $envProc = $env:DSH_FLASH_SH
+  $envUser = [Environment]::GetEnvironmentVariable('DSH_FLASH_SH', 'User')
+  $envMachine = [Environment]::GetEnvironmentVariable('DSH_FLASH_SH', 'Machine')
+}
+Write-Info ($envName + '：当前进程=' + $envProc + '  用户=' + $envUser + '  系统=' + $envMachine)
 $envEffective = $envProc
 if ([string]::IsNullOrEmpty($envEffective)) { if ($envUser) { $envEffective = $envUser } else { $envEffective = $envMachine } }
-if ($envEffective -eq '1') { Write-Ok 'DSH_FLASH_SH=1：强制打开（重新从开始菜单启动的 DSH 才能看到新值）' }
-elseif ($envEffective -eq '0') { Write-Warn2 'DSH_FLASH_SH=0：强制关闭，补丁里的 enabled 不起作用' }
-elseif (-not [string]::IsNullOrEmpty($envEffective)) { Write-Warn2 ('DSH_FLASH_SH=' + $envEffective + '：只认 0 / 1，此值被忽略') }
+if ($envEffective -eq '1') { Write-Ok ($envName + '=1：强制打开（重新从开始菜单启动的 DSH 才能看到新值）') }
+elseif ($envEffective -eq '0') { Write-Warn2 ($envName + '=0：强制关闭，补丁里的 enabled 不起作用') }
+elseif (-not [string]::IsNullOrEmpty($envEffective)) { Write-Warn2 ($envName + '=' + $envEffective + '：只认 0 / 1，此值被忽略') }
 else { Write-Info '未设置（由补丁里的 enabled 决定）' }
 foreach ($envFile in @((Join-Path $DshHome '.env'))) {
   $t = Read-TextFile $envFile
-  if ($null -ne $t -and $t -match '(?m)^\s*(export\s+)?DSH_FLASH_SH') { Write-Bad ($envFile + ' 里写了 DSH_FLASH_SH：DSH 拒绝 .env 里出现 DSH_* 变量（会启动失败），请删掉，改用 setx 或补丁') }
+  if ($null -ne $t -and $t -match '(?m)^\s*(export\s+)?DSH_(FL_BASH|FLASH_SH)') { Write-Bad ($envFile + ' 里写了 DSH_FL_BASH / DSH_FLASH_SH：DSH 拒绝 .env 里出现 DSH_* 变量（会启动失败），请删掉，改用 setx 或补丁') }
 }
 if ($null -ne $envProc -and $null -ne $envUser -and $envProc -ne $envUser) { Write-Warn2 '当前窗口与用户级的值不同：setx 只影响之后新启动的程序' }
-if ($env:DSH_FLASH_SH_ANY_PLATFORM -or $env:DSH_FLASH_SH_BIN) { Write-Info ('开发变量：DSH_FLASH_SH_ANY_PLATFORM=' + $env:DSH_FLASH_SH_ANY_PLATFORM + '  DSH_FLASH_SH_BIN=' + $env:DSH_FLASH_SH_BIN) }
+if ($env:DSH_FL_BASH_ANY_PLATFORM -or $env:DSH_FL_BASH_BIN -or $env:DSH_FLASH_SH_ANY_PLATFORM -or $env:DSH_FLASH_SH_BIN) { Write-Info ('开发变量：DSH_FL_BASH_ANY_PLATFORM=' + $env:DSH_FL_BASH_ANY_PLATFORM + '  DSH_FL_BASH_BIN=' + $env:DSH_FL_BASH_BIN + '  DSH_FLASH_SH_ANY_PLATFORM=' + $env:DSH_FLASH_SH_ANY_PLATFORM + '  DSH_FLASH_SH_BIN=' + $env:DSH_FLASH_SH_BIN) }
 
 $standaloneOn = $standaloneRow -and (-not $rowDisabled) -and (($envEffective -eq '1') -or (($envEffective -ne '0') -and ($enabledFinal -eq 'true')))
 if ($standaloneRow) {
-  if ($standaloneOn) { Write-Ok '综合：flash-sh-standalone 这一行会尝试注册 flash_sh（还需 Windows x64 与 exe 正常）' }
-  else { Write-Warn2 '综合：flash-sh-standalone 这一行不会注册 flash_sh' }
+  if ($standaloneOn) { Write-Ok '综合：fl-bash-standalone 这一行会尝试注册 fl_bash（还需 Windows x64 与 exe 正常）' }
+  else { Write-Warn2 '综合：fl-bash-standalone 这一行不会注册 fl_bash' }
 }
 
-# ── 6. dsh-flash-presets 的 flashSh 子功能 ───────────────────────────────────
-Write-Section '6. dsh-flash-presets 的 flashSh 子功能'
+# ── 6. dsh-flash-presets 里的 fl-bash 组件行 ────────────────────────────────
+Write-Section '6. dsh-flash-presets 里的 fl-bash 组件（行 id fl-bash）'
 $presetsOn = $false
 if ($presetsInstalled) {
   $presetsPatch = Read-TextFile (Join-Path $presetsDir 'cordis.patch.yml')
-  $bundleRows = Find-SectionEnabled $presetsPatch 'flash-presets' 'flashSh'
-  $hasFeature = $false
-  foreach ($r in $bundleRows) { if ($r.HasSection) { $hasFeature = $true } }
-  if (-not $hasFeature) {
-    Write-Info 'dsh-flash-presets 已安装，但这个版本没有 flashSh 子功能（0.3.4 起才有）'
+  $bundleRows = Find-PatchRows $presetsPatch 'fl-bash'
+  $hasRow = $false
+  $pEnabled = 'false'
+  foreach ($r in $bundleRows) { if ($r.Kind -eq 'insert') { $hasRow = $true; if ($null -ne $r.Enabled) { $pEnabled = $r.Enabled } } }
+  if (-not $hasRow) {
+    Write-Info 'dsh-flash-presets 已安装，但这个版本没有 fl-bash 组件行（合并后的 0.3.4 起才有）'
   } else {
-    $pEnabled = 'false'
-    foreach ($r in $bundleRows) { if ($null -ne $r.Enabled) { $pEnabled = $r.Enabled } }
     $pDisabledRow = $false
+    $ownOverride = $false
+    $legacyEnabled = $null
     foreach ($layer in $layers) {
       $lt = Read-TextFile $layer.Path
-      foreach ($r in (Find-SectionEnabled $lt 'flash-presets' 'flashSh')) {
-        if ($r.Kind -eq 'override' -and $null -ne $r.Enabled) { $pEnabled = $r.Enabled; Write-Info ($layer.Label + ' 第 ' + $r.Line + ' 行：flash-presets.config.flashSh.enabled=' + $r.Enabled) }
+      foreach ($r in (Find-PatchRows $lt 'fl-bash')) {
+        if ($r.Kind -ne 'override') { continue }
+        if ($r.Disabled -eq 'true') { $pDisabledRow = $true }
+        if ($null -ne $r.Enabled) { $pEnabled = $r.Enabled; $ownOverride = $true; Write-Info ($layer.Label + ' 第 ' + $r.Line + ' 行：fl-bash.config.enabled=' + $r.Enabled) }
       }
-      foreach ($r in (Find-PatchRows $lt 'flash-presets')) { if ($r.Kind -eq 'override' -and $r.Disabled -eq 'true') { $pDisabledRow = $true } }
-      # 旧写法：feat/flash-sh 预览版里 presets 的独立行 id 是 flash-sh，启动时由 row-overrides 换算到 flashSh
+      # 旧写法：flash-presets 行的 config.flashSh、预览版行 id flash-sh；启动时由 fl-bash 组件行读回（id: fl-bash 上的写法优先）
+      foreach ($r in (Find-SectionEnabled $lt 'flash-presets' 'flashSh')) {
+        if ($r.Kind -eq 'override' -and $null -ne $r.Enabled) { $legacyEnabled = $r.Enabled; Write-Warn2 ($layer.Label + ' 第 ' + $r.Line + ' 行：旧写法 flash-presets.config.flashSh.enabled=' + $r.Enabled + '（仍会生效，建议改写到 id: fl-bash 的 config.enabled）') }
+      }
       foreach ($r in (Find-PatchRows $lt 'flash-sh')) {
-        if ($r.Kind -eq 'override' -and $null -ne $r.Enabled) { Write-Info ($layer.Label + ' 第 ' + $r.Line + ' 行：旧行 id flash-sh 的 enabled=' + $r.Enabled + '（启动时换算到 flashSh；id: flash-presets 上的写法优先）') }
+        if ($r.Kind -eq 'override' -and $null -ne $r.Enabled) { $legacyEnabled = $r.Enabled; Write-Warn2 ($layer.Label + ' 第 ' + $r.Line + ' 行：旧行 id flash-sh 的 enabled=' + $r.Enabled + '（仍会生效，建议改写到 id: fl-bash）') }
       }
     }
+    if ((-not $ownOverride) -and ($null -ne $legacyEnabled)) { $pEnabled = $legacyEnabled }
     if (-not $presetsBundle) { Write-Warn2 'dsh-flash-presets 已安装但没有被选为组合包' }
-    if ($pDisabledRow) { Write-Warn2 'flash-presets 整行被 disabled: true 关掉了：flashSh 也不会启动' }
+    if ($pDisabledRow) { Write-Warn2 'fl-bash 整行被 disabled: true 关掉了' }
     $presetsOn = $presetsBundle -and (-not $pDisabledRow) -and (($envEffective -eq '1') -or (($envEffective -ne '0') -and ($pEnabled -eq 'true')))
-    Write-Info ('flash-presets.config.flashSh.enabled=' + $pEnabled + $(if ($envEffective -eq '1') { '（DSH_FLASH_SH=1 也会打开它）' } else { '' }))
+    Write-Info ('fl-bash 组件 enabled=' + $pEnabled + $(if ($envEffective -eq '1') { '（环境变量为 1 也会打开它）' } else { '' }))
     if ($presetsOn) {
-      if ($null -ne $pkgJson) { Write-Ok '综合：flashSh 子功能会加载 dsh-flash-sh 并注册 flash_sh（还需 Windows x64）' }
-      else { Write-Bad '综合：flashSh 已启用，但 profile 里没有 dsh-flash-sh（可选依赖没装上），子功能会跳过' }
+      if ($null -ne $pkgJson) { Write-Ok '综合：fl-bash 组件会加载 fl-bash 并注册 fl_bash（还需 Windows x64）' }
+      else { Write-Bad '综合：fl-bash 组件已启用，但 profile 里没有 fl-bash 包（可选依赖没装上），会跳过' }
     } else {
-      Write-Info '综合：flashSh 子功能未启用'
+      Write-Info '综合：fl-bash 组件未启用'
     }
   }
   if ($presetsOn -and $standaloneOn) {
-    Write-Warn2 '两边都打开了：同一时刻只注册一个 flash_sh（dsh-flash-presets 的 flashSh 优先，flash-sh-standalone 记一条日志跳过），功能不受影响；建议只保留一处启用'
+    Write-Warn2 '两边都打开了：同一时刻只注册一个 fl_bash（dsh-flash-presets 的 fl-bash 组件优先，fl-bash-standalone 记一条日志跳过），功能不受影响；建议只保留一处启用'
   } elseif (-not $presetsOn -and -not $standaloneOn) {
-    Write-Warn2 '两处都没有启用 flash_sh'
+    Write-Warn2 '两处都没有启用 fl_bash'
   } else {
     Write-Ok '没有重复启用'
   }
 } else {
   Write-Ok '未安装 dsh-flash-presets，无重复'
-  if (-not $standaloneOn) { Write-Warn2 'flash_sh 没有启用' }
+  if (-not $standaloneOn) { Write-Warn2 'fl_bash 没有启用' }
 }
 
 # ── 7. 日志 ───────────────────────────────────────────────────────────────────
-Write-Section '7. 日志里的 [flash-sh]（提示性）'
+Write-Section '7. 日志里的 [fl-bash]（提示性）'
 $logDir = Join-Path $DshHome 'logs'
 $found = $false
 if (Test-Path -LiteralPath $logDir -PathType Container) {
   $files = Get-ChildItem -LiteralPath $logDir -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 20
   foreach ($f in $files) {
-    $hits = Select-String -LiteralPath $f.FullName -Pattern '\[flash-sh\]' -SimpleMatch:$false -ErrorAction SilentlyContinue | Select-Object -Last 3
+    $hits = Select-String -LiteralPath $f.FullName -Pattern '\[(fl-bash|flash-sh)\]' -SimpleMatch:$false -ErrorAction SilentlyContinue | Select-Object -Last 3
     if ($hits) { $found = $true; foreach ($h in $hits) { Write-Info ($f.Name + ': ' + $h.Line.Trim()) } ; break }
   }
 }
-if (-not $found) { Write-Info ('在 ' + $logDir + ' 里没找到 [flash-sh] 行（桌面端日志可能不写在这里）；以对话里的测试提示词为准') }
+if (-not $found) { Write-Info ('在 ' + $logDir + ' 里没找到 [fl-bash] 行（桌面端日志可能不写在这里）；以对话里的测试提示词为准') }
 
 Write-Host ''
 if ($script:Fails -gt 0) { Write-Host ('结果：' + $script:Fails + ' 项失败，' + $script:Warns + ' 项提示') -ForegroundColor Red; exit 1 }

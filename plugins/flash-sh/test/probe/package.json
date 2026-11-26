@@ -1,10 +1,17 @@
 {
-  "name": "dsh-flash-sh-probe",
+  "name": "fl-bash-probe",
   "version": "0.0.0",
   "private": true,
-  "description": "test-only probe bundle for dsh-flash-sh: after boot, reports whether flash_sh is registered and runs it once through the real tool pipeline, then exits.",
+  "description": "test-only probe bundle for fl-bash: after boot, reports whether fl_bash is registered (and how many times), dumps the plugin inventory the plugin page reads, runs fl_bash once through the real tool pipeline, then exits.",
   "type": "module",
   "main": "./lib/index.js",
-  "files": ["lib", "cordis.patch.yml"],
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
 }

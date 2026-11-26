@@ -1,16 +1,17 @@
-// dsh-flash-sh：Windows x64 上可选的 Bash 兼容 shell 工具（工具名 flash_sh）。
+// fl-bash：Windows x64 上可选的 Bash 兼容 shell 工具（工具名 fl_bash）。0.1.x 叫 dsh-flash-sh、工具名 flash_sh。
 //
 // 一份实现，两种装法：
-//   · 独立组合包：本包自己的补丁行 id: flash-sh-standalone（cordis.patch.yml）；
-//   · dsh-flash-presets 的子功能：presets 把本包声明为 optionalDependencies（os:[win32] cpu:[x64]，
-//     非 Windows x64 上 pnpm/npm 直接跳过、不下载 exe），在 flash-presets 那一行的 config.flashSh 下
+//   · 独立组合包：本包自己的补丁行 id: fl-bash-standalone（cordis.patch.yml）；
+//   · dsh-flash-presets 里单独的组件行 id: fl-bash：presets 把本包声明为 optionalDependencies（os:[win32] cpu:[x64]，
+//     非 Windows x64 上 pnpm/npm 直接跳过、不下载 exe），由 presets 的 lib/fl-bash-row.js
 //     用 createPlugin({ owner: "dsh-flash-presets" }) 挂上。
+//   底层解释器仍叫 flash-sh（vendor/win32-x64/flash-sh.exe），只是实现细节。
 //   两者同时启用时，经进程级协调器（globalThis[Symbol.for("dsh-flash-sh/coordinator@1")]）只注册一次：
 //   presets 子功能优先（优先级 2 ＞ 独立行 1），独立行检测到后跳过并记日志；presets 那边被关掉/卸载时独立行接管。
-//   别的插件（第三方）已经注册了 flash_sh 时两边都不抢，等它注销后再补上。
+//   别的插件（第三方）已经注册了 fl_bash 时两边都不抢，等它注销后再补上。
 //
-// 开关优先级：环境变量 DSH_FLASH_SH=0/1 ＞ config.enabled ＞ 默认 false。
-// 只在 Windows x64 注册（DSH_FLASH_SH_ANY_PLATFORM=1 / allowNonWindows 仅供开发验证，需配合 binPath）。
+// 开关优先级：环境变量 DSH_FL_BASH=0/1（旧名 DSH_FLASH_SH 仍认）＞ config.enabled ＞ 默认 false。
+// 只在 Windows x64 注册（DSH_FL_BASH_ANY_PLATFORM=1 / allowNonWindows 仅供开发验证，需配合 binPath）。
 //
 // 安全面（2026-11-24 审计修复，见 README「安全」）：
 //   · 审批闸失败即关闭：拿不到会话权限模式也要审批；审批服务缺失 / 调用出错一律拒绝执行。
@@ -27,11 +28,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const name = "dsh-flash-sh";
+export const name = "fl-bash";
 export const inject = ["tools"];
 
-export const TOOL_NAME = "flash_sh";
-const TAG = "[flash-sh]";
+export const TOOL_NAME = "fl_bash";
+const TAG = "[fl-bash]";
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_BIN = path.join(here, "..", "vendor", "win32-x64", "flash-sh.exe");
 
@@ -53,7 +54,10 @@ export const PREVIEW_MAX_CHARS = 2000;
 export const SPILL_TOTAL_CAP = 64 * 1024 * 1024;
 /** 启动时清理多久以前的 spill 目录。 */
 export const SPILL_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-export const SPILL_PREFIX = "dsh-flash-sh-spill-";
+export const SPILL_PREFIX = "fl-bash-spill-";
+/** 0.1.x（dsh-flash-sh）的 spill 目录前缀：清理时一并认。 */
+export const LEGACY_SPILL_PREFIXES = Object.freeze(["dsh-flash-sh-spill-"]);
+const ownSpillName = (n) => n.startsWith(SPILL_PREFIX) || LEGACY_SPILL_PREFIXES.some((p) => n.startsWith(p));
 /** exe 在 --timeout 到点时写到 stderr 的标记（native/flash-sh/src/proc.rs start_timeout）。 */
 export const TIMEOUT_MARK = /flash-sh: timed out after [0-9.]+s, process tree killed/;
 /** 插件在 exe 自带超时之上的硬杀宽限。 */
@@ -62,7 +66,7 @@ export const GUARD_GRACE_MS = 5000;
 // ── Config：schemastery（DSH 自己用的 schema 库）优先，退回手写 Standard Schema ─────────────────
 function buildSchemasteryConfig(Schema) {
   return Schema.object({
-    enabled: Schema.boolean().default(DEFAULTS.enabled).description("总开关；也可用环境变量 DSH_FLASH_SH=1 / 0 覆盖"),
+    enabled: Schema.boolean().default(DEFAULTS.enabled).description("总开关；也可用环境变量 DSH_FL_BASH=1 / 0 覆盖（旧名 DSH_FLASH_SH 仍认）"),
     binPath: Schema.string().description("自定义 flash-sh 可执行文件路径（默认用本包 vendor/win32-x64/flash-sh.exe；空字符串 = 未设置）"),
     timeoutMs: Schema.natural().min(1).default(DEFAULTS.timeoutMs).description("单次调用默认超时（毫秒）"),
     maxTimeoutMs: Schema.natural().min(1).default(DEFAULTS.maxTimeoutMs).description("模型可请求的最大超时（毫秒）"),
@@ -116,7 +120,7 @@ export function validateConfig(input) {
 }
 
 export const FallbackConfig = Object.freeze({
-  "~standard": Object.freeze({ version: 1, vendor: "dsh-flash-sh", validate: validateConfig }),
+  "~standard": Object.freeze({ version: 1, vendor: "fl-bash", validate: validateConfig }),
 });
 
 let schemaSource = "fallback";
@@ -157,6 +161,12 @@ function makeLog(ctx, prefix = "") {
 // ── 开关与平台判定 ──────────────────────────────────────────────────────────────────────────
 const blank = (v) => typeof v !== "string" || v.trim() === "";
 
+/** 环境变量：新名 DSH_FL_BASH* 优先，0.1.x 的旧名 DSH_FLASH_SH* 仍认。 */
+export function envOf(env, suffix) {
+  const v = env["DSH_FL_BASH" + suffix];
+  return v !== undefined && v !== "" ? v : env["DSH_FLASH_SH" + suffix];
+}
+
 export function resolveConfig(config, env = process.env) {
   const merged = { ...DEFAULTS };
   if (config !== null && typeof config === "object") {
@@ -164,11 +174,12 @@ export function resolveConfig(config, env = process.env) {
   }
   if (blank(merged.binPath)) delete merged.binPath;
   merged.binSource = merged.binPath === undefined ? "bundled" : "config";
-  if (env.DSH_FLASH_SH === "1") merged.enabled = true;
-  if (env.DSH_FLASH_SH === "0") merged.enabled = false;
-  if (env.DSH_FLASH_SH_ANY_PLATFORM === "1") merged.allowNonWindows = true;
-  if (!blank(env.DSH_FLASH_SH_BIN)) {
-    merged.binPath = env.DSH_FLASH_SH_BIN;
+  const flag = envOf(env, "");
+  if (flag === "1") merged.enabled = true;
+  if (flag === "0") merged.enabled = false;
+  if (envOf(env, "_ANY_PLATFORM") === "1") merged.allowNonWindows = true;
+  if (!blank(envOf(env, "_BIN"))) {
+    merged.binPath = envOf(env, "_BIN");
     merged.binSource = "env";
   }
   if (!APPROVAL_MODES.includes(merged.approval)) merged.approval = DEFAULTS.approval;
@@ -178,7 +189,7 @@ export function resolveConfig(config, env = process.env) {
 
 /** 是否应注册；不注册时给出原因（写日志用） */
 export function decide(cfg, platform = process.platform, arch = process.arch) {
-  if (cfg.enabled !== true) return { register: false, reason: "disabled (config.enabled=false; set it to true or DSH_FLASH_SH=1)" };
+  if (cfg.enabled !== true) return { register: false, reason: "disabled (config.enabled=false; set it to true or DSH_FL_BASH=1)" };
   const winx64 = platform === "win32" && arch === "x64";
   if (!winx64 && cfg.allowNonWindows !== true) return { register: false, reason: "only active on Windows x64 (this is " + platform + "-" + arch + ")" };
   if (!winx64 && blank(cfg.binPath)) return { register: false, reason: "non-Windows test mode needs binPath" };
@@ -905,7 +916,7 @@ export async function gate(ctx, cfg, exec, command, where, memory, log) {
   if (remember && memory.has(session, cls.key)) return { asked: false, mode, remembered: cls.key };
   const approval = serviceOf(ctx, exec, "approval");
   if (approval === undefined || typeof approval.request !== "function" || !exec || exec.agent === undefined) {
-    throw new Error("flash_sh: not run — this call needs user approval (session mode: " + modeText + "; flash_sh is not sandboxed) but no approval channel is available");
+    throw new Error("fl_bash: not run — this call needs user approval (session mode: " + modeText + "; fl_bash is not sandboxed) but no approval channel is available");
   }
   const scopeNote = remember
     ? "Approving also allows commands of the same kind (" + cls.key + ") for the rest of this session."
@@ -916,14 +927,14 @@ export async function gate(ctx, cfg, exec, command, where, memory, log) {
       agent: exec.agent,
       toolName: TOOL_NAME,
       ...(exec.callId !== undefined ? { callId: exec.callId } : {}),
-      reason: "flash_sh runs outside the DSH sandbox (session mode: " + modeText + "). " + scopeNote + "\nCommand:\n" + commandPreview(command),
+      reason: "fl_bash runs outside the DSH sandbox (session mode: " + modeText + "). " + scopeNote + "\nCommand:\n" + commandPreview(command),
       ...(exec.signal !== undefined ? { signal: exec.signal } : {}),
     });
   } catch (error) {
-    throw new Error("flash_sh: not run — the approval request failed (" + errorText(error) + "); flash_sh refuses to run without an explicit approval");
+    throw new Error("fl_bash: not run — the approval request failed (" + errorText(error) + "); fl_bash refuses to run without an explicit approval");
   }
   if (outcome !== "allowed-once") {
-    throw new Error("flash_sh: not run — approval " + String(outcome) + " (session mode: " + modeText + "; flash_sh is not sandboxed)");
+    throw new Error("fl_bash: not run — approval " + String(outcome) + " (session mode: " + modeText + "; fl_bash is not sandboxed)");
   }
   if (remember && memory.add(session, cls.key) && log) log("info", "session approval remembered for: " + cls.key);
   return { asked: true, mode, remembered: remember ? cls.key : undefined };
@@ -966,7 +977,7 @@ const SPILL_FILE = /^([0-9a-f]{32}|\d+-\d+-\d+-[0-9a-f]{6})\.(stdout|stderr)\.lo
  * 逐个 unlink 再 rmdir，不递归。混进了别的东西就不动，返回 false。
  */
 export function removeSpillDir(dir) {
-  if (typeof dir !== "string" || !path.basename(dir).startsWith(SPILL_PREFIX)) return false;
+  if (typeof dir !== "string" || !ownSpillName(path.basename(dir))) return false;
   let st;
   try { st = fs.lstatSync(dir); } catch (error) { return false; }
   if (!st.isDirectory() || st.isSymbolicLink()) return false;
@@ -989,7 +1000,7 @@ export function cleanupStaleSpills(root = os.tmpdir(), maxAgeMs = SPILL_MAX_AGE_
   try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch (error) { return removed; }
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
   for (const e of entries) {
-    if (!e.name.startsWith(SPILL_PREFIX)) continue;
+    if (!ownSpillName(e.name)) continue;
     const p = path.join(root, e.name);
     if (p === spillState.dir) continue;
     try {
@@ -1272,7 +1283,7 @@ export function resolveWorkdir(workdir, base, workspace, platform = process.plat
   const cwd = P.isAbsolute(wd) && !(win && /^[\\/](?![\\/])/.test(wd)) ? P.resolve(wd) : P.resolve(base, wd);
   if (win && isUncLike(cwd)) {
     const rel = typeof workspace === "string" && isUncLike(workspace) ? P.relative(P.resolve(workspace), cwd) : "..";
-    if (rel.startsWith("..") || P.isAbsolute(rel)) throw new Error("flash_sh: workdir on a network share or device path outside the workspace is not allowed: " + cwd);
+    if (rel.startsWith("..") || P.isAbsolute(rel)) throw new Error("fl_bash: workdir on a network share or device path outside the workspace is not allowed: " + cwd);
   }
   return cwd;
 }
@@ -1304,17 +1315,17 @@ export function toolDefinition(ctx, cfg, bin, opts = {}) {
     async execute(args, exec = {}) {
       const a = args !== null && typeof args === "object" ? args : {};
       const extra = Object.keys(a).filter((k) => !known.includes(k));
-      if (extra.length > 0) throw new Error("flash_sh: unknown argument(s) " + extra.join(", ") + "; accepted: " + known.join(", "));
-      if (typeof a.command !== "string" || a.command.trim() === "") throw new Error("flash_sh: command must be a non-empty string");
+      if (extra.length > 0) throw new Error("fl_bash: unknown argument(s) " + extra.join(", ") + "; accepted: " + known.join(", "));
+      if (typeof a.command !== "string" || a.command.trim() === "") throw new Error("fl_bash: command must be a non-empty string");
       let timeoutMs = a.timeoutMs === undefined ? cfg.timeoutMs : a.timeoutMs;
-      if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("flash_sh: timeoutMs must be a positive number");
+      if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("fl_bash: timeoutMs must be a positive number");
       timeoutMs = Math.min(timeoutMs, cfg.maxTimeoutMs);
       const workspace = await resolveCwd(ctx, exec);
       const base = workspace ?? process.cwd();
       const cwd = resolveWorkdir(a.workdir, base, workspace);
       let isDir = false;
       try { isDir = fs.statSync(cwd).isDirectory(); } catch (error) {}
-      if (!isDir) throw new Error("flash_sh: workdir is not an existing directory: " + cwd);
+      if (!isDir) throw new Error("fl_bash: workdir is not an existing directory: " + cwd);
       await gate(ctx, cfg, exec, a.command, { cwd, workspace }, memory, log);
       return runFlashSh(bin, { command: a.command, cwd, timeoutMs, maxOutputBytes: cfg.maxOutputBytes, signal: exec.signal, env: childEnv(process.env) });
     },
@@ -1329,18 +1340,18 @@ function lookup(registry, toolName) {
   }
 }
 
-// ── 进程级协调：两种装法同时启用时只注册一个 flash_sh ─────────────────────────────────────────
+// ── 进程级协调：两种装法同时启用时只注册一个 fl_bash ─────────────────────────────────────────
 export const OWNERS = Object.freeze({
-  "dsh-flash-presets": { priority: 2, label: "dsh-flash-presets（flash-presets 行的 flashSh 子功能）" },
-  "dsh-flash-sh": { priority: 1, label: "dsh-flash-sh（flash-sh-standalone 行）" },
+  "dsh-flash-presets": { priority: 2, label: "dsh-flash-presets（fl-bash 组件行）" },
+  "fl-bash": { priority: 1, label: "fl-bash（单独安装，fl-bash-standalone 行）" },
 });
 const COORD_KEY = Symbol.for("dsh-flash-sh/coordinator@1");
 /**
  * presets 一侧的意向（第二轮审计 T2：消除启动时的短暂双注册）。dsh-flash-presets 的 lib/bundle.js 按同一个 Symbol
  * 直接写这个全局对象（它不能静态 import 本包——本包是它的可选依赖）：
- *   pending  flash-presets 行开始 apply，还没决定要不要提供 flash_sh
- *   loading  决定加载 dsh-flash-sh 并挂 flashSh 子功能，claim 稍后到
- *   none     不提供（flashSh 关 / 平台不对 / 加载失败 / 子功能不注册 / 行被卸载）
+ *   pending  presets 的 fl-bash 组件行开始 apply，还没决定要不要提供 fl_bash
+ *   loading  presets 的 fl-bash 组件行决定挂上，claim 稍后到
+ *   none     不提供（fl-bash 行关 / 平台不对 / 加载失败 / 子功能不注册 / 行被卸载）
  *   claimed  presets 的 claim 已登记（由本文件的 createPlugin 写）
  * 字段：{ state, at, listeners: Set<fn> }；改 state 后逐个调用 listeners。
  */
@@ -1360,7 +1371,7 @@ export function setPresetsIntent(state) {
   for (const fn of [...o.listeners]) { try { fn(state); } catch (error) {} }
 }
 
-/** 独立行等 presets 表态的时限：知道 flash-presets 行存在 / 已表态 pending 时等得久一些；完全不知道时只等一小会儿。 */
+/** 独立行等 presets 表态的时限：知道 presets 的 fl-bash 行存在 / 已表态 pending 时等得久一些；完全不知道时只等一小会儿。 */
 const DEFER = { long: 15000, short: 3000 };
 /** 仅测试用：改等待时限。 */
 export function _setDeferTimings(t = {}) { if (t.long !== undefined) DEFER.long = t.long; if (t.short !== undefined) DEFER.short = t.short; }
@@ -1393,7 +1404,7 @@ export function registryKey(registry) {
   return SHARED_REGISTRY_KEY;
 }
 
-/** 在同一个工具注册表上的候选里选出应持有 flash_sh 的那个，并让其余的让位。 */
+/** 在同一个工具注册表上的候选里选出应持有 fl_bash 的那个，并让其余的让位。 */
 function elect(key) {
   const c = coordinator();
   const mine = c.claims.filter((x) => x.key === key);
@@ -1421,7 +1432,7 @@ export function presetsRowHint(ctx) {
     for (let depth = 0; group && depth < 8; depth++) {
       if (Array.isArray(group.data)) {
         seen = true;
-        const row = group.data.find((o) => o && (o.id === "flash-presets" || o.name === "dsh-flash-presets" || /^dsh-flash-presets(\/|$)/.test(String(o.name))));
+        const row = group.data.find((o) => o && (o.id === "fl-bash" || o.name === "dsh-flash-presets/fl-bash"));
         if (row) return row.disabled === true ? "disabled" : "present";
       }
       const up = group.ctx && group.ctx.fiber && group.ctx.fiber.entry;
@@ -1447,24 +1458,24 @@ export function configDiff(a, b) {
 
 /**
  * 生成一个插件对象。owner 决定日志前缀与协调优先级：
- *   "dsh-flash-sh"（默认，独立包那一行） / "dsh-flash-presets"（presets 的 flashSh 子功能，优先）。
+ *   "fl-bash"（默认，独立包那一行） / "dsh-flash-presets"（presets 里的 fl-bash 组件行，优先）。
  * 独立行不会立刻注册：先确认 presets 那边会不会提供（见 PRESETS_INTENT_KEY / presetsRowHint），
  * 这样两包同开时启动阶段也不会出现「独立行先注册、presets 随后接管」的双注册窗口。
  */
-export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
+export function createPlugin({ owner = "fl-bash" } = {}) {
   const meta = OWNERS[owner] ?? { priority: 0, label: owner };
-  const prefix = owner === "dsh-flash-sh" ? "" : "(" + owner + ") ";
+  const prefix = owner === "fl-bash" ? "" : "(" + owner + ") ";
   const isPresets = owner === "dsh-flash-presets";
   function applyPlugin(ctx, config) {
     const log = makeLog(ctx, prefix);
     const cfg = resolveConfig(config);
     const d = decide(cfg);
     if (!d.register) {
-      log("info", "flash_sh not registered: " + d.reason);
+      log("info", "fl_bash not registered: " + d.reason);
       if (isPresets) setPresetsIntent("none");
       return;
     }
-    if (cfg.binSource === "env") log("info", "binPath taken from the environment variable DSH_FLASH_SH_BIN=" + cfg.binPath);
+    if (cfg.binSource === "env") log("info", "binPath taken from the environment variable DSH_FL_BASH_BIN / DSH_FLASH_SH_BIN=" + cfg.binPath);
     if (d.custom) {
       let digest = "(unreadable)";
       try { digest = sha256File(d.bin); } catch (error) {}
@@ -1476,7 +1487,7 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
     } catch (error) {}
     const registry = typeof ctx.get === "function" ? ctx.get("tools") : undefined;
     if (registry === undefined || typeof registry.register !== "function") {
-      log("warn", "no tool registry; flash_sh not registered");
+      log("warn", "no tool registry; fl_bash not registered");
       if (isPresets) setPresetsIntent("none");
       return;
     }
@@ -1501,7 +1512,7 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
         yieldedTo = undefined;
         const existing = lookup(registry, TOOL_NAME);
         if (existing !== undefined) {
-          if (!claim.waiting) log("info", "flash_sh already registered by another plugin (not dsh-flash-sh / dsh-flash-presets); skipping, will take over if it goes away");
+          if (!claim.waiting) log("info", "fl_bash already registered by another plugin (not fl-bash / dsh-flash-presets); skipping, will take over if it goes away");
           claim.waiting = true;
           return;
         }
@@ -1509,14 +1520,14 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
           dispose = registry.register(definition);
           c.ours.add(definition);
           claim.active = true;
-          log("info", "flash_sh registered (" + d.bin + ")" + (claim.waiting ? " (took over after the other flash_sh went away)" : ""));
+          log("info", "fl_bash registered (" + d.bin + ")" + (claim.waiting ? " (took over after the other fl_bash went away)" : ""));
           // 只在真正生效时提醒（让位的那一行配置不生效，提醒它反而误导）
-          if (cfg.approval === "off") log("warn", "approval is off: flash_sh runs every command without asking, outside the DSH sandbox");
+          if (cfg.approval === "off") log("warn", "approval is off: fl_bash runs every command without asking, outside the DSH sandbox");
           claim.waiting = false;
         } catch (error) {
           claim.waiting = true;
           // 撞名（对方与本插件同时注册）或 schema 被拒：只报告，不让插件激活失败
-          log("warn", "flash_sh could not be registered: " + errorText(error));
+          log("warn", "fl_bash could not be registered: " + errorText(error));
         }
       },
       deactivate(winner) {
@@ -1524,14 +1535,14 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
         claim.active = false;
         try { if (typeof dispose === "function") dispose(); } catch (error) {}
         dispose = undefined;
-        log("info", "flash_sh handed over to " + winner.label + "; this row stays idle");
+        log("info", "fl_bash handed over to " + winner.label + "; this row stays idle");
       },
       yieldTo(winner) {
         if (yieldedTo === winner) return;
         yieldedTo = winner;
         const diff = configDiff(cfg, winner.cfg);
-        if (diff.length) log("warn", "flash_sh is provided by " + winner.label + "; " + meta.label + " skips registering it. Its settings differ and are NOT in effect: " + diff.join(", "));
-        else log("info", "flash_sh is provided by " + winner.label + "; " + meta.label + " skips registering it");
+        if (diff.length) log("warn", "fl_bash is provided by " + winner.label + "; " + meta.label + " skips registering it. Its settings differ and are NOT in effect: " + diff.join(", "));
+        else log("info", "fl_bash is provided by " + winner.label + "; " + meta.label + " skips registering it");
       },
       label: meta.label,
     };
@@ -1540,7 +1551,7 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
     let timer;
     let released = false;
     const intent = presetsIntent();
-    const onChange = () => { if (!joined && !released && readyToJoin()) join("presets " + (presetsClaimed() ? "claimed flash_sh" : "will not provide flash_sh")); };
+    const onChange = () => { if (!joined && !released && readyToJoin()) join("presets " + (presetsClaimed() ? "claimed fl_bash" : "will not provide fl_bash")); };
     const presetsClaimed = () => c.claims.some((x) => x.owner === "dsh-flash-presets" && x.key === key);
     const readyToJoin = () => {
       if (isPresets || presetsClaimed()) return true;
@@ -1580,7 +1591,7 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
     };
     let bound = false;
     try {
-      if (typeof ctx.effect === "function") { ctx.effect(() => release, "flash-sh claim"); bound = true; }
+      if (typeof ctx.effect === "function") { ctx.effect(() => release, "fl-bash claim"); bound = true; }
     } catch (error) {}
     if (!bound) {
       try { if (typeof ctx.on === "function") ctx.on("dispose", release); } catch (error) {}
@@ -1590,19 +1601,19 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
       const st = intent.state;
       const hint = presetsRowHint(ctx);
       const wait = st === "pending" || st === "loading" || st === "claimed" || hint === "present" ? DEFER.long : DEFER.short;
-      log("info", "waiting up to " + wait + " ms for dsh-flash-presets to report whether it provides flash_sh (intent=" + (st ?? "none-yet") + ", flash-presets row: " + hint + ")");
+      log("info", "waiting up to " + wait + " ms for dsh-flash-presets to report whether it provides fl_bash (intent=" + (st ?? "none-yet") + ", presets fl-bash row: " + hint + ")");
       intent.listeners.add(onChange);
       c.watchers.add(onChange);
       timer = setTimeout(() => {
         timer = undefined;
         if (joined || released) return;
-        log(hint === "present" || st !== undefined ? "warn" : "info", "dsh-flash-presets did not report within " + wait + " ms; the standalone row registers flash_sh (if presets claims it later, it takes over)");
+        log(hint === "present" || st !== undefined ? "warn" : "info", "dsh-flash-presets did not report within " + wait + " ms; the standalone row registers fl_bash (if presets claims it later, it takes over)");
         join();
       }, wait);
       if (typeof timer.unref === "function") timer.unref();
     }
     if (typeof ctx.on === "function") {
-      // 第三方的 flash_sh 被注销后补上
+      // 第三方的 fl_bash 被注销后补上
       try {
         ctx.on("tools/change", () => {
           if (c.claims.includes(claim) && claim.waiting && !claim.active && lookup(registry, TOOL_NAME) === undefined) elect(key);
@@ -1613,6 +1624,6 @@ export function createPlugin({ owner = "dsh-flash-sh" } = {}) {
   return { name, inject, Config, apply: applyPlugin };
 }
 
-const standalone = createPlugin({ owner: "dsh-flash-sh" });
+const standalone = createPlugin({ owner: "fl-bash" });
 export const apply = standalone.apply;
 export default standalone;

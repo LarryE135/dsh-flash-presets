@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// dsh-flash-sh 自测入口（npm test）：
+// fl-bash 自测入口（npm test）：
 //   node test/run.mjs                                   unit + adversarial（必跑；不需要 DSH、不需要二进制）
 //   FLASH_SH_TEST_BIN=/path/flash-sh node test/run.mjs  + host（真实 cordis + dsh-tools 宿主：注册/执行/超时/截断/取消/审批/撞名）
 //                                                       + read 回归（直接跑该可执行文件：管道 / here-string / heredoc 逐行读取）
@@ -24,5 +24,5 @@ if (process.env.FLASH_SH_TEST_BIN) {
 } else console.log("read 回归 / 进程树收尾：跳过（未设置 FLASH_SH_TEST_BIN）");
 if (process.env.DSH_REAL_NM) ok = run("bash", [path.join(dir, "real-dsh.sh")]) && ok;
 else console.log("real-dsh：跳过（未设置 DSH_REAL_NM）");
-console.log(ok ? "dsh-flash-sh 自测：全部通过" : "dsh-flash-sh 自测：有失败");
+console.log(ok ? "fl-bash 自测：全部通过" : "fl-bash 自测：有失败");
 process.exit(ok ? 0 : 1);
