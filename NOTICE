@@ -13,6 +13,11 @@ Copyright (c) 2026 DeepSeek
 
 本包与上游均以 MIT License 发布；上游许可全文如下（本包的 LICENSE 见仓库根目录）。
 
+另外，vendor/win32-x64/flash-sh.exe（fl-bash 组件用的 Bash 兼容解释器，本仓库 native/flash-sh，MIT）静态链接了
+uutils coreutils / sed（MIT）、ICU4X（Unicode-3.0）及其他宽松许可的 Rust crate。逐个 crate 的许可清单见
+vendor/win32-x64/THIRD_PARTY_LICENSES.md，各许可全文与版权声明见 vendor/win32-x64/THIRD_PARTY_LICENSE_TEXTS.txt，
+组件说明见 vendor/win32-x64/NOTICE。
+
 ---
 
 MIT License

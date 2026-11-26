@@ -4,6 +4,7 @@
 //   plugins/flash-sh/lib/index.js                     → lib/fl-bash.js（DEFAULT_BIN 按 ../vendor 找 exe，放在 lib/ 下正好指到包根 vendor/）
 //   plugins/flash-sh/vendor/win32-x64/flash-sh.exe(.sha256) → vendor/win32-x64/
 //   plugins/flash-sh/locale/*.json                    → locale/fl-bash/*.json（插件页标题 / 简介）
+//   plugins/flash-sh/NOTICE、THIRD_PARTY_LICENSE*      → vendor/win32-x64/（exe 的第三方许可，随 exe 再分发必须带）
 // 都是逐字节复制（git 里相同内容只存一份 blob，不额外占仓库体积）。
 //   node scripts/sync-fl-bash.mjs           同步
 //   node scripts/sync-fl-bash.mjs --check   只校验是否一致（CI / verify 用）
@@ -19,6 +20,10 @@ export const PAIRS = [
   ['vendor/win32-x64/flash-sh.exe.sha256', 'vendor/win32-x64/flash-sh.exe.sha256'],
   ['locale/zh.json', 'locale/fl-bash/zh.json'],
   ['locale/en.json', 'locale/fl-bash/en.json'],
+  // exe 静态链接了第三方 crate（MIT / Apache-2.0 / Unicode-3.0 等）：随 exe 再分发时必须带上许可清单与全文
+  ['NOTICE', 'vendor/win32-x64/NOTICE'],
+  ['THIRD_PARTY_LICENSES.md', 'vendor/win32-x64/THIRD_PARTY_LICENSES.md'],
+  ['THIRD_PARTY_LICENSE_TEXTS.txt', 'vendor/win32-x64/THIRD_PARTY_LICENSE_TEXTS.txt'],
 ];
 const checkOnly = process.argv.includes('--check');
 let bad = 0;
