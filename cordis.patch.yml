@@ -399,7 +399,7 @@
 # 不需要 Git Bash / WSL / MSYS2。默认关闭（enabled: false）—— 它在本机执行命令，要用户显式打开：
 #   在插件页打开它的设置，或在 profile 的 cordis.patch.yml 里写 `- id: fl-bash` + `config: { enabled: true }`，
 #   或设置用户环境变量 DSH_FL_BASH=1（旧名 DSH_FLASH_SH 仍认）。配置项见 fl-bash 的 README。
-# 实现与 flash-sh.exe（约 7.9 MB）随本包发行，从 npm 装好就能打开；只在 Windows x64 上注册工具。
+# 实现与 flash-sh.exe（约 1.7 MB）随本包发行，从 npm 装好就能打开；只在 Windows x64 上注册工具。
 - insert:
     - id: fl-bash
       name: 'dsh-flash-presets/fl-bash'

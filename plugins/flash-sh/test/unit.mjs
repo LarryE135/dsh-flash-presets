@@ -694,6 +694,110 @@ ok(types.every((t) => typeof t === "string"), "输出 schema 只用单一 type")
 ok(mod.renderResult({ exitCode: 3, stdout: "a\n", stderr: "b\n", timedOut: false, truncated: false }) === "a\n[stderr]\nb\n\n[exit code: 3]", "渲染格式");
 ok(/full output: \/x\/o\.log , \/x\/e\.log/.test(mod.renderResult({ exitCode: 0, stdout: "a", stderr: "", timedOut: false, truncated: true, spillPath: "/x/o.log", stderrSpillPath: "/x/e.log" })), "截断时渲染两个溢出文件路径");
 ok(mod.DESCRIPTION.length < 1600, "工具描述 " + mod.DESCRIPTION.length + " 字符");
+// 0.1.7：resolveWorkdir 在 Windows 上把 /tmp 映射到 os.tmpdir()；runFlashSh ENOENT 统一返回 127
+ok(mod.resolveWorkdir("/tmp", "C:\\w\\proj", "C:\\w\\proj", "win32", "C:\\TempDir") === "C:\\TempDir", "resolveWorkdir('/tmp') 在 Windows 映射到 tmpdir");
+ok(mod.resolveWorkdir("/tmp/sub", "C:\\w\\proj", "C:\\w\\proj", "win32", "C:\\TempDir") === "C:\\TempDir\\sub", "resolveWorkdir('/tmp/sub') 在 Windows 映射到 tmpdir\\sub");
+{
+  const r = await mod.runFlashSh(path.join(os.tmpdir(), "definitely-no-such-flash-sh-bin-99999.exe"), { command: "echo hi", cwd: os.tmpdir(), timeoutMs: 3000 });
+  ok(r.exitCode === 127 && typeof r.error === "string" && r.error.length > 0, "runFlashSh 找不到二进制时返回 exitCode=127（非 libuv 负 errno）", JSON.stringify(r));
+}
+// 0.1.9：EACCES / EPERM 返回 126（按 err.code 字符串判定，避免 libuv 负 errno -13）
+{
+  ok(mod.spawnExitCode(-13, { code: "EACCES" }, null) === 126, "spawnExitCode: EACCES + code=-13 → 126");
+  ok(mod.spawnExitCode(-1, { code: "EPERM" }, null) === 126, "spawnExitCode: EPERM + code=-1 → 126");
+  ok(mod.spawnExitCode(-2, { code: "ENOENT" }, null) === 127, "spawnExitCode: ENOENT + code=-2 → 127");
+  ok(mod.spawnExitCode(42, undefined, null) === 42, "spawnExitCode: 正常退出码保留真实值");
+  ok(mod.spawnExitCode(null, undefined, "abort") === 130 && mod.spawnExitCode(null, undefined, "guard") === 124, "spawnExitCode: abort=130 / guard=124");
+  if (process.platform !== "win32") {
+    const td = fs.mkdtempSync(path.join(os.tmpdir(), "fl-eacces-"));
+    try {
+      const target = path.join(td, "noexec.sh");
+      fs.writeFileSync(target, "#!/bin/sh\necho hi\n", { mode: 0o644 });
+      const r = await mod.runFlashSh(target, { command: "echo hi", cwd: os.tmpdir(), timeoutMs: 3000 });
+      ok(r.exitCode === 126 && typeof r.error === "string" && r.error.length > 0, "runFlashSh 不可执行文件（EACCES）返回 exitCode=126", JSON.stringify(r));
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  }
+}
+// 0.1.9：supportsStandbyVersion 版本门槛（≥ 0.1.9）及不兼容二进制自动停用待命进程
+{
+  ok(mod.supportsStandbyVersion("flash-sh 0.1.9 (bash-compatible subset)") === true, "supportsStandbyVersion: 0.1.9 → true");
+  ok(mod.supportsStandbyVersion("flash-sh 0.2.0 (bash-compatible subset)") === true, "supportsStandbyVersion: 0.2.0 → true");
+  ok(mod.supportsStandbyVersion("flash-sh 0.1.8 (bash-compatible subset)") === false, "supportsStandbyVersion: 0.1.8 → false（无 FSHR 握手）");
+  ok(mod.supportsStandbyVersion("flash-sh 0.1.6 (bash-compatible subset)") === false, "supportsStandbyVersion: 0.1.6 → false");
+  ok(mod.supportsStandbyVersion("v22.15.0") === false, "supportsStandbyVersion: 非 flash-sh → false");
+  // 用非 flash-sh 二进制（node 自身）探测：自动标记 unsupported，绝不挂死也不报错
+  const fakePool = new mod.StandbyPool(process.execPath, { idleMs: 3000, readyTimeoutMs: 1500, enabled: true });
+  try {
+    fakePool.scheduleWarm();
+    await new Promise((res) => setTimeout(res, 250));
+    ok(fakePool.unsupported === true && fakePool.take() === null, "StandbyPool 面对非 flash-sh / 旧版自定义二进制经 --version 探测后自动停用", JSON.stringify({ probeState: fakePool.probeState, unsupported: fakePool.unsupported }));
+  } finally {
+    fakePool.dispose();
+  }
+  // 即使绕过版本探测（模拟内置 exe 被替换成不发 FSHR 的旧版），未收到 FSHR 前 take() 恒返回 null，退出后永久停用
+  const fakeBundled = new mod.StandbyPool(process.execPath, { idleMs: 3000, readyTimeoutMs: 1500, enabled: true, isBundled: true });
+  try {
+    fakeBundled.warm();
+    ok(fakeBundled.take() === null, "StandbyPool 未收到 FSHR 就绪握手前 take() 返回 null（不把未就绪进程交给调用方）");
+    await new Promise((res) => setTimeout(res, 250));
+    ok(fakeBundled.unsupported === true && fakeBundled.slot === null, "StandbyPool 不发 FSHR 的二进制退出后自动停用", JSON.stringify({ unsupported: fakeBundled.unsupported, slot: Boolean(fakeBundled.slot) }));
+  } finally {
+    fakeBundled.dispose();
+  }
+}
+// 0.1.7：check-flash-sh.ps1 必须带 UTF-8 BOM（否则 Windows PowerShell 5.1 读中文会报语法错）
+{
+  const ps1Bytes = fs.readFileSync(path.join(pluginDir, "scripts", "check-flash-sh.ps1"));
+  ok(ps1Bytes.length >= 3 && ps1Bytes[0] === 0xef && ps1Bytes[1] === 0xbb && ps1Bytes[2] === 0xbf, "check-flash-sh.ps1 带 UTF-8 BOM（兼容 Windows PowerShell 5.1）");
+}
+// Phase 3：encodeStandbyFrame 编码（跳过 Windows 伪变量 =C: 与含 NUL 的键值）与 StandbyPool 实测
+{
+  const frame = mod.encodeStandbyFrame({ timeoutMs: 1600, cwd: "C:\\tmp", command: "echo ok", env: { A: "1", "=C:": "C:\\", "BAD\0": "x", GOOD: "v" } });
+  ok(frame.subarray(0, 4).toString("ascii") === "FSH1", "encodeStandbyFrame 魔数 FSH1");
+  ok(frame.readBigUInt64LE(4) === 1600n, "encodeStandbyFrame 写入 timeoutMs");
+  const cwdLen = frame.readUInt32LE(12);
+  const cmdOff = 16 + cwdLen;
+  const cmdLen = frame.readUInt32LE(cmdOff);
+  const envCnt = frame.readUInt32LE(cmdOff + 4 + cmdLen);
+  ok(envCnt === 2, "encodeStandbyFrame 跳过 =C: 与 NUL 键，保留合法环境变量", "envCnt=" + envCnt);
+}
+if (process.platform === "win32" && fs.existsSync(mod.DEFAULT_BIN)) {
+  const d1 = fs.mkdtempSync(path.join(os.tmpdir(), "fl-standby-1-"));
+  const d2 = fs.mkdtempSync(path.join(os.tmpdir(), "fl-standby-2-"));
+  const pool = new mod.StandbyPool(mod.DEFAULT_BIN, { idleMs: 5000, enabled: true });
+  try {
+    // 1) 冷启动 + 预热
+    const r0 = await mod.runFlashSh(mod.DEFAULT_BIN, { command: "echo cold", cwd: d1, timeoutMs: 5000, maxOutputBytes: 4096, env: { ...mod.childEnv(process.env), SB_TAG: "first" }, standbyPool: pool });
+    ok(r0.exitCode === 0 && r0.stdout.trim() === "cold" && pool.misses === 1, "StandbyPool 首调冷启动并触发后台预热", JSON.stringify(r0));
+    await new Promise((res) => setTimeout(res, 120));
+    // 2) 命中预热进程：验证 cwd 切换、自定义 env 生效、stdin 为 EOF（不读到协议帧）、退出码透传
+    const r1 = await mod.runFlashSh(mod.DEFAULT_BIN, { command: "pwd; echo TAG=$SB_TAG; read -r line; echo rdc=$?; exit 7", cwd: d2, timeoutMs: 5000, maxOutputBytes: 4096, env: { ...mod.childEnv(process.env), SB_TAG: "second" }, standbyPool: pool });
+    ok(pool.hits === 1 && r1.exitCode === 7 && r1.stdout.includes("TAG=second") && r1.stdout.includes("rdc=1") && r1.stdout.toLowerCase().includes(path.basename(d2).toLowerCase()), "StandbyPool 命中预热：cwd/env/stdin-EOF/exitCode 均正确", JSON.stringify(r1));
+    await new Promise((res) => setTimeout(res, 120));
+    // 3) 跨调用环境隔离：上一条的 SB_TAG 不得泄漏到下一条
+    const r2 = await mod.runFlashSh(mod.DEFAULT_BIN, { command: "echo TAG=${SB_TAG:-NONE}", cwd: d1, timeoutMs: 5000, maxOutputBytes: 4096, env: mod.childEnv(process.env), standbyPool: pool });
+    ok(pool.hits === 2 && r2.exitCode === 0 && r2.stdout.trim() === "TAG=NONE", "StandbyPool 跨调用环境完全隔离（不残留旧变量）", JSON.stringify(r2));
+    await new Promise((res) => setTimeout(res, 120));
+    // 4) 待命进程内超时强杀（Job Object + 超时标记）
+    const r3 = await mod.runFlashSh(mod.DEFAULT_BIN, { command: "sleep 10", cwd: d1, timeoutMs: 500, maxOutputBytes: 4096, env: mod.childEnv(process.env), standbyPool: pool });
+    ok(pool.hits === 3 && r3.exitCode === 124 && r3.timedOut === true, "StandbyPool 命中预热时超时正常杀树并置 timedOut=true", JSON.stringify(r3));
+    await new Promise((res) => setTimeout(res, 120));
+    // 5) 待命进程内 AbortSignal 取消
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 120);
+    const r4 = await mod.runFlashSh(mod.DEFAULT_BIN, { command: "sleep 10", cwd: d1, timeoutMs: 10000, maxOutputBytes: 4096, signal: ac.signal, env: mod.childEnv(process.env), standbyPool: pool });
+    ok(pool.hits === 4 && typeof r4.error === "string" && r4.error.includes("cancelled"), "StandbyPool 命中预热时 AbortSignal 正常取消", JSON.stringify(r4));
+    // 6) dispose 后清理空闲待命进程且不再预热
+    pool.dispose();
+    ok(pool.slot === null && pool.disposed === true, "StandbyPool dispose 立即清理待命槽");
+  } finally {
+    pool.dispose();
+    fs.rmSync(d1, { recursive: true, force: true });
+    fs.rmSync(d2, { recursive: true, force: true });
+  }
+}
 
 if (failed > 0) {
   console.log("unit 自检：" + failed + " 项失败");

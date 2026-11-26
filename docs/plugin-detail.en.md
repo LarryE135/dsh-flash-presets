@@ -20,6 +20,6 @@ Four features hang off this single row. Each starts as soon as the host services
 
 To switch one feature, set `enabled` under `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` of `id: flash-presets` in the profile patch. Overrides written against the old row ids (`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`, up to 0.3.2) still apply. Turning the whole row off also turns off legacy-session support.
 
-The Windows Bash tool **fl-bash** is a separate component on the plugin page (off by default, Windows x64 only; shipped in this package, ready once installed; the exe is about 7.9 MB and the tool registers only on Windows x64). Turn it on with `config.enabled: true` on `id: fl-bash`. It is not sandboxed: outside full-access sessions it asks you, once per kind of command per session, and every time for dangerous commands.
+The Windows Bash tool **fl-bash** is a separate component on the plugin page (off by default, Windows x64 only; shipped in this package, ready once installed; the exe is about 1.7 MB and the tool registers only on Windows x64). Turn it on with `config.enabled: true` on `id: fl-bash`. It is not sandboxed: outside full-access sessions it asks you, once per kind of command per session, and every time for dangerous commands.
 
 Switch examples, measurements and the compatibility table: [GitHub](https://github.com/LarryE135/dsh-flash-presets).

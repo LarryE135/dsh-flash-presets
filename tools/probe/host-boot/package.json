@@ -1,0 +1,10 @@
+{
+  "name": "dsh-host-boot-probe",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CI-only probe bundle: boots inside a real DSH host next to dsh-flash-presets, records what the plugin page / preset registry / plan mode / tool pipeline actually see, writes a JSON report and exits. Never shipped (tools/ is not in package.json files).",
+  "type": "module",
+  "main": "./lib/index.js",
+  "files": ["lib", "cordis.patch.yml"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

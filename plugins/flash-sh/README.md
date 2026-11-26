@@ -9,7 +9,7 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 两种装法，二选一即可（都装也没关系，见「与 dsh-flash-presets 同时安装」）：
 
-- **随 dsh-flash-presets（推荐；需要 presets ≥ 0.3.4，尚未发布）**：presets 自带本包的实现与 exe（从这里逐字节同步），从 npm 装好 presets
+- **随 dsh-flash-presets（推荐；需要 presets ≥ 0.3.4）**：presets 自带本包的实现与 exe（从这里逐字节同步），从 npm 装好 presets
   就能在插件页打开**单独的组件 fl-bash**（默认关）。已发布的 presets（≤ 0.3.2）里还没有这部分代码，目前请用下面的单独安装。
 - **单独安装**：本包自己是一个组合包（一行 `fl-bash-standalone`，插件页标题 fl-bash），见下面「安装」。
 
@@ -28,14 +28,14 @@ coreutils / grep / sed / awk / diff / find / xargs 都编在 exe 里，与 GNU �
 
 ### 桌面端（推荐：插件页）
 
-1. 把 `fl-bash-0.1.6.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\fl-bash-0.1.6.tgz`。
+1. 把 `fl-bash-0.1.9.tgz` 放到一个**不会被删的固定位置**，例如 `C:\Users\<你>\dsh-plugins\fl-bash-0.1.9.tgz`。
 2. 打开 DSH 桌面端 → 侧边栏 **插件** → **添加插件**，填 tgz 的**绝对路径**（插件管理器只接受绝对路径；
-   `C:\...\fl-bash-0.1.6.tgz` 或 `file:C:\...\fl-bash-0.1.6.tgz` 都行）。
+   `C:\...\fl-bash-0.1.9.tgz` 或 `file:C:\...\fl-bash-0.1.9.tgz` 都行）。
 3. 装好后**完全退出并重启**桌面端（桌面 profile 只在启动时应用补丁层）。
 
 > 命令行 `dsh plugin --profile desktop …` 在 npm 装的 `dsh` 上会被拒绝（"profile "desktop" is managed exclusively by the
 > Electron application"），桌面 profile 只能由桌面端自带的管理器改。web / 自定义 profile 可以用
-> `dsh plugin --profile web add C:\...\fl-bash-0.1.6.tgz`。
+> `dsh plugin --profile web add C:\...\fl-bash-0.1.9.tgz`。
 
 ### 手动安装（插件页不可用时）
 
@@ -89,6 +89,7 @@ profile 补丁会**整体替换**这一行的 `config`（DSH 的 patch 语义）
 
 `binPath` 写成空字符串等于没写（用内置 exe）。用环境变量 `DSH_FL_BASH_BIN` 换了 exe 时启动日志会写一行说明；
 `binPath` 指向**非内置** exe 时启动日志打一条 warn 并附上它的 sha256，便于核对来源。
+默认启用单预热待命进程（`flash-sh --standby`，仅对内置 exe 或版本 ≥ 0.1.9 的自定义 exe 生效，并在收到 `FSHR` 就绪握手后才启用，异常时自动回退普通启动）：每次调用结束后异步预热 1 个位于系统临时目录的待命进程（60 秒无调用自动退出、不锁工作区目录，每条命令仍在独立进程与独立 Job Object 中执行完即退出；与普通工具调用一致，命令的 stdin 始终为 EOF），连续调用端到端延迟由 ~35 ms 降至 ~4 ms；设 `DSH_FL_BASH_NO_STANDBY=1` 可关闭。
 
 随 dsh-flash-presets 用时，这些字段写在 presets 的 `- id: fl-bash` 那一行的 `config` 下（插件页上也能直接改）（例如 `config: { enabled: true, approval: sandboxed }`），含义相同。
 
@@ -114,7 +115,7 @@ DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升�
   把代码从管道喂给解释器（`… | python3`）、`awk` 里的 `system()` / 管道 / 写文件、`sed` 的 `e` / `w`；`git push` / `clean` / `reset --hard` / `checkout .` / `restore` / `config`（写）/ `-c …` /
   `-C <工作区外>` 等；`find -delete` / `-exec` / `-fprint`；`chmod` / `chown` / `ln`；函数定义；`curl` / `wget` / `ssh` / `dd` / `kill` / `reg` / `setx` / `patch` / 包管理器等；参数里有 UNC 路径。
   这是一套保守的启发式规则，原则是**看不懂的写法一律每次都问**；规则键用原样的命令名，`/usr/bin/rm`、`RM.exe` 与 `rm` 互不借用批准。
-  对抗用例见 `test/adversarial.mjs`（77 条 + 15 条良性写法）。仍然要知道：同一类里的命令参数不同也算同一类（批准过 `rm a.o` 后，工作区内的 `rm b.c` 不再问；
+  对抗用例见 `test/adversarial.mjs`（129 条 + 23 条良性写法）。仍然要知道：同一类里的命令参数不同也算同一类（批准过 `rm a.o` 后，工作区内的 `rm b.c` 不再问；
   批准过 `python3 x.py` 后，`python3 y.py` 不再问——脚本内容本身不受审查）。
 - **子进程环境脱敏**：名字里含 `KEY` / `PASSWORD` / `PASSWD` / `SECRET` / `TOKEN` / `CREDENTIAL` / `COOKIE` / `JWT`（不分大小写，`db_password` 也算）、
   以 `_PAT` / `_AUTH` 为词（`GITHUB_PAT`、`NPM_CONFIG__AUTH`、`SSH_AUTH_SOCK`；不误伤 `NODE_PATH` 这类 `*_PATH` 与 `GIT_AUTHOR_*`）、
@@ -139,26 +140,21 @@ DSH 的工具管线默认不为任何工具弹审批（审批只用于沙箱升�
 
 ## 内置命令的已知差异
 
-以下按 `native/flash-sh` 源码（awk、diff 是自己写的；sed 用的是 uutils `sed` 0.3.0 crate）逐项核对，并在 Linux 构建上实测过。
+以下按 `flash-sh` 0.1.9（内置 coreutils / sed / awk / grep / diff / find / xargs / jq 全部自写并就地执行，不再链接 uutils / icu / fancy-regex，经 nightly `build-std` 编译后单文件体积由 7.51 MB 降至约 1.65 MB；stable 工具链构建约 2.3 MB、功能相同）逐项核对，并在 Windows x64 上实测过。
 Windows 程序（`git`、`node`、`python`…）按 PATH 调用，不在此列。
 
-**awk**（POSIX 语言 + 常用 gawk 扩展：`length(arr)`、`tolower`、`-v`、正则 FS / RS、`printf %c`、`ENVIRON`、`getline` 各种形式、
-`print > 文件` / `>>` / `| 命令`、`cmd | getline`、`system`、`close`、`match(s, re, arr)`、`**`）。**不支持**：
+**awk**（POSIX 语言 + 常用 gawk 扩展：`length(arr)`、`tolower`、`-v`、正则 FS / RS、空 `FS=""` 逐字符切分、`printf %c`、`ENVIRON`、`getline` 各种形式、
+`print > 文件` / `>>` / `| 命令`、`cmd | getline`、`system`、`close`、`match(s, re, arr)`、`**`；0.1.9 起完整保留非 UTF-8/GBK 原始字节）。**不支持**：
 
 - 函数：`gensub`、`strftime` / `systime` / `mktime`、`asort` / `asorti`、`and` / `or` / `xor` / `lshift` / `rshift` / `compl`、
   `strtonum`、`typeof` / `isarray`、`patsplit`（调用时报 `function … not defined`）；`split` 的第 4 参数（分隔符数组）不会被填充。
 - 语法 / 特殊变量：`BEGINFILE` / `ENDFILE`、`nextfile`（语法错误）、`|&` 协进程、`@include` / `@load`、`RT`、`FPAT`、`FIELDWIDTHS`、
   `IGNORECASE`、`PROCINFO`（如 `sorted_in`）；命令行选项 `--csv` 等 gawk 长选项。
 
-**sed**（uutils sed 0.3.0：POSIX 全部 + 多数 GNU 扩展，`-E` / `-n` / `-i后缀` / `-s`、`a` `i` `c` 单行写法、`I` `M` 标志、
-`0,/re/`、`first~step`、`addr,+N`、`F` `Q` `R` `W` `T` `z`、`e` / `s///e`）。**不支持或行为不同**：
+**sed**（0.1.7 起自写就地执行，0.1.8 升级为原生字节安全 `regex::bytes` + 内置反向引用回溯匹配：`-E` / `-r` / `-n` / `-e` / `-f` / `-i[后缀]` / `-s` / `-z`，完整保留非 UTF-8/GBK 字节，`s///` 任意分隔符与 `g`/`N`/`Ng`/`p`/`i`/`I`/`w` 标志及匹配侧/替换侧 `\1..\9`、`&`、`\n`/`\r`/`\t`、`\u`/`\U`/`\l`/`\L`/`\E`，`d` `D` `p` `P` `a` `i` `c` `q` `Q` `=` `y` `n` `N` `h` `H` `g` `G` `x` `b` `t` `T` `:label` `w` `r` `l` `z` `{...}`，`N` `$` `first~step` `/re/[I]` `addr1,addr2` `addr1,+N` `0,/re/` `!`）。**不支持或行为不同**：
 
-- `e` 命令和 `s///e` 标志在 Windows 上交给 **`cmd.exe /C`** 执行，不是 bash —— 写 bash 语法的命令会失败。
-- 替换里的大小写转换 `\U` `\L` `\u` `\l` `\E` 不生效（原样输出）；`\b`、`\<`、`\>` 词边界匹配不到任何东西。
-- `s///` 不能同时用数字和 `g`（`s/a/b/2g` 报错）；没有 `v`（会崩溃退出）、`L` 命令；`-z` 不会把 NUL 当行分隔。
-- 默认按**字节**处理（Windows 上通常没有 `LANG`）：正则里的反向引用 `\(a\)\1` 直接报错，`.` 匹配单个字节而不是一个中文字符。
-  需要时在命令前加 `LC_ALL=C.UTF-8`（例如 `LC_ALL=C.UTF-8 sed 's/\(a\)\1/x/'`）。
-- `-i` 必须把备份后缀连写（`-i.bak`）；BSD 的 `-i ''` / `-i .bak` 不支持。写 `/dev/stdout` 这类特殊文件会失败。
+- 不支持 `e` / `s///e` 外部命令执行。
+- `-i` 备份后缀需连写（`-i.bak`）；BSD 的 `-i ''` / `-i .bak` 不支持。
 
 **diff**（自写，Myers 算法：普通格式、`-u` / `-U N` / `--unified=N`、`-q` / `--brief`、`-r`、`-i`、`-w` / `-b` / `-B`、`--label`、`-` 读 stdin、
 「\ No newline at end of file」，退出码同 GNU）。**不支持**：`-c` / `-C`（上下文格式）、`-y` / `--side-by-side`、`-e` / `--normal` / `-n`、
@@ -240,7 +236,7 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 | `${#s}`（多字节） | 按字符数（`中文` = 2） | UTF-8 locale 下同样是 2；C locale 下按字节（6） | 不改：flash-sh 始终按 UTF-8 字符计。需要字节数用 `printf %s "$s" \| wc -c` |
 | `$( )` 里的 NUL | 保留（`x=$(printf 'a\0b')` 长度 3） | 丢掉 NUL 并警告（长度 2） | 不要靠命令替换搬二进制数据，改用临时文件 |
 | `ls -l` 权限位 | 恒为 `-rwxrwxrwx` | 真实权限 | Windows 文件没有 Unix 权限位；不要解析 `ls -l` 的权限列 |
-| `du -sh` 小目录 | `0` | `1.0K` | uutils du 在 Windows 上对很小的目录可能显示 0；要文件的字节数用 `wc -c < 文件` 或 `du -b` |
+| `du -sh` 小目录 | 按 1 KB 块上取整 | 同左（不同文件系统簇大小可能略有差异） | 要精确文件字节数用 `wc -c < 文件` 或 `du -b` |
 | `ulimit`（`-n`、`-a` 等） | 恒报 `unlimited` | 3200 等真实上限 | **只是占位**：`ulimit` 不读也不设任何限制。不要用 `ulimit -n` / `ulimit -a` 的输出判断能开多少文件或进程 |
 | `kill -INT $$`（子 shell 里打自己的父 shell） | 进程以 130 结束 | Linux bash 5.x：把信号推迟到前台任务结束后再处理，随后顶层 trap 触发；Git Bash：同样不触发 trap | **不要依赖子 shell 里的 `kill -INT $$`**。顶层 `trap … INT; kill -INT $$` 三者行为相同（trap 触发、继续执行、rc=0） |
 | CRLF 结尾的脚本 | 行尾的 `\r` 保留在单词里（与 Linux bash 相同） | Git Bash 会忽略 `\r` | Windows 上写脚本文件请用 LF 换行 |
@@ -273,7 +269,7 @@ PATH 上没有 jq 时用内置版本；设 `FLASH_SH_JQ=builtin` 可以强制使
 
 ## 与 dsh-flash-presets 同时安装
 
-dsh-flash-presets（需要 presets ≥ 0.3.4，尚未发布）自带本包的实现与 exe，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。装了 presets 就不必再单独装本包；两种装法也可以并存：
+dsh-flash-presets（需要 presets ≥ 0.3.4）自带本包的实现与 exe，在插件页上放了**单独的一个组件 fl-bash**（行 id `fl-bash`，默认关），不挂在「Flash 精简预设」那一行下面。装了 presets 就不必再单独装本包；两种装法也可以并存：
 
 - 插件页上是两行：presets 带来的 `fl-bash`，以及单独装的本包那一行 `fl-bash-standalone`（标题都是 fl-bash）；
 - 工具名都叫 `fl_bash`，由进程内的协调器保证**任何时候只注册一个**，启动阶段也不例外：本包这一行启动时先不注册，等 presets 那边表态
@@ -319,4 +315,4 @@ DSH_HOST_NM=/path/to/node_modules FLASH_SH_TEST_BIN=... node test/host.mjs   # h
 DSH_REAL_NM=/path/to/dsh-install/node_modules FLASH_SH_TEST_BIN=... npm test   # 再加真实 DSH 安装的 plugin add / dump-config / 启动（需要 bash）
 ```
 
-许可：MIT（见 LICENSE）。flash-sh.exe 内含 uutils coreutils / sed（MIT）等第三方组件，见 NOTICE 与 THIRD_PARTY_LICENSES.md。
+许可：MIT（见 LICENSE）。flash-sh.exe 静态链接的第三方 Rust crate 许可清单与全文见 NOTICE、THIRD_PARTY_LICENSES.md 与 THIRD_PARTY_LICENSE_TEXTS.txt。

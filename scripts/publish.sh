@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 把本仓库推到 GitHub（main + tag + release）。
 #   最简单：先 `gh auth login`，再执行  bash scripts/publish.sh
+#   Release 正文：RELEASE_NOTES=说明.md bash scripts/publish.sh（或把文件作第一个参数）；标题可用 RELEASE_TITLE 覆盖
 #   或先改好下面的 GH_USER / REPO / VISIBILITY，或直接用环境变量覆盖它们。
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -127,6 +128,9 @@ if [ -n "$remote_tags" ]; then
   fi
 fi
 echo "前置守卫通过（版本 ${PKG_VERSION}，标签在 HEAD 历史上，远端标签未被移动）"
+if [ -n "${RELEASE_NOTES:-${1:-}}" ] && [ ! -s "${RELEASE_NOTES:-${1:-}}" ]; then
+  fail "Release 说明文件不存在或为空：${RELEASE_NOTES:-${1:-}}" "推送前就检查，免得 tag 推上去了 Release 却建不出来"
+fi
 if [ "$DRY_RUN" = "1" ]; then echo "DRY_RUN=1：只做检查（含远端标签检查），不推送、不发 npm、不建 Release。"; exit 0; fi
 
 if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
@@ -141,7 +145,12 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
         "改走 PR：git switch -c <branch> && git push -u origin <branch>，等四个必过检查绿了再合进 main，然后重跑本脚本"
     fi
   fi
-  git push -u origin main   # 幂等：main 已是最新时是 no-op，不会触发规则
+  # 不再 `git push -u origin main`（推的是本地 main 分支而不是 HEAD：本地 main 落后时被当成非快进拒绝，
+  # 脚本在推 tag / 建 Release 之前中止）。main 只经 PR 合入；这里只核对「tag 指向的提交已在远端 main 上」。
+  git fetch -q origin main 2>/dev/null || fail "取不到远端 main（git fetch origin main 失败）" "检查网络 / 凭据后重试；核对不了就不发"
+  git merge-base --is-ancestor "$(git rev-parse "$TAG^{commit}")" origin/main || \
+    fail "标签 ${TAG}（$(git rev-parse --short "$TAG^{commit}")）指向的提交不在远端 main 上" \
+      "先经 PR 合进 main，再在 main 的那个提交上打 tag；不要发孤儿提交"
   git push origin "$TAG"
 
   # ⑤ npm 必须先发（2026-11-12 审计 D2）：Release 早于 npm，会让正文里的安装命令指向一个装不到的版本。
@@ -159,7 +168,17 @@ if command -v gh >/dev/null 2>&1 && gh_ auth status >/dev/null 2>&1; then
   # 每次重打：复用 dist/ 里的旧附件会让 Release 内容与 tag 悄悄不一致（第六轮审计 U3-7）。
 rm -f dist/dsh-flash-presets-*.zip   # dist/ 只放本次附件，免得旧包混进 Release
   git archive --format=zip -o "dist/dsh-flash-presets-$TAG.zip" "$TAG"
-  gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TAG" --notes "见 README 版本历史"
+  # Release 正文：RELEASE_NOTES=<文件> 或第一个参数给出说明文件（建议写 pnpm 24 小时冷却、行为变化、已知遗留）；
+  # 不给时退回固定一句。标题可用 RELEASE_TITLE 覆盖（默认就是 tag 名）。
+  NOTES_FILE="${RELEASE_NOTES:-${1:-}}"
+  TITLE="${RELEASE_TITLE:-$TAG}"
+  if [ -n "$NOTES_FILE" ]; then
+    [ -s "$NOTES_FILE" ] || fail "Release 说明文件不存在或为空：$NOTES_FILE" "RELEASE_NOTES=<非空的 markdown 文件> bash scripts/publish.sh"
+    gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TITLE" --notes-file "$NOTES_FILE"
+  else
+    echo "⚠ 没给 RELEASE_NOTES，Release 正文只写「见 README 版本历史」；发版后可在网页上补"
+    gh_ release create "$TAG" "dist/dsh-flash-presets-$TAG.zip" --title "$TITLE" --notes "见 README 版本历史"
+  fi
   echo "完成：https://github.com/$GH_USER/$REPO"
 else
   cat <<MSG

@@ -104,7 +104,8 @@ const bridged = async (c) => {
   if ((await bridged(c)).native !== true) throw new Error("T4 前置失败");
   const r = await c.post(c.session.id, { action: "plan-off" });
   if (r.ok !== true || r.native !== false) throw new Error("T4 响应异常：" + JSON.stringify(r));
-  await new Promise((res) => setTimeout(res, 20));
+  // 轮询而不是固定等 20 ms：/plan off 先 setTimeout(0) 再经 Promise 链执行，CI runner 繁忙时 20 ms 偶尔不够
+  for (let i = 0; i < 50 && !c.seen.includes("/plan off"); i++) await new Promise((res) => setTimeout(res, 10));
   if (!c.seen.includes("/plan off")) throw new Error("T4 没有真的执行 /plan off，seen=" + JSON.stringify(c.seen));
   if ((await c.get(c.session.id)).native !== false) throw new Error("T4 退出后 native 仍为 true");
   console.log("PASS T4 action=plan-off 执行 /plan off 且 native=false");
