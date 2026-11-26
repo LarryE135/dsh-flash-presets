@@ -30,7 +30,10 @@ TGZ=$(ls "$W"/pack/fl-bash-*.tgz | head -1)
 timeout 110 dsh plugin --profile p1 add "$TGZ" > "$W/add1.log" 2>&1; rc=$?
 if [ "$(uname -s)" != "MINGW64_NT" ] && ! grep -qi microsoft /proc/version 2>/dev/null; then
   [ $rc -ne 0 ] && grep -Eq "Unsupported platform|ERR_PNPM_UNSUPPORTED_PLATFORM|Bundle supports Host platforms win32" "$W/add1.log"; ok $? "非 Windows x64 宿主：add 被拒（rc=${rc}；$(grep -Eo 'ERR_PNPM_UNSUPPORTED_PLATFORM|Bundle supports Host platforms win32' "$W/add1.log" | head -1)）"
-  ! grep -q '"fl-bash"' "$W/home/.dsh/profiles/p1/package.json" 2>/dev/null; ok $? "被拒后 profile package.json 里没有 fl-bash"
+  # DSH 0.2.2-rc.5 + pnpm 12：本地 tgz 不按 os/cpu 拦，dependencies 里会留下 fl-bash（DSH 提示用 dsh plugin remove 清），
+  # 但组合包选择不变。断言只看 dsh.profile.bundles；dependencies 有残留只记录、不判失败。
+  node -e 'let p={};try{p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))}catch{};process.exit(((p.dsh&&p.dsh.profile&&p.dsh.profile.bundles)||[]).includes("fl-bash")?1:0)' "$W/home/.dsh/profiles/p1/package.json" 2>/dev/null; ok $? "被拒后 profile 的 dsh.profile.bundles 里没有 fl-bash"
+  if grep -q '"fl-bash"' "$W/home/.dsh/profiles/p1/package.json" 2>/dev/null; then echo "  （记录）profile package.json 的 dependencies 里留有 fl-bash（pnpm 未按平台拦本地 tgz），不判失败"; fi
 fi
 
 # 2. 去掉 os/cpu/platforms 的变体

@@ -146,7 +146,7 @@ jobs:
       - name: 上传 read-bench JSON
         if: runner.os == 'Windows' && !cancelled()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: read-bench-${{ matrix.os }}-${{ strategy.job-index }}
           path: ${{ runner.temp }}/read-bench.json
@@ -370,7 +370,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dsh: ["0.2.1-rc.5", "0.2.2-rc.1", "0.2.2-rc.3"]   # 声明的下限 + npm latest + npm next（#29 报告者用的就是 rc.3；rc.1 起要求 Node ≥ 24.9，上面已 pin 24）
+        dsh: ["0.2.1-rc.5", "0.2.2-rc.1", "0.2.2-rc.3"]   # 声明的下限 + 历史 rc（rc.1；rc.3 是 #29 报告者的版本）；当前 npm latest/next（0.2.2-rc.5）见下面的 dsh-real（rc.1 起要求 Node ≥ 24.9，上面已 pin 24）
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -378,7 +378,7 @@ jobs:
           node-version: '24'   # dsh CLI 在 Node 20 下会静默退出（0 输出 / 退出码 0）
 
       - name: 安装 DSH 与 pnpm
-        run: npm i -g pnpm @deepseek-ai/dsh@${{ matrix.dsh }}   # 矩阵覆盖 engines 下限与 npm latest；canary 走脚本路径，不加载插件，不能替代这里
+        run: npm i -g pnpm @deepseek-ai/dsh@${{ matrix.dsh }}   # 矩阵覆盖 engines 下限与历史 rc（latest 见 dsh-real）；canary 走脚本路径，不加载插件，不能替代这里
 
       - name: 环境诊断
         run: |
