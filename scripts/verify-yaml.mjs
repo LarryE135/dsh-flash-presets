@@ -256,7 +256,11 @@ if (args.length) {
               'flash-presets 行指向本包 dsh-flash-presets');
         const oldRows = insertRows.filter(r => r && ['plan-mode-ui', 'flash-presets-core', 'flash-presets-alias', 'delivery-gate'].includes(r.id));
         check(oldRows.length === 0, '合成产物不再插入 0.3.2 的 4 个旧行（实际 ' + oldRows.map(r => r.id).join(', ') + '）');
-        check(insertRows.filter(r => r && !/^preset-/.test(r.id)).length === 1, '除两个预设外只插入一行（插件页组件数 = 3）');
+        // 用户要求 Bash 工具 fl-bash 在插件页上单独成一个组件：除两个预设外恰好两行 flash-presets + fl-bash（插件页组件数 = 4）。
+        const others = insertRows.filter(r => r && !/^preset-/.test(r.id)).map(r => r.id).sort();
+        check(JSON.stringify(others) === '["fl-bash","flash-presets"]', '除两个预设外只插入 flash-presets 与 fl-bash 两行（插件页组件数 = 4；实际 ' + others.join(', ') + '）');
+        const flRow = insertRows.find(r => r && r.id === 'fl-bash');
+        check(flRow && flRow.name === 'dsh-flash-presets/fl-bash' && flRow.config && flRow.config.enabled === false, 'fl-bash 行指向本包子路径 dsh-flash-presets/fl-bash，默认 enabled: false');
         check(!String(JSON.stringify(pluginRows)).includes('dsh-plan-mode-ui'),
               '合成产物不再引用独立包 dsh-plan-mode-ui');
         // 客户端 bundle 的注册 id 必须等于包名：DSH 的 boot graph 用包名做行 id，
