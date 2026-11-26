@@ -1,6 +1,6 @@
 {
   "name": "fl-bash",
-  "version": "0.1.6",
+  "version": "0.1.9",
   "description": "fl-bash for DeepSeek Harness: an optional Bash-compatible shell tool (fl_bash) for Windows x64 hosts, backed by a bundled single-file Rust interpreter (flash-sh; no Git Bash / WSL / MSYS2). Off by default. Shows up as its own component, whether installed standalone or through dsh-flash-presets. Formerly dsh-flash-sh.",
   "keywords": [
     "dsh",

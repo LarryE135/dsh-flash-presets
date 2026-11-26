@@ -211,9 +211,9 @@ v = valueOf(res);
 ok(v && v.exitCode === 124 && v.timedOut === false, "脚本自己 exit 124 → 不算超时", JSON.stringify(v));
 process.env.HOST_TEST_API_KEY = "leak";
 process.env.DSH_HOST_TEST = "leak";
-res = await call(ctx, { command: "env", workdir: tmp });
+res = await call(ctx, { command: "env | grep -iE '^(HOST_TEST_API_KEY|DSH_HOST_TEST|PATH)='", workdir: tmp });
 v = valueOf(res);
-ok(v && v.exitCode === 0 && !/HOST_TEST_API_KEY|DSH_HOST_TEST/.test(v.stdout) && /PATH=/.test(v.stdout), "子进程环境已脱敏（真实 exe 里 env 看不到 *_KEY / DSH_*）");
+ok(v && v.exitCode === 0 && !/HOST_TEST_API_KEY|DSH_HOST_TEST/.test(v.stdout) && /^PATH=/im.test(v.stdout), "子进程环境已脱敏（真实 exe 里 env 看不到 *_KEY / DSH_*）");
 delete process.env.HOST_TEST_API_KEY;
 delete process.env.DSH_HOST_TEST;
 

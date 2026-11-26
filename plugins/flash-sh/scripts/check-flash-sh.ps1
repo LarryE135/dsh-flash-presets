@@ -40,7 +40,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$ExpectedSha256 = '2f876038cb5d9705dc1c480c6b5915ea3996c8f1afb78b0e15d45cb3decc08cf'
+$ExpectedSha256 = '04c44cee9ad5ebbf8726fc11269f70c9b7f6bcf5d5f55ecb6ba09cac13a60cd1'
 $RowId = 'fl-bash-standalone'
 $PackageName = 'fl-bash'
 
@@ -57,7 +57,7 @@ function Read-TextFile([string]$path) {
   try { return [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) } catch { return $null }
 }
 
-# 在一份 cordis.patch.yml 里找某个 id 的所有块，返回每块的 kind（insert / override）与 enabled 值（true/false/$null）
+# 在一份 cordis.patch.yml 里找某个 id 的所有块，返回每块的 kind（insert / override）、HasConfig 与 enabled 值（true/false/$null）
 function Find-PatchRows([string]$text, [string]$id) {
   $result = @()
   if ($null -eq $text) { return ,$result }
@@ -67,6 +67,9 @@ function Find-PatchRows([string]$text, [string]$id) {
     $m = [regex]::Match($lines[$i], $pattern)
     if (-not $m.Success) { continue }
     $indent = $m.Groups[1].Value.Length
+    $propIndent = -1
+    $hasConfig = $false
+    $configIndent = -1
     $enabled = $null
     $disabled = $null
     $name = $null
@@ -75,12 +78,25 @@ function Find-PatchRows([string]$text, [string]$id) {
       if ($line -match '^\s*(#.*)?$') { continue }
       $lead = ([regex]::Match($line, '^\s*')).Value.Length
       if ($lead -le $indent) { break }
-      $em = [regex]::Match($line, '^\s*enabled:\s*(true|false)\b')
-      if ($em.Success) { $enabled = $em.Groups[1].Value }
-      $dm = [regex]::Match($line, '^\s*disabled:\s*(true|false)\b')
-      if ($dm.Success -and ($lead -eq $indent + 2)) { $disabled = $dm.Groups[1].Value }
-      $nm = [regex]::Match($line, '^\s*name:\s*[''"]?([^''"#\s]+)')
-      if ($nm.Success -and ($lead -eq $indent + 2)) { $name = $nm.Groups[1].Value }
+      if ($propIndent -lt 0) { $propIndent = $lead }
+      if ($configIndent -ge 0 -and $lead -le $configIndent) { $configIndent = -1 }
+      if ($lead -eq $propIndent) {
+        $cm = [regex]::Match($line, '^\s*config:\s*(\{.*\})?\s*(#.*)?$')
+        if ($cm.Success) {
+          $hasConfig = $true
+          $configIndent = $lead
+          $inl = [regex]::Match($line, '\benabled:\s*(true|false)\b')
+          if ($inl.Success) { $enabled = $inl.Groups[1].Value }
+          continue
+        }
+        $dm = [regex]::Match($line, '^\s*disabled:\s*(true|false)\b')
+        if ($dm.Success) { $disabled = $dm.Groups[1].Value }
+        $nm = [regex]::Match($line, '^\s*name:\s*[''"]?([^''"#\s]+)')
+        if ($nm.Success) { $name = $nm.Groups[1].Value }
+      } elseif ($configIndent -ge 0) {
+        $em = [regex]::Match($line, '^\s*enabled:\s*(true|false)\b')
+        if ($em.Success) { $enabled = $em.Groups[1].Value }
+      }
     }
     # 判断它是否在某个 "- insert:" 之下：向上找缩进更小的最近一行
     $kind = 'override'
@@ -89,11 +105,11 @@ function Find-PatchRows([string]$text, [string]$id) {
       if ($up -match '^\s*(#.*)?$') { continue }
       $lead2 = ([regex]::Match($up, '^\s*')).Value.Length
       if ($lead2 -lt $indent) {
-        if ($up -match '^\s*-?\s*insert:\s*$') { $kind = 'insert' }
+        if ($up -match '^\s*-?\s*insert:\s*(#.*)?$') { $kind = 'insert' }
         break
       }
     }
-    $result += New-Object PSObject -Property @{ Kind = $kind; Enabled = $enabled; Disabled = $disabled; Name = $name; Line = ($i + 1) }
+    $result += New-Object PSObject -Property @{ Kind = $kind; HasConfig = $hasConfig; Enabled = $enabled; Disabled = $disabled; Name = $name; Line = ($i + 1) }
   }
   return ,$result
 }
@@ -137,7 +153,7 @@ function Find-SectionEnabled([string]$text, [string]$id, [string]$section) {
       if ($up -match '^\s*(#.*)?$') { continue }
       $lead2 = ([regex]::Match($up, '^\s*')).Value.Length
       if ($lead2 -lt $indent) {
-        if ($up -match '^\s*-?\s*insert:\s*$') { $kind = 'insert' }
+        if ($up -match '^\s*-?\s*insert:\s*(#.*)?$') { $kind = 'insert' }
         break
       }
     }
@@ -242,7 +258,7 @@ if (Test-Path -LiteralPath $BinPath -PathType Leaf) {
     } else {
       Write-Warn2 '没找到 flash-sh.exe.sha256'
     }
-    if ($hash -eq $ExpectedSha256) { Write-Ok '与 fl-bash 0.1.6 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.6 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
+    if ($hash -eq $ExpectedSha256) { Write-Ok '与 fl-bash 0.1.9 发布的 exe 相同' } else { Write-Warn2 ('与 0.1.9 发布的 exe（' + $ExpectedSha256.Substring(0, 12) + '…）不同；自定义 binPath 时可忽略') }
   }
 
   # ── 3. 执行 ────────────────────────────────────────────────────────────────
@@ -294,8 +310,8 @@ foreach ($layer in $layers) {
   foreach ($r in $rows) {
     if ($r.Kind -eq 'insert') { $insertCount++ }
     if ($r.Disabled -eq 'true') { $rowDisabled = $true } elseif ($r.Disabled -eq 'false') { $rowDisabled = $false }
-    # 覆盖行替换整个 config：没写 enabled 等于回到 schema 默认 false
-    if ($r.Kind -eq 'override' -and $null -eq $r.Enabled) { $enabledFinal = 'false(覆盖行未写 enabled，config 被整体替换)' }
+    # 覆盖行带 config 时会替换整个 config：没写 enabled 等于回到 schema 默认 false；不带 config（如仅改 disabled）保留原 enabled
+    if ($r.Kind -eq 'override' -and $r.HasConfig -and $null -eq $r.Enabled) { $enabledFinal = 'false(覆盖行未写 enabled，config 被整体替换)' }
     elseif ($null -ne $r.Enabled) { $enabledFinal = $r.Enabled }
     Write-Info ($layer.Label + ' 第 ' + $r.Line + ' 行：' + $r.Kind + '，enabled=' + $r.Enabled + $(if ($null -ne $r.Disabled) { '，disabled=' + $r.Disabled } else { '' }))
   }

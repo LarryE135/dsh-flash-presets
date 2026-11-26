@@ -56,9 +56,13 @@ check(!/tune-runtime\.mjs\s+--\w+\s+-Profile/.test(ps1 || ''),
       'install.ps1 没有把 PowerShell 的 -Profile 传给 tune-runtime');
 
 // Windows PowerShell 5.1 对无 BOM 的 .ps1 会按系统 ANSI(GBK) 解码 → 中文全乱码
-for (const f of ['install.ps1', 'publish.ps1']) {
-  const buf = fs.readFileSync(path.join(here, f));
-  check(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf, f + ' 带 UTF-8 BOM（5.1 中文不乱码）');
+for (const [label, p] of [
+  ['install.ps1', path.join(here, 'install.ps1')],
+  ['publish.ps1', path.join(here, 'publish.ps1')],
+  ['plugins/flash-sh/scripts/check-flash-sh.ps1', path.join(repo, 'plugins', 'flash-sh', 'scripts', 'check-flash-sh.ps1')],
+]) {
+  const buf = fs.readFileSync(p);
+  check(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf, label + ' 带 UTF-8 BOM（5.1 中文不乱码）');
 }
 
 // 文案：不得再出现已删除的非 PTC 预设名
