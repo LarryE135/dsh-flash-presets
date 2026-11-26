@@ -564,3 +564,125 @@ jobs:
             [ ! -e "/tmp/pkg/x/package/scripts/$f" ] || { echo "::error::$f 不应随包发布"; exit 1; }
           done
           test -f /tmp/pkg/x/package/NOTICE || { echo "::error::NOTICE 未随包发布"; exit 1; }
+
+  # 真实 DSH 宿主矩阵（2026-11-26 rc.5 审计）：npm 上 latest = next = 0.2.2-rc.5，但上面各 job 锁的是
+  # 0.2.1-rc.5 / rc.1 / rc.3，从没在 rc.5 上装过、启动过。这个 job 把 DSH 装进独立前缀（不碰全局），
+  # 用 dsh 自己初始化的真实 profile（不是手铺的「0.1.7 布局」），两条安装路径都走一遍，再真正启动宿主：
+  #   A 插件卡：npm pack → dsh plugin add <tgz> → dump-config 断言 / doctor --all → 带 CI 探针启动宿主
+  #     （tools/probe/host-boot：插件页行、预设与历史 id、#29 守卫、原生计划模式 set()/"/plan"、fl-bash）
+  #   B 脚本：install.sh / install.ps1 → dump-config 断言 / verify-presets / verify-yaml / doctor --all
+  #   plan-mode-ui 全量测试，宿主包换成这一版 DSH 的 node_modules
+  # 0.2.2-rc.5 锁死、阻断；latest 只在 ubuntu 上跑、不阻断（canary：latest 一旦越过 engines 上限 <0.2.3-0，
+  # 插件卡会被拒装，这里先红）。
+  dsh-real:
+    name: real DSH ${{ matrix.dsh }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    continue-on-error: ${{ matrix.canary }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        dsh: ['0.2.2-rc.5']
+        canary: [false]
+        include:
+          - os: ubuntu-latest
+            dsh: latest
+            canary: true
+    defaults:
+      run:
+        shell: bash
+    env:
+      DSH_VERSION: ${{ matrix.dsh }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'   # DSH 0.2.2 要求 Node >= 24.9
+
+      # T = RUNNER_TEMP 的正斜杠写法：Windows 上 D:\a\_temp 里的反斜杠进了 bash / pnpm 的 file: 路径会出事。
+      - name: 安装 DSH（独立前缀）、pnpm 与 js-yaml
+        timeout-minutes: 5
+        run: |
+          T="${RUNNER_TEMP//\\//}"
+          echo "T=$T" >> "$GITHUB_ENV"
+          npm i -g pnpm
+          npm i --prefix "$T/dsh-host" --no-audit --no-fund "@deepseek-ai/dsh@$DSH_VERSION"
+          echo "$T/dsh-host/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "DSH_NM=$T/dsh-host/node_modules" >> "$GITHUB_ENV"
+          npm install --no-save --silent js-yaml@4
+
+      - name: 版本确认
+        run: |
+          v=$(dsh --version | tail -1)
+          echo "dsh $v / node $(node -v) / pnpm $(pnpm -v) / $RUNNER_OS-$RUNNER_ARCH"
+          if [ "$DSH_VERSION" != "latest" ] && [ "$v" != "$DSH_VERSION" ]; then
+            echo "::error::装到的 DSH 是 $v，不是 $DSH_VERSION"; exit 1
+          fi
+
+      - name: 路径 A：插件卡（npm pack → dsh plugin add <tgz>）
+        timeout-minutes: 3
+        run: |
+          export DSH_HOME="$T/home-card"
+          mkdir -p "$T/pkg"
+          npm pack --ignore-scripts --pack-destination "$T/pkg" >/dev/null
+          tgz=$(cd "$T/pkg" && ls dsh-flash-presets-*.tgz | head -1)
+          # 相对路径交给 dsh：它按调用目录解析，绕开 Windows 盘符路径
+          (cd "$T/pkg" && dsh plugin --profile web add "./$tgz")
+          echo "--- dsh 自己初始化的 profile ---"; ls -la "$DSH_HOME/profiles/web"
+          dsh --profile web --dump-config > "$T/dump-card.yml"
+          node scripts/verify-runtime.mjs "$T/dump-card.yml"
+          node tools/probe/alias-vs-config.mjs "$T/dump-card.yml"
+          node scripts/doctor.mjs --profile web --all
+
+      - name: 路径 A：真实宿主启动探针（插件页行 / 预设 / #29 / 计划模式 / fl-bash 默认关）
+        timeout-minutes: 3
+        run: |
+          export DSH_HOME="$T/home-card"
+          dsh plugin --profile web add ./tools/probe/host-boot
+          rc=0
+          DSH_HOST_PROBE_OUT="$T/probe-card.json" timeout 150 dsh --profile web --port 0 --no-open < /dev/null > "$T/boot-card.log" 2>&1 || rc=$?
+          echo "宿主退出码 $rc"; grep -E '^\[(flash-presets|fl-bash|plan-mode-ui|preset-alias|composition-check|tool-concurrency)\]' "$T/boot-card.log" | head -20 || true
+          node tools/probe/host-boot-check.mjs "$T/probe-card.json"
+
+      # 打开 fl-bash 行：Windows x64 上必须注册一次并经真实 tools 管线跑通随包的 flash-sh.exe；
+      # 其他平台必须只写一行说明、不注册（不能因为没有 exe 而让宿主或组合包报错）。
+      - name: fl-bash 打开后（Windows：注册并执行；其他平台：优雅跳过）
+        timeout-minutes: 3
+        run: |
+          export DSH_HOME="$T/home-card"
+          printf -- "- id: fl-bash\n  config:\n    enabled: true\n    approval: 'off'\n" > "$DSH_HOME/profiles/web/cordis.patch.yml"
+          rc=0
+          DSH_HOST_PROBE_OUT="$T/probe-flbash.json" timeout 150 dsh --profile web --port 0 --no-open < /dev/null > "$T/boot-flbash.log" 2>&1 || rc=$?
+          echo "宿主退出码 $rc"; grep -F '[fl-bash]' "$T/boot-flbash.log" || true
+          if [ "$RUNNER_OS" = "Windows" ]; then mode=registered; else mode=skipped; fi
+          node tools/probe/host-boot-check.mjs "$T/probe-flbash.json" --fl-bash "$mode"
+
+      - name: 路径 B：脚本安装进 dsh 初始化的真实 profile
+        timeout-minutes: 3
+        run: |
+          export DSH_HOME="$T/home-script"
+          dsh --profile web --dump-config > /dev/null   # 由 dsh 建 profile（cordis.yml / package.json / pnpm-workspace.yaml / cordis.patch.yml）
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -DshHome "$DSH_HOME"
+          else
+            bash scripts/install.sh --profile web
+          fi
+          dsh --profile web --dump-config > "$T/dump-script.yml"
+          node scripts/verify-runtime.mjs "$T/dump-script.yml"
+          node scripts/verify-presets.mjs
+          node scripts/verify-yaml.mjs "$DSH_HOME/profiles/web/cordis.patch.yml"
+          node scripts/doctor.mjs --profile web --all
+
+      # 宿主包（@deepseek-ai/dsh-llm 等）换成这一版 DSH 的。run.sh 发现 node_modules 已在就直接用、不删。
+      # Windows 上插件测试此前从没跑过（plugin-tests 只在 ubuntu），先观察、不阻断；转绿后去掉 continue-on-error。
+      - name: plan-mode-ui 全量测试（宿主包 = 这一版 DSH）
+        timeout-minutes: 4
+        continue-on-error: ${{ runner.os == 'Windows' }}
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pwsh -NoProfile -Command "New-Item -ItemType Junction -Path plugins/plan-mode-ui/node_modules -Target '$DSH_NM' | Out-Null"
+          else
+            ln -s "$DSH_NM" plugins/plan-mode-ui/node_modules
+          fi
+          cd plugins/plan-mode-ui && bash test/run.sh

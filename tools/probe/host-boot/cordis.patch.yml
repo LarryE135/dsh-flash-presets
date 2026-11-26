@@ -1,0 +1,4 @@
+# CI 专用探针（不随包发行）：宿主启动后把实际看到的状态写成 JSON 再退出，断言在 tools/probe/host-boot-check.mjs。
+- insert:
+    - id: dsh-host-boot-probe
+      name: 'dsh-host-boot-probe'
