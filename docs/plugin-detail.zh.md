@@ -20,6 +20,6 @@
 
 单独开关某个功能：在 profile 补丁里给 `id: flash-presets` 写 `config.planMode` / `toolConcurrency` / `alias` / `deliveryGate` 的 `enabled`。0.3.2 及以前按旧组件 id（`flash-presets-core` / `plan-mode-ui` / `flash-presets-alias` / `delivery-gate`）写的覆盖升级后仍然生效。关掉整行会连旧会话兼容一起关掉。
 
-Windows 上的 Bash 工具 **fl-bash** 是插件页上单独的组件（默认关，仅 Windows x64；随本包发行，装好就能打开；exe 约 1.7 MB，只在 Windows x64 上注册工具）。打开：给 `id: fl-bash` 写 `config.enabled: true`。它不受沙箱约束：非「完全访问」会话里要你审批，同类命令一个会话只问一次，危险命令每次都问。
+Windows 上的 Bash 工具 **fl-bash** 是插件页上单独的组件（**默认开启**，随本包发行，装好即用；exe 约 1.7 MB，只在 Windows x64 上注册工具，其他平台这一行只写一行说明）。不想要就在插件页关掉这一行，或给 `id: fl-bash` 写 `config.enabled: false`（环境变量 `DSH_FL_BASH=0` 也行）。它不受沙箱约束：非「完全访问」会话里要你审批，同类命令一个会话只问一次，危险命令每次都问。
 
 开关示例、实测数据与版本兼容表见 [GitHub](https://github.com/LarryE135/dsh-flash-presets)。

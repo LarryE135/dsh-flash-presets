@@ -645,7 +645,7 @@ jobs:
           node tools/probe/alias-vs-config.mjs "$T/dump-card.yml"
           node scripts/doctor.mjs --profile web --all
 
-      - name: 路径 A：真实宿主启动探针（插件页行 / 预设 / #29 / 计划模式 / fl-bash 默认关）
+      - name: 路径 A：真实宿主启动探针（插件页行 / 预设 / #29 / 计划模式 / fl-bash 默认开）
         timeout-minutes: 3
         run: |
           export DSH_HOME="$T/home-card"

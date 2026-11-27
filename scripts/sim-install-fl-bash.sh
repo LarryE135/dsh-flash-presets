@@ -4,7 +4,7 @@
 # 是不是**单独的一个组件**，以及工具 fl_bash 只注册一次。
 #
 #   A. 真实的非 Windows 宿主，原样装 npm pack 出来的 presets：包里自带 fl-bash 实现与 flash-sh.exe（不另装包）；
-#      插件页上有单独的 fl-bash 一行（标题 fl-bash，正常运行，不是红行），默认关，工具不注册。
+#      插件页上有单独的 fl-bash 一行（标题 fl-bash，正常运行，不是红行），默认开，但非 Windows x64 上工具不注册。
 #   B. 同一个包，profile 补丁打开 id: fl-bash，模拟 Windows（DSH_FL_BASH_ANY_PLATFORM=1 + DSH_FL_BASH_BIN=Linux 版解释器）
 #      → fl_bash 注册 1 次、经真实管线执行；--dump-config-schema 里这一行带设置项。
 #   C. 在 B 的 profile 里再单独装一份 fl-bash（去掉 os/cpu/platforms 的测试变体）并打开它的 fl-bash-standalone 行
@@ -60,7 +60,7 @@ boot() { # $1 profile  $2 输出
 }
 
 # ── A. 真实非 Windows 宿主 ──
-echo "A. 真实 $(uname -s)-$(uname -m) 宿主，原样安装 presets（默认关）"
+echo "A. 真实 $(uname -s)-$(uname -m) 宿主，原样安装 presets（默认开，非 Windows 上跳过）"
 timeout 115 dsh plugin --profile a add "$PTGZ" > "$W/addA.log" 2>&1; ok $? "dsh plugin add dsh-flash-presets"
 PDIR=$(node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "$W/home/.dsh/profiles/a/node_modules/dsh-flash-presets")
 [ -f "$PDIR/vendor/win32-x64/flash-sh.exe" ] && [ -f "$PDIR/lib/fl-bash.js" ]; ok $? "装好的 presets 里有 flash-sh.exe 与 lib/fl-bash.js"
@@ -73,7 +73,7 @@ boot a "$W/probeA.json"; ok $? "宿主启动"
 summ "$W/probeA.json"
 row "$W/probeA.json" dsh-flash-presets/fl-bash | grep -q '"enabled":true,"fiberPhase":"active","title":{"en":"fl-bash","zh":"fl-bash"}'; ok $? "插件页：fl-bash 单独一行，标题 fl-bash，运行中（非红行）"
 row "$W/probeA.json" dsh-flash-presets | grep -q '"zh":"Flash 精简预设"'; ok $? "插件页：flash-presets 行标题不变"
-node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(r.flBashCount===0&&!r.legacyToolPresent?0:1)' "$W/probeA.json"; ok $? "默认关：fl_bash 不注册，也没有旧名 flash_sh"
+node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(r.flBashCount===0&&!r.legacyToolPresent?0:1)' "$W/probeA.json"; ok $? "默认开但非 Windows x64：fl_bash 不注册，也没有旧名 flash_sh"
 
 # ── B. 模拟 Windows（变体 + 开发模式） ──
 echo "B. 同一个包，profile 补丁打开 id: fl-bash，模拟 Windows"

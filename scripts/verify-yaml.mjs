@@ -260,7 +260,7 @@ if (args.length) {
         const others = insertRows.filter(r => r && !/^preset-/.test(r.id)).map(r => r.id).sort();
         check(JSON.stringify(others) === '["fl-bash","flash-presets"]', '除两个预设外只插入 flash-presets 与 fl-bash 两行（插件页组件数 = 4；实际 ' + others.join(', ') + '）');
         const flRow = insertRows.find(r => r && r.id === 'fl-bash');
-        check(flRow && flRow.name === 'dsh-flash-presets/fl-bash' && flRow.config && flRow.config.enabled === false, 'fl-bash 行指向本包子路径 dsh-flash-presets/fl-bash，默认 enabled: false');
+        check(flRow && flRow.name === 'dsh-flash-presets/fl-bash' && flRow.config && flRow.config.enabled === true, 'fl-bash 行指向本包子路径 dsh-flash-presets/fl-bash，默认 enabled: true');
         check(!String(JSON.stringify(pluginRows)).includes('dsh-plan-mode-ui'),
               '合成产物不再引用独立包 dsh-plan-mode-ui');
         // 客户端 bundle 的注册 id 必须等于包名：DSH 的 boot graph 用包名做行 id，
