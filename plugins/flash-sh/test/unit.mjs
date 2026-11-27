@@ -50,12 +50,12 @@ if (inRepo) {
   const presetsPatch = fs.readFileSync(path.join(repoRoot, "cordis.patch.yml"), "utf8");
   const presetIds = [...presetsPatch.matchAll(/^\s+- id: ([\w-]+)/gm)].map((m) => m[1]);
   ok(!presetIds.includes("fl-bash-standalone") && !presetIds.includes("flash-sh") && !presetIds.includes("flash-sh-standalone"), "dsh-flash-presets 补丁里没有独立包的行 id（不会与单独安装的 fl-bash 撞 id）");
-  ok(/- id: fl-bash\n\s+name: 'dsh-flash-presets\/fl-bash'\n\s+config:\n\s+enabled: false/.test(presetsPatch), "dsh-flash-presets 补丁有单独的组件行 id: fl-bash（name dsh-flash-presets/fl-bash，默认 enabled: false）");
+  ok(/- id: fl-bash\n\s+name: 'dsh-flash-presets\/fl-bash'\n\s+config:\n\s+enabled: true/.test(presetsPatch), "dsh-flash-presets 补丁有单独的组件行 id: fl-bash（name dsh-flash-presets/fl-bash，组合包里默认 enabled: true；单独安装仍默认关）");
   ok(!/flashSh:/.test(presetsPatch), "flash-presets 行下不再有 flashSh 子功能");
   for (const lang of ["zh", "en"]) {
     const a = JSON.parse(fs.readFileSync(path.join(pluginDir, "locale", lang + ".json"), "utf8"));
     const b = JSON.parse(fs.readFileSync(path.join(repoRoot, "locale", "fl-bash", lang + ".json"), "utf8"));
-    ok(a.meta.title === "fl-bash" && JSON.stringify(a) === JSON.stringify(b), "插件页标题 fl-bash，两种装法的 locale/" + lang + ".json 相同");
+    ok(a.meta.title === "fl-bash" && b.meta.title === "fl-bash" && /默认关|[Oo]ff by default/.test(a.meta.description) && /默认开启|[Oo]n by default/.test(b.meta.description), "插件页标题 fl-bash；单独安装的简介写默认关，组合包的写默认开（locale/" + lang + ".json）");
   }
   const presetsPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   ok(!presetsPkg.optionalDependencies?.["fl-bash"] && presetsPkg.files.includes("vendor/"), "dsh-flash-presets 随包带 fl-bash（files 含 vendor/，不依赖单独的 fl-bash 包）");

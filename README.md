@@ -18,7 +18,7 @@
 
 > 当前版本：v0.3.4（npm 侧一律以 `npm view dsh-flash-presets version` 为准）· 上一版正式版 v0.3.2 · 误发版本 v0.3.3（npm 上仍可安装、已 `deprecate`，**不是正式版**，别当等价替代））· 预设 v3 / v3 balance · 计划模式 plan-mode v1（1.0.0）· 要求 DSH `>=0.2.1-rc.5 <0.2.3-0`（`engines` 闸：安装时会拒装，启动加载时区间外的 DSH 会跳过本插件，可用 `dsh plugin allow-version` 自担风险放行；脚本安装不经过这道闸），CI 实测 0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.3 与 0.2.2-rc.5（rc.5 含 Windows）
 >
-> 正式版：tag `v0.3.4` + npm 0.3.4 + GitHub Release（用 `npm view dsh-flash-presets version` 复核；若还显示 0.3.2，说明镜像/缓存未刷或 pnpm 的 24 小时冷却未过，可用 `#v0.3.4` 装同一份代码）。上一版正式版是 0.3.2。**0.3.3 是误发版本**（npm 上已 `deprecate`，仍可安装，但不是正式版，比 0.3.2 少第四轮 6 项修复），所以**装包务必写死版本号**：`^0.3` 这类范围仍可能解析到 0.3.3。0.3.4 把插件页上的组件从 6 个简并为 4 个、随包带上 Windows Bash 工具 fl-bash（默认关），并收口第五轮审计。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
+> 正式版：tag `v0.3.4` + npm 0.3.4 + GitHub Release（用 `npm view dsh-flash-presets version` 复核；若还显示 0.3.2，说明镜像/缓存未刷或 pnpm 的 24 小时冷却未过，可用 `#v0.3.4` 装同一份代码）。上一版正式版是 0.3.2。**0.3.3 是误发版本**（npm 上已 `deprecate`，仍可安装，但不是正式版，比 0.3.2 少第四轮 6 项修复），所以**装包务必写死版本号**：`^0.3` 这类范围仍可能解析到 0.3.3。0.3.4 把插件页上的组件从 6 个简并为 4 个、随包带上 Windows Bash 工具 fl-bash（默认开启），并收口第五轮审计。**不要装 0.2.5** —— 它在 DSH 0.2.2-rc.1 上无法新建会话（#19）。
 
 ## 适合谁，不适合什么
 
@@ -208,15 +208,15 @@ pnpm 会在该 profile 的 `pnpm-workspace.yaml` 里留下一行本包记录，`
 - 注意：出厂配置把这行写成 `enabled: false`，插件 schema 的默认值也是**关**（0.3.1 是 `true`，0.3.2 改回 `false` —— 0.3.1 那一版会让普通对话也被验收门追着跑）。0.3.1 的代码只认 `DSH_DELIVERY_GATE=0`，设 `1` 打不开；从 0.3.2 起 `=1` 才真正生效。
 - **版本提示**：交付门 0.3.0 里没有，**0.3.1 起随 npm 发布**（包内含 `lib/delivery-gate.js`，`cordis.patch.yml` 里也有这一行：`enabled: false` / `maxRounds: 2`，脚本按平台选 —— Windows 先 `verify.ps1`、其余先 `verify.sh`）。0.3.0 想用只能从 git 装（`dsh plugin --profile web add github:LarryE135/dsh-flash-presets#main`）；npm 上的 0.3.1、0.3.2（正式版）与 0.3.3（误发版）都带这一行，**不需要再等下一版**。
 
-## Windows 上的 Bash 工具 fl-bash（单独的组件，默认关闭）
+## Windows 上的 Bash 工具 fl-bash（单独的组件，默认开启）
 
 在 **Windows x64** 上给模型加一个 Bash 兼容的 shell 工具 `fl_bash`（内置单文件解释器 `flash-sh.exe`，不需要 Git Bash / WSL；
 不占用 `bash` / `pwsh` / `run_code`）。它在插件页上是**单独的一个组件「fl-bash」**，不挂在「Flash 精简预设」那一行下面。
 
-- **随包发行**：实现（`lib/fl-bash.js`）和 `flash-sh.exe`（约 1.7 MB）都在本包里，**从 npm 装好 dsh-flash-presets 就能在插件页打开 fl-bash**，不用另装包。
+- **随包发行**：实现（`lib/fl-bash.js`）和 `flash-sh.exe`（约 1.7 MB）都在本包里，**从 npm 装好 dsh-flash-presets 就默认开启**，不用另装包。
   源码只有一份，在 [`plugins/flash-sh`](https://github.com/LarryE135/dsh-flash-presets/blob/main/plugins/flash-sh/README.md)，发布前由 `scripts/sync-fl-bash.mjs` 逐字节同步进包（0.1.x 叫 `dsh-flash-sh`、工具名 `flash_sh`）。
   exe 在所有平台都会随包下载，但只在 Windows x64 上注册工具；macOS / Linux / Windows ARM64 上插件页仍显示 fl-bash 组件（正常运行、不是红行），只写一行说明。
-- **打开**：profile 补丁里写 `- id: fl-bash` / `config.enabled: true`，或设用户环境变量 `DSH_FL_BASH=1`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。
+- **关闭**（默认开启）：在插件页关掉 fl-bash 这一行，或在 profile 补丁里写 `- id: fl-bash` / `config.enabled: false`，或设用户环境变量 `DSH_FL_BASH=0`（不能写进 `.env`；旧名 `DSH_FLASH_SH` 仍认）。只改别的设置、不写 `enabled` 时仍是开。
   其余字段（`approval`、`approvalMemory`、`timeoutMs`、`maxOutputBytes`、`binPath`…）也写在这一行的 `config` 里，含义见 fl-bash 的 README。
   预览版的旧写法（`flash-presets` 行的 `config.flashSh`、行 id `flash-sh`）升级后仍然生效，启动日志会提示改写。
 - **安全**：`fl_bash` 不受 DSH 文件沙箱约束。默认 `approval: sandboxed` —— 会话不是「完全访问」时要你审批（读不到会话模式也要审批，审批出错就不执行）；
@@ -314,7 +314,7 @@ node scripts/verify-session-compat.mjs   # 升级后旧会话还能不能打开�
 发布：npm 上的 0.3.4、GitHub Release `v0.3.4`、tag `v0.3.4`。相对 0.3.2 的变化，逐条见 [CHANGELOG](https://github.com/LarryE135/dsh-flash-presets/blob/main/docs/CHANGELOG.md) 的 0.3.4 一节。
 
 - **插件页从 6 个组件简并为 4 个**：两个预设 + 一行「Flash 精简预设」（原来的 core / 计划模式 / 别名层 / 交付门合成一行，各功能仍可在这一行的设置里单独开关）+ Windows Bash 工具 fl-bash。升级后旧行的覆盖会被自动认领，`doctor` 会提示残留。
-- **新增 fl-bash（Windows x64 的 Bash 工具，默认关）**：实现与 `flash-sh.exe`（约 1.7 MB）随本包发行，从 npm 装好就能在插件页打开；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 129 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
+- **新增 fl-bash（Windows x64 的 Bash 工具，默认开启）**：实现与 `flash-sh.exe`（约 1.7 MB）随本包发行，从 npm 装好即用；只在 Windows x64 上注册 `fl_bash` 工具，其他平台这一行只写一行说明。命令按读 / 写 / 执行分类审批，对抗用例 129 条。也可以单独安装 `fl-bash` 包，两者并存时只注册一个工具。
 - **第五轮审计整改**：计划探测改三态（「计划刚落盘就动手」不再被判成没计划）、PTC 飞行计数按 `subCallId` 配对、评审守卫改词边界判定并堵住模板串插值与正则字面量两种绕过、`merge-presets` 修 CRLF 与缩进根序列、`verify-yaml` 不再强求托管块里两条预设都在。
 - **发版与 CI**：`publish-npm.sh` 要求 CI 全部完成再放行，并断言 registry 版本序；bundle-install 矩阵加入 DSH `0.2.2-rc.3`。
 - **包体积**：因随包带 exe，npm 包从约 0.7 MB（解包）增大到约 2.7 MB，下载约 1.1 MB（gzip）。

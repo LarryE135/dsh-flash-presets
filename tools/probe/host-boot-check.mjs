@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // 断言 tools/probe/host-boot 探针在真实 DSH 宿主里采到的报告。CI 的 dsh-real job 用。
-//   node tools/probe/host-boot-check.mjs <report.json> [--fl-bash off|skipped|registered]
-//     off        默认：fl-bash 行 enabled:false，fl_bash 不注册
+//   node tools/probe/host-boot-check.mjs <report.json> [--fl-bash default|off|skipped|registered]
+//     default    不传时：原样安装（0.3.4 起 fl-bash 行默认 enabled:true）→ Windows x64 上注册一次，其他平台优雅跳过
+//     off        行被关掉（enabled:false）→ fl_bash 不注册
 //     skipped    行已打开（enabled:true），但宿主不是 Windows x64 → 优雅跳过、不注册
 //     registered 行已打开且在 Windows x64 上 → 注册一次，并经真实管线执行成功
 // 退出码：0 全部通过 · 1 有失败 · 2 报告读不了
 import fs from "node:fs";
 
 const [file, ...rest] = process.argv.slice(2);
-const flBash = rest.includes("--fl-bash") ? rest[rest.indexOf("--fl-bash") + 1] : "off";
-if (!["off", "skipped", "registered"].includes(flBash)) { console.error("--fl-bash 只认 off / skipped / registered"); process.exit(2); }
+const flBash = rest.includes("--fl-bash") ? rest[rest.indexOf("--fl-bash") + 1] : "default";
+if (!["default", "off", "skipped", "registered"].includes(flBash)) { console.error("--fl-bash 只认 default / off / skipped / registered"); process.exit(2); }
 let r;
 try { r = JSON.parse(fs.readFileSync(file, "utf8")); } catch (error) { console.error("读不了探针报告 " + file + "：" + error.message); process.exit(2); }
 
@@ -53,13 +54,18 @@ check(p.cmdPlanOff === "success" && p.activeAfterOff === false, "\"/plan off\" �
 const ev = p.events || [];
 check(ev.includes("plan/mode:true") && ev.includes("plan/mode:false"), "session/event 上收到 plan/mode true / false", ev.join(","));
 
-// fl-bash：默认关 / 非 Windows 上打开 → 不注册；Windows x64 上打开后 → 注册且经真实管线执行成功
-if (flBash === "registered") {
+// fl-bash：关掉 / 非 Windows 上打开 → 不注册；Windows x64 上打开后 → 注册且经真实管线执行成功；
+// 默认（原样安装，默认开）：Windows x64 上注册一次（默认审批模式下不在这里执行命令），其他平台不注册
+if (flBash === "default") {
+  const winx64 = r.platform === "win32" && r.arch === "x64";
+  check(r.flBashRegistered === winx64, winx64 ? "默认开：fl_bash 已注册" : "默认开：fl_bash 未注册（非 Windows x64，优雅跳过）");
+  if (winx64) check((r.tools || []).filter((t) => t === "fl_bash").length === 1, "fl_bash 只注册一次");
+} else if (flBash === "registered") {
   check(r.flBashRegistered === true, "fl_bash 已注册");
   check((r.tools || []).filter((t) => t === "fl_bash").length === 1, "fl_bash 只注册一次");
   check(r.flBashExec?.ok === true, "fl_bash 经 ctx.tools.execute 输出 probe-42、exitCode 0", r.flBashExec?.raw);
 } else {
-  check(r.flBashRegistered === false, flBash === "skipped" ? "fl_bash 未注册（非 Windows x64，优雅跳过）" : "fl_bash 未注册（默认关）");
+  check(r.flBashRegistered === false, flBash === "skipped" ? "fl_bash 未注册（非 Windows x64，优雅跳过）" : "fl_bash 未注册（已关掉）");
 }
 
 console.log(bad === 0 ? "宿主探针：全部通过" : "宿主探针：" + bad + " 项失败");
