@@ -118,6 +118,16 @@ jobs:
           node plugins/flash-sh/test/job-tree.mjs $exe
           if ($LASTEXITCODE -ne 0) { Write-Error "flash-sh.exe 进程树收尾回归失败"; exit 1 }
 
+      # 下游 P1：命中 --standby 待命进程时 stdout 超过管道缓冲会卡死到 124。用随包 exe 走待命路径，断言与直连输出一致。
+      - name: fl-bash 待命池大输出（Windows）
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = Resolve-Path plugins/flash-sh/vendor/win32-x64/flash-sh.exe
+          node plugins/flash-sh/test/standby-output.mjs $exe
+          if ($LASTEXITCODE -ne 0) { Write-Error "待命池大输出回归失败"; exit 1 }
+
       # 对照用：取 0.1.0 的 exe（541be29 的 vendor，sha256 e4951f47…）。下游报告的 0.1.0 管道 read 数字
       # （10 万行 0.057 s）是用不数行的循环测的；read-bench 每项先计数，能看出 0.1.0 在 Windows 管道上读了多少行。
       - name: 取 0.1.0 的 flash-sh.exe（只作 read 计时对照）
